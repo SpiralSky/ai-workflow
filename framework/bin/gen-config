@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+# Generate mcp.json / settings.json from the *.template.json files with the absolute framework path.
+set -euo pipefail
+D="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+for f in mcp settings; do
+  t="$(<"$D/$f.template.json")"
+  printf '%s\n' "${t//__FW__/$D}" > "$D/$f.json"
+done

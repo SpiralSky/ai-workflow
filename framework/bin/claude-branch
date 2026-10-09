@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+# Run claude with only the branch framework config (user settings/MCP excluded).
+set -euo pipefail
+D="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+[ -f "$D/mcp.json" ] && [ -f "$D/settings.json" ] || "$D/bin/gen-config"
+export BRANCH_TRACE_DIR="${BRANCH_TRACE_DIR:-$PWD/.branch-traces}"
+# Tool search off so the branch tool is loaded (not deferred); small built-in tool set keeps context ~10k.
+export ENABLE_TOOL_SEARCH=false
+exec claude --setting-sources "" --tools "${BRANCH_TOOLS-Bash,Read,Edit,Write,Glob,Grep}" --settings "$D/settings.json" \
+  --strict-mcp-config --mcp-config "$D/mcp.json" \
+  --append-system-prompt-file "$("$D/bin/build-prompt")" "$@"

@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+# Builds the appended system prompt: tool rules + helper API + usage guidance. Prints the output path.
+# BRANCH_REPORT=intent (default) adds the per-file "what and why" rule for the final message; BRANCH_REPORT=none omits it.
+set -euo pipefail
+P="$(cd "$(dirname "${BASH_SOURCE[0]}")/../prompt" && pwd)"
+{
+  echo "# Branch tool"; cat "$P/tool.md" "$P/helpers.d.ts"; printf '```\n\n'; cat "$P/system.md"
+  if [ "${BRANCH_REPORT:-intent}" != "none" ]; then cat "$P/report-intent.md"; fi
+} > "$P/.system.full.md"
+echo "$P/.system.full.md"

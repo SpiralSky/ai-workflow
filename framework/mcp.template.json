@@ -1,0 +1,1 @@
+{"mcpServers":{"branch":{"command":"node","args":["--import","__FW__/node_modules/tsx/dist/loader.mjs","__FW__/src/server.ts"]}}}
