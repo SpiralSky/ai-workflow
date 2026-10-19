@@ -16,9 +16,8 @@ discussion questions (for issues where the design isn't settled yet).
 | ~~08-stale-docs.md~~ | ~~README/issues README have dead links and stale status for issues 01 and 06~~ | **DONE (2026-10-19)** |
 | ~~09-orchestrate-prompt-contamination.md~~ | ~~Residual problem-specific hints in orchestrate-system.md (p01/p03/p04/p05)~~ | **DONE (2026-10-19)** — neutral examples in both prompt files |
 | ~~10-orchestrate-dangling-reference.md~~ | ~~"(see circular import fix below)" references a removed section~~ | **DONE (2026-10-19)** |
-| [11-minor-design-drift.md](11-minor-design-drift.md) | compare/all mode aliases; attach concept in README but not HANDOFF | Low priority |
+| ~~[11-minor-design-drift.md](11-minor-design-drift.md)~~ | ~~compare/all mode aliases; attach concept in README but not HANDOFF~~ | **DONE (2026-10-19)** — ALL_MODES constant; attach removed from README |
 
 ## Working order
 
-Discuss **04**, **05**, **09** before touching them. **07** is a symptom — it
-resolves as the others close. **11** is low priority; do last.
+Discuss **04**, **05** before touching them. **07** is a symptom — it resolves as the others close.

@@ -1,6 +1,6 @@
 # Issue 08 — Stale Documentation and Broken Issue Links
 
-**Status:** Clear fix — update docs
+**Status:** DONE (2026-10-19)
 
 ## Problem
 

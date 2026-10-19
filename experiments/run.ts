@@ -141,6 +141,7 @@ const CODING_TOOLS = "Bash,Read,Edit,Write,Glob,Grep";
 //   branch-only — primary isolation test: branch tool only; model uses tool() inside branch for file ops
 //   orchestrate — two-tier: main model sends task descriptions -> BM25 shortlist -> secondary LLM branch loop
 type Mode = "baseline" | "branch-only" | "orchestrate";
+const ALL_MODES: Mode[] = ["baseline", "branch-only", "orchestrate"];
 type Backend = "openai";
 
 // Temp copy of a problem without the hidden notes / acceptance tests.
@@ -474,7 +475,7 @@ async function main() {
   const modes: Mode[] =
     a.mode === "compare" ? ["baseline", "branch-only", "orchestrate"] as Mode[]
     : a.mode === "both" ? ["baseline", "branch-only"] as Mode[]
-    : a.mode === "all" ? ["baseline", "branch-only", "orchestrate"] as Mode[]
+    : a.mode === "all" ? [...ALL_MODES] as Mode[]
     : [a.mode as Mode];
   const runsDir = join(HERE, "runs", new Date().toISOString().replace(/[:.]/g, "-"));
   mkdirSync(runsDir, { recursive: true });

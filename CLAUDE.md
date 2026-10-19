@@ -33,7 +33,7 @@ Use `deepseek/deepseek-chat-v3-0324` only — strong instruction following, good
 - **orchestrate** — two-tier: delegate tool → BM25 shortlist → secondary LLM branch loop
 - **compare**     — shorthand for baseline + branch-only + orchestrate (all three, default)
 - **both**        — shorthand for baseline + branch-only
-- **all**         — all three modes
+- **all**         — every mode in ALL_MODES; add new modes there and `--mode all` picks them up automatically
 
 ## --backend flag
 - `--backend openai` (default, only option): calls OpenAI chat-completions API directly

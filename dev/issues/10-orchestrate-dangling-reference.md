@@ -1,6 +1,6 @@
 # Issue 10 — Dangling Forward Reference in orchestrate-system.md
 
-**Status:** Clear fix — one-line edit
+**Status:** DONE (2026-10-19)
 
 ## Problem
 

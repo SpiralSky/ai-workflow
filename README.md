@@ -29,14 +29,14 @@ flowchart LR
 |------|-------------|-----------------|
 | **baseline** | Standard atomic tools: Bash, Read, Edit, Write, Glob, Grep. Control condition. | No context isolation — every tool result appends to context. |
 | **branch-only** | Model writes a short TypeScript program as a single `branch` tool call. Raw output stays inside the sandbox; only the return value enters context. | TypeScript cognitive overhead causes syntax errors and `returnUser` misuse. |
-| **orchestrate** | Two-tier: coordinator LLM gets only `delegate`; secondary LLM writes branch programs. BM25 shortlist pre-injects relevant composite tools into secondary context. | File listing is pre-injected (passive) rather than discovered on demand. Task decomposition quality depends on main LLM writing self-contained task strings (see [issue 06](dev/issues/06-cross-call-state.md), addressed 2026-10-19). |
+| **orchestrate** | Two-tier: coordinator LLM gets only `delegate`; secondary LLM writes branch programs. BM25 shortlist pre-injects relevant composite tools into secondary context. | File listing is pre-injected (passive) rather than discovered on demand. Task decomposition quality depends on main LLM writing self-contained task strings (cross-call state addressed 2026-10-19). |
 
 ### Planned: orchestrate-active
 
 Replace passive file-listing injection with an active coordinator that uses a constrained tool set:
 `list_files` · `grep` · `find_symbol` · `get_structure` · `delegate`
 
-No `read_file` for the coordinator — the tool set enforces the constraint. A metered `attach(path, lines?)` escape hatch lets it pull a file excerpt when truly needed; attach rate becomes a logged metric.
+No `read_file` for the coordinator — the tool set enforces the constraint.
 
 ---
 
@@ -52,7 +52,7 @@ No `read_file` for the coordinator — the tool set enforces the constraint. A m
 
 **Contamination caveat:** `framework/prompt/orchestrate-system.md` contained per-problem hints (p04, p06, p07) that gave orchestrate an unfair advantage. Those hints were stripped on 2026-10-19. A clean rerun is needed before drawing conclusions — this is the top roadmap item.
 
-**What is not yet measured:** Secondary LLM token cost and turn counts (`subCost`, `orchestrateTurns`) are always 0 in the current implementation. The claim that orchestrate is *cheaper* than baseline cannot be evaluated until [issue 01](dev/issues/01-secondary-token-tracking.md) is resolved.
+**Secondary LLM metrics are tracked:** `subCost`, `orchestrateTurns`, and secondary token counts are computed from trace files and displayed in the viewer. The cost comparison vs. baseline can now be evaluated.
 
 ---
 
@@ -70,13 +70,12 @@ This project draws on ideas from several prior systems — Cloudflare Code Mode,
 
 ## Roadmap
 
-1. **Secondary token accounting** — implement `subCost` and `orchestrateTurns` tracking ([issue 01](dev/issues/01-secondary-token-tracking.md))
-2. **Clean rerun** — rerun all 9 problems after hint removal to get uncontaminated scores
-3. **orchestrate-active + attach** — active coordinator tool set; metered `attach` escape hatch
-4. **branch-python** — Python execution language instead of TypeScript ([issue 02](dev/issues/02-secondary-interface-language.md))
-5. **Expand to ~25 problems** — broader coverage, including multi-file tasks
-6. **Catalog-size scaling experiment** — measure whether BM25 context savings grow with tool catalog size ([issue 03](dev/issues/03-tool-selection-bm25.md))
-7. **Provider-agnostic backend + per-tier model routing** — different models for coordinator vs. executor
+1. **Clean rerun** — rerun all 9 problems after hint removal to get uncontaminated scores
+2. **orchestrate-active** — active coordinator tool set (`list_files`, `grep`, `find_symbol`, `get_structure`, `delegate`)
+3. **branch-python** — Python execution language instead of TypeScript ([issue 02](dev/issues/02-secondary-interface-language.md))
+4. **Expand to ~25 problems** — broader coverage, including multi-file tasks
+5. **Catalog-size scaling experiment** — measure whether BM25 context savings grow with tool catalog size ([issue 03](dev/issues/03-tool-selection-bm25.md))
+6. **Provider-agnostic backend + per-tier model routing** — different models for coordinator vs. executor
 
 ---
 

@@ -1,6 +1,6 @@
 # Issue 11 — Minor Design Drift (compare/all aliases; attach concept)
 
-**Status:** Low priority — two small inconsistencies, no functional impact
+**Status:** DONE (2026-10-19)
 
 ## Problem A — compare and all are identical
 
