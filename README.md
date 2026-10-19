@@ -2,7 +2,7 @@
 
 An experiment comparing three agentic coding strategies on small Python repair/feature tasks.
 
-## The Two Workflows
+## The Three Modes
 
 ### branch-only
 The model emits a short TypeScript program as a single `branch` MCP tool call instead of many atomic tool calls. The program runs synchronously in a worker thread with helper functions (`readFile`, `edit`, `bash`, `runTests`, etc.). When the program calls `returnUser("…")`, the turn ends.
