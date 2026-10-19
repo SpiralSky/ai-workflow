@@ -1,6 +1,6 @@
 # AI Workflow — Handoff
 
-> **To resume**: read this file. No pending tasks — eval is complete and harness is improved.
+> **To resume**: read this file, then see the [Roadmap](README.md#roadmap) in the main README for pending work.
 
 ---
 

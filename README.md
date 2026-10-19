@@ -1,64 +1,82 @@
-# AI Workflow — Branch Framework
+# AI Workflow
 
-An experiment comparing three agentic coding strategies on small Python repair/feature tasks.
+**Research harness for context-efficient coding agents.**
 
-## The Three Modes
+Three agentic coding strategies — differing in how much raw tool output enters model context — are evaluated against the same 9 Python repair/feature problems so pass rates and costs can be compared fairly.
 
-### branch-only
-The model emits a short TypeScript program as a single `branch` MCP tool call instead of many atomic tool calls. The program runs synchronously in a worker thread with helper functions (`readFile`, `edit`, `bash`, `runTests`, etc.). When the program calls `returnUser("…")`, the turn ends.
+The central thesis: keep raw file contents and raw tool output *out of context by capability, not by prompt instruction*. If a coordinator model has no `read_file` tool, it cannot accumulate file contents regardless of what the prompt says.
 
-**Goal:** Fold a predictable multi-step sequence (read → fix → test → report) into one LLM turn, cutting context growth and round-trips.
+```mermaid
+flowchart LR
+    U([User]) --> C[Coordinator\nlist_files · grep · get_structure · delegate]
+    C -->|delegate task+context| E[Executor]
+    E -->|writes branch program| S[(Sandbox + helpers\nbash · edit · runTests · classify)]
+    S -->|return value + path summary| C
+    C -->|returnUser| U
 
-**Current limitation:** TypeScript cognitive overhead causes syntax errors and `returnUser` misuse. The single-tool constraint is also somewhat artificial — real Claude Code lets the model use many tools.
+    style S fill:#f5f5f5,stroke:#999
+```
 
-### orchestrate
-Two-tier architecture: the main LLM gets only a `delegate` tool; it hands off precise subtasks to a secondary LLM that writes TypeScript branch programs. A BM25 shortlist pre-injects relevant composite tools into the secondary's context.
+*Coordinator sees only structure. Raw tool output stays inside the sandbox. Only the return value and a compact path summary leave it.*
 
-**Goal:** Keep the coordinator high-level (never touches file contents), let the executor handle all file work.
-
-**Current limitation:** File listing is pre-injected passively — the coordinator gets context it didn't ask for rather than discovering it actively.
-
-### baseline (control)
-Standard atomic tool calls: Bash, Read, Edit, Write, Glob, Grep. No branch tool. Used as the comparison baseline.
-
----
-
-## Current Results (2026-10-18, DeepSeek v3, 9 problems × 3 runs)
-
-| Mode | Pass rate | Notes |
-|------|-----------|-------|
-| baseline | 20/27 (74%) | |
-| orchestrate | 17/27 (63%) | |
-| branch-only | 12/27 (44%) | |
-
-**⚠ These scores are partially contaminated.** `orchestrate-system.md` had per-problem hints (p04, p06, p07) that gave orchestrate an unfair advantage. Those hints were stripped on 2026-10-19 — a clean rerun is needed before drawing conclusions.
+> **Note (2026-10-19):** The diagram above shows the planned **orchestrate-active** design. The current build uses a simpler passive-injection coordinator; see Modes below.
 
 ---
 
-## Unfinished / Next Steps
+## Modes
 
-### Immediate
-- [ ] Rerun eval on p04, p06, p07 (and ideally all problems) after hint removal to get clean scores
-- [ ] Investigate p01 and p09 (0/3 orchestrate failures in last run)
-- [ ] Analyze `failReason` distribution across modes (turn-limit vs. no-edit vs. wrong-edit)
+| Mode | Description | Known limitation |
+|------|-------------|-----------------|
+| **baseline** | Standard atomic tools: Bash, Read, Edit, Write, Glob, Grep. Control condition. | No context isolation — every tool result appends to context. |
+| **branch-only** | Model writes a short TypeScript program as a single `branch` tool call. Raw output stays inside the sandbox; only the return value enters context. | TypeScript cognitive overhead causes syntax errors and `returnUser` misuse. |
+| **orchestrate** | Two-tier: coordinator LLM gets only `delegate`; secondary LLM writes branch programs. BM25 shortlist pre-injects relevant composite tools into secondary context. | File listing is pre-injected (passive) rather than discovered on demand. Secondary LLM token cost is currently untracked (see [issue 01](dev/issues/01-secondary-token-tracking.md)). |
 
-### Proposed redesigns (not yet implemented)
+### Planned: orchestrate-active
 
-**orchestrate-active:** Replace passive file-listing injection with an active coordinator that uses tools to discover context on demand:
-- `list_files` — raw file tree for orientation
-- `grep(pattern)` / `find_symbol(name)` — targeted lookup without reading contents
-- `get_structure(path)` — semantic digest (exports, imports, class/function names), no raw content
-- `delegate(task, context)` — hand off a subtask with exactly the context the executor needs
+Replace passive file-listing injection with an active coordinator that uses a constrained tool set:
+`list_files` · `grep` · `find_symbol` · `get_structure` · `delegate`
 
-No `read_file` for the coordinator — the tool set is the constraint that keeps it high-level. BM25 shortlist becomes a live `grep` the coordinator calls when needed.
+No `read_file` for the coordinator — the tool set enforces the constraint. A metered `attach(path, lines?)` escape hatch lets it pull a file excerpt when truly needed; attach rate becomes a logged metric.
 
-**branch-python:** Replace TypeScript with Python as the execution language. Models are trained on far more Python than custom TS DSLs; helpers map naturally to Python functions. The "done vs. continue" signal becomes implicit (no tool call = done), removing the `returnUser` misuse failure mode.
+---
 
-### Fairness baseline for next experiment
-Before running: ensure all three modes have equivalent prompt quality (no per-problem hints in any of them), then compare:
-- **baseline** — unchanged atomic tools
-- **branch-python** — single tool, Python execution
-- **orchestrate-active** — coordinator with list/grep/structure/delegate, no pre-injection
+## Results
+
+| Mode | Pass / Total | Rate | Notes |
+|------|-------------|------|-------|
+| baseline | 20 / 27 | 74% | |
+| orchestrate | 17 / 27 | 63% | |
+| branch-only | 12 / 27 | 44% | |
+
+*DeepSeek v3 · 9 problems × 3 runs · run `2026-10-18T05-39-00-582Z`*
+
+**Contamination caveat:** `framework/prompt/orchestrate-system.md` contained per-problem hints (p04, p06, p07) that gave orchestrate an unfair advantage. Those hints were stripped on 2026-10-19. A clean rerun is needed before drawing conclusions — this is the top roadmap item.
+
+**What is not yet measured:** Secondary LLM token cost and turn counts (`subCost`, `orchestrateTurns`) are always 0 in the current implementation. The claim that orchestrate is *cheaper* than baseline cannot be evaluated until [issue 01](dev/issues/01-secondary-token-tracking.md) is resolved.
+
+---
+
+## How this differs from related work
+
+This project draws on ideas from several prior systems — Cloudflare Code Mode, Anthropic programmatic tool calling, CodeAct, smolagents, ReWOO, LLMCompiler, and RLM — detailed in [docs/PLAN.md](docs/PLAN.md). The table below describes where the design makes different choices.
+
+| Prior work | How it differs here |
+|---|---|
+| **Claude Code subagents** | The parent session retains its full tool set; each subagent accumulates raw tool output in its own context. Here the executor writes programs that contain output inside a sandbox — only the return value leaves. |
+| **Aider architect/editor mode** | The architect reasons over full file contents and has no tools; the split is reasoning vs. edit formatting. Here the coordinator is constrained by its tool set, not by prompt instruction. |
+| **OpenHands DelegatorAgent** | A fixed state machine routes tasks to specialist agents; delegates use ordinary tools. Here the coordinator is itself an LLM and delegates write sandboxed programs. |
+
+---
+
+## Roadmap
+
+1. **Secondary token accounting** — implement `subCost` and `orchestrateTurns` tracking ([issue 01](dev/issues/01-secondary-token-tracking.md))
+2. **Clean rerun** — rerun all 9 problems after hint removal to get uncontaminated scores
+3. **orchestrate-active + attach** — active coordinator tool set; metered `attach` escape hatch
+4. **branch-python** — Python execution language instead of TypeScript ([issue 02](dev/issues/02-secondary-interface-language.md))
+5. **Expand to ~25 problems** — broader coverage, including multi-file tasks
+6. **Catalog-size scaling experiment** — measure whether BM25 context savings grow with tool catalog size ([issue 03](dev/issues/03-tool-selection-bm25.md))
+7. **Provider-agnostic backend + per-tier model routing** — different models for coordinator vs. executor
 
 ---
 
@@ -66,33 +84,41 @@ Before running: ensure all three modes have equivalent prompt quality (no per-pr
 
 | Path | What |
 |---|---|
-| `framework/` | MCP server, hooks, prompt parts, tests. Self-contained; see [framework/README.md](framework/README.md). |
-| `experiments/` | Eval harness (`run.ts`) + 9 Python problems (`problems/0N-*`). Output in `experiments/runs/<ts>/` (gitignored). |
-| `experiments/viewer/` | Self-contained HTML dashboard (`index.html`). Build with `cd framework && npm run view`. |
-| `dev/jobs/` | Specs for framework dev tasks; `_common.md` prepended to each. |
-| `dev/run-job` | Runs a job spec; results in `dev/out/` (gitignored). |
-| `docs/` | Design docs. |
+| `framework/` | MCP server, sandbox runner, helpers, prompts, tests. See [framework/README.md](framework/README.md). |
+| `experiments/` | Eval harness (`run.ts`) + 9 Python problems (`problems/0N-*/`). Outputs in `experiments/runs/<ts>/` (gitignored). |
+| `experiments/viewer/` | Self-contained HTML dashboard. Build with `cd framework && npm run view`, then open `experiments/viewer/index.html`. |
+| `dev/issues/` | Open design and implementation issues. |
+| `dev/jobs/` | Specs for framework dev tasks. |
+| `docs/` | Design documents. |
 
 ## Running
 
-```bash
-cd framework && ./setup.sh                        # once / after moving: deps, config, tests, tsc
-cd framework && npm test && npx tsc -p .          # after every change (no LLM calls)
+<details>
+<summary>Setup and running experiments</summary>
 
-# Full eval (requires OPENAI_BASE_URL + OPENAI_API_KEY for OpenRouter):
+```bash
+# One-time setup (installs deps, generates config, runs tests):
+cd framework && ./setup.sh
+
+# After any code change:
+cd framework && npm test && npx tsc -p .
+
+# Full eval (requires an OpenAI-compatible endpoint):
 OPENAI_BASE_URL=https://openrouter.ai/api/v1 OPENAI_API_KEY=<key> \
   npm run eval -- --problem all --mode compare --n 3 --model deepseek/deepseek-chat-v3-0324
 
 # Retry only failed jobs from a prior run:
-OPENAI_BASE_URL=... OPENAI_API_KEY=<key> \
+OPENAI_BASE_URL=https://openrouter.ai/api/v1 OPENAI_API_KEY=<key> \
   npm run eval -- --retry-failed <run-dir-timestamp> --mode orchestrate --n 3 --model deepseek/deepseek-chat-v3-0324
 
 # View results:
 cd framework && npm run view   # then open experiments/viewer/index.html
 ```
 
-**Model:** Use `deepseek/deepseek-chat-v3-0324` only via OpenRouter. Do not use Claude/Anthropic models — too expensive.
+Experiments use `deepseek/deepseek-chat-v3-0324` via OpenRouter to keep per-run cost low; any OpenAI-compatible endpoint works.
 
-Generated files (`framework/mcp.json`, `framework/settings.json`, `framework/prompt/.system.<mode>.md`) contain absolute paths and are not committed; `setup.sh` / `bin/claude-branch` / eval regenerate them.
+**Mode flags:** `--mode compare` runs all three modes. `--mode both` runs baseline + branch-only. `--turns N` / `--orch-turns N` override the main-loop and secondary-LLM turn caps (defaults: 40 / 15).
 
-Current state and detailed notes: [HANDOFF.md](HANDOFF.md).
+Generated files (`framework/mcp.json`, `framework/settings.json`, `framework/prompt/.system.<mode>.md`) contain absolute paths and are not committed; `setup.sh` regenerates them.
+
+</details>

@@ -1,3 +1,5 @@
+> For the project overview and the thesis behind the branch tool, see the [main README](../README.md).
+
 # Branch framework
 
 A TypeScript MCP stdio server exposing one tool, `branch({intent, code})`. The model writes a short async TS program that runs in a
