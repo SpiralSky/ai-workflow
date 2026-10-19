@@ -7,7 +7,7 @@ import type { Limits } from "./runner.js";
 import type { ToolEntry, BM25Index } from "./catalog.js";
 import type { OrchestratorDeps } from "./orchestrator.js";
 
-const TOP_K = parseInt(process.env.BRANCH_DELEGATE_TOP_K ?? "8");
+const TOP_K = parseInt(process.env.BRANCH_DELEGATE_TOP_K ?? "12");
 
 // Module-level cache so long-running server doesn't rebuild on every call.
 let _catalog: ToolEntry[] | undefined;
@@ -37,6 +37,7 @@ export interface DelegateDeps {
 export async function handleDelegate(
   task: string,
   policy: string | undefined,
+  toolNames: string[] | undefined,
   session: Session,
   limits: Limits = defaultLimits,
   deps: DelegateDeps = {},
@@ -46,8 +47,10 @@ export async function handleDelegate(
   const orchestrateFn = deps.orchestrateFn ?? orchestrate;
 
   try {
-    const { index } = getCatalogIndexFn();
-    const shortlist = searchFn(task, index, TOP_K);
+    const { catalog, index } = getCatalogIndexFn();
+    const shortlist = toolNames && toolNames.length > 0
+      ? catalog.filter(e => toolNames.includes(e.id) || toolNames.includes(e.name))
+      : searchFn(task, index, TOP_K);
     return await orchestrateFn(task, policy, shortlist, session, limits, deps.orchestratorDeps);
   } catch (e: any) {
     return `Delegate error: ${String(e?.message ?? e)}`;

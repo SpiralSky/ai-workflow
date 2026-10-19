@@ -356,7 +356,7 @@ async function runOneWithOpenAIBackend(problemDir: string, mode: Mode, model: st
             const tsFile2 = join(work, ".delegate-ts");
             writeFileSync(tsFile2, "");
             const { handleDelegate } = await import("../framework/src/delegate.js");
-            result = await handleDelegate(fnArgs.task as string, fnArgs.policy as string | undefined, session as any);
+            result = await handleDelegate(fnArgs.task as string, fnArgs.policy as string | undefined, (fnArgs.tools as string[] | undefined), session as any);
             if (!anyEdit) {
               const changed2 = spawnSync("bash", ["-c", "find . -newer .delegate-ts -type f -not -path '*/__pycache__/*' -not -name '*.pyc' -not -name '.delegate-ts' | head -1"], { cwd: work, encoding: "utf8" }).stdout.trim();
               if (changed2) anyEdit = true;

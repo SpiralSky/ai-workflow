@@ -75,11 +75,12 @@ if (mode === "orchestrate" || mode === "both") {
       inputSchema: {
         task: z.string().describe("What to accomplish. Include relevant file paths and context."),
         policy: z.string().optional().describe("Optional stop/escalation conditions in plain text."),
+        tools: z.array(z.string()).optional().describe("Optional list of tool IDs or names to use instead of BM25 selection."),
       },
       annotations: { title: "Delegate" },
     },
-    async ({ task, policy }) => {
-      const report = await handleDelegate(task, policy, session);
+    async ({ task, policy, tools }) => {
+      const report = await handleDelegate(task, policy, tools, session);
       trace(session, { type: "delegate", task, reportChars: report.length });
       return { content: [{ type: "text", text: report }] };
     },

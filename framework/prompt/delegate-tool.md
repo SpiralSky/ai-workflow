@@ -8,6 +8,7 @@
 
 - **`task`** *(required)* — describe what to accomplish. Include relevant file paths, function names, or context the executor will need. The more specific, the fewer clarifying turns are needed.
 - **`policy`** *(optional)* — limit the *scope* of the fix (e.g. "fix the pricing formula only; do not touch other files"). Do NOT use policy to prevent edits or ask for approval — that leaves the task unfinished.
+- **`tools`** *(optional)* — explicit list of tool IDs/names to give the executor, bypassing BM25 selection. Use when you know exactly which tools are needed (e.g. `["bash", "edit", "runTests"]`).
 
 ### Returns
 

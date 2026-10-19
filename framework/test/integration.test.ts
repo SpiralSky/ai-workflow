@@ -70,6 +70,7 @@ describe("handleDelegate integration", () => {
     const result = await handleDelegate(
       "read the README and summarize it",
       undefined,
+      undefined,
       fakeSession(),
       defaultLimits,
       {
@@ -94,6 +95,7 @@ describe("handleDelegate integration", () => {
   test("full pipeline: error in orchestrateFn returns Delegate error string", async () => {
     const result = await handleDelegate(
       "do something",
+      undefined,
       undefined,
       fakeSession(),
       defaultLimits,

@@ -24,7 +24,7 @@ describe("handleDelegate", () => {
     let searchedTask = "";
     let receivedShortlist: ToolEntry[] = [];
 
-    const result = await handleDelegate("read the README", undefined, fakeSession(), defaultLimits, {
+    const result = await handleDelegate("read the README", undefined, undefined, fakeSession(), defaultLimits, {
       getCatalogIndexFn: () => ({ catalog: [fakeEntry], index: fakeIndex }),
       searchFn: (task, _idx, _k) => { searchedTask = task; return [fakeEntry]; },
       orchestrateFn: async (_task, _policy, shortlist) => {
@@ -40,7 +40,7 @@ describe("handleDelegate", () => {
 
   test("passes policy to orchestrateFn", async () => {
     let receivedPolicy: string | undefined;
-    await handleDelegate("do something", "stop after 2 steps", fakeSession(), defaultLimits, {
+    await handleDelegate("do something", "stop after 2 steps", undefined, fakeSession(), defaultLimits, {
       getCatalogIndexFn: () => ({ catalog: [], index: fakeIndex }),
       searchFn: (_t, _i, _k) => [],
       orchestrateFn: async (_task, policy) => { receivedPolicy = policy; return "done"; },
@@ -50,7 +50,7 @@ describe("handleDelegate", () => {
 
   test("passes undefined policy when not provided", async () => {
     let receivedPolicy: string | undefined = "sentinel";
-    await handleDelegate("task", undefined, fakeSession(), defaultLimits, {
+    await handleDelegate("task", undefined, undefined, fakeSession(), defaultLimits, {
       getCatalogIndexFn: () => ({ catalog: [], index: fakeIndex }),
       searchFn: () => [],
       orchestrateFn: async (_t, policy) => { receivedPolicy = policy; return "done"; },
@@ -59,7 +59,7 @@ describe("handleDelegate", () => {
   });
 
   test("returns the report string from orchestrateFn", async () => {
-    const result = await handleDelegate("task", undefined, fakeSession(), defaultLimits, {
+    const result = await handleDelegate("task", undefined, undefined, fakeSession(), defaultLimits, {
       getCatalogIndexFn: () => ({ catalog: [], index: fakeIndex }),
       searchFn: () => [],
       orchestrateFn: async () => "final report text",
@@ -68,7 +68,7 @@ describe("handleDelegate", () => {
   });
 
   test("returns error message string when orchestrateFn throws (no propagation)", async () => {
-    const result = await handleDelegate("task", undefined, fakeSession(), defaultLimits, {
+    const result = await handleDelegate("task", undefined, undefined, fakeSession(), defaultLimits, {
       getCatalogIndexFn: () => ({ catalog: [], index: fakeIndex }),
       searchFn: () => [],
       orchestrateFn: async () => { throw new Error("connection refused"); },
@@ -78,7 +78,7 @@ describe("handleDelegate", () => {
   });
 
   test("returns error message string when getCatalogIndexFn throws", async () => {
-    const result = await handleDelegate("task", undefined, fakeSession(), defaultLimits, {
+    const result = await handleDelegate("task", undefined, undefined, fakeSession(), defaultLimits, {
       getCatalogIndexFn: () => { throw new Error("catalog load failed"); },
     });
     assert.ok(result.startsWith("Delegate error:"));
@@ -86,7 +86,7 @@ describe("handleDelegate", () => {
   });
 
   test("returns error message string when searchFn throws", async () => {
-    const result = await handleDelegate("task", undefined, fakeSession(), defaultLimits, {
+    const result = await handleDelegate("task", undefined, undefined, fakeSession(), defaultLimits, {
       getCatalogIndexFn: () => ({ catalog: [], index: fakeIndex }),
       searchFn: () => { throw new Error("index corrupted"); },
     });
@@ -97,7 +97,7 @@ describe("handleDelegate", () => {
   test("passes session to orchestrateFn", async () => {
     const session = fakeSession();
     let receivedSession: Session | undefined;
-    await handleDelegate("task", undefined, session, defaultLimits, {
+    await handleDelegate("task", undefined, undefined, session, defaultLimits, {
       getCatalogIndexFn: () => ({ catalog: [], index: fakeIndex }),
       searchFn: () => [],
       orchestrateFn: async (_t, _p, _sl, s) => { receivedSession = s; return "done"; },
@@ -108,12 +108,69 @@ describe("handleDelegate", () => {
   test("passes limits to orchestrateFn", async () => {
     const limits = { ...defaultLimits, maxCalls: 10 };
     let receivedLimits;
-    await handleDelegate("task", undefined, fakeSession(), limits, {
+    await handleDelegate("task", undefined, undefined, fakeSession(), limits, {
       getCatalogIndexFn: () => ({ catalog: [], index: fakeIndex }),
       searchFn: () => [],
       orchestrateFn: async (_t, _p, _sl, _s, l) => { receivedLimits = l; return "done"; },
     });
     assert.equal(receivedLimits, limits);
+  });
+});
+
+// ── tools override ───────────────────────────────────────────────────────────
+
+describe("tools override", () => {
+  test("toolNames bypasses searchFn and filters catalog by id", async () => {
+    const entryA: ToolEntry = {
+      id: "readFile", name: "readFile",
+      toolDef: { name: "readFile", description: "read a file", inputSchema: { type: "object", properties: {} } },
+      searchDescription: "read file", tags: [], executionKind: "helper",
+    };
+    const entryB: ToolEntry = {
+      id: "bash", name: "bash",
+      toolDef: { name: "bash", description: "run shell", inputSchema: { type: "object", properties: {} } },
+      searchDescription: "run shell", tags: [], executionKind: "helper",
+    };
+    let searchCalled = false;
+    let receivedShortlist: ToolEntry[] = [];
+
+    await handleDelegate("task", undefined, ["readFile"], fakeSession(), defaultLimits, {
+      getCatalogIndexFn: () => ({ catalog: [entryA, entryB], index: fakeIndex }),
+      searchFn: () => { searchCalled = true; return [entryB]; },
+      orchestrateFn: async (_t, _p, shortlist) => { receivedShortlist = shortlist; return "done"; },
+    });
+
+    assert.equal(searchCalled, false, "searchFn must not be called when toolNames provided");
+    assert.deepEqual(receivedShortlist, [entryA]);
+  });
+
+  test("toolNames matching by name also works", async () => {
+    const entry: ToolEntry = {
+      id: "tool-123", name: "myTool",
+      toolDef: { name: "myTool", description: "desc", inputSchema: { type: "object", properties: {} } },
+      searchDescription: "desc", tags: [], executionKind: "helper",
+    };
+    let receivedShortlist: ToolEntry[] = [];
+
+    await handleDelegate("task", undefined, ["myTool"], fakeSession(), defaultLimits, {
+      getCatalogIndexFn: () => ({ catalog: [entry], index: fakeIndex }),
+      searchFn: () => [],
+      orchestrateFn: async (_t, _p, shortlist) => { receivedShortlist = shortlist; return "done"; },
+    });
+
+    assert.deepEqual(receivedShortlist, [entry]);
+  });
+
+  test("empty toolNames falls back to BM25 searchFn", async () => {
+    let searchCalled = false;
+
+    await handleDelegate("task", undefined, [], fakeSession(), defaultLimits, {
+      getCatalogIndexFn: () => ({ catalog: [], index: fakeIndex }),
+      searchFn: () => { searchCalled = true; return []; },
+      orchestrateFn: async () => "done",
+    });
+
+    assert.equal(searchCalled, true, "searchFn must be called when toolNames is empty");
   });
 });
 
@@ -127,8 +184,8 @@ describe("catalog caching", () => {
       searchFn: () => [] as ToolEntry[],
       orchestrateFn: async () => "done",
     };
-    await handleDelegate("t1", undefined, fakeSession(), defaultLimits, deps);
-    await handleDelegate("t2", undefined, fakeSession(), defaultLimits, deps);
+    await handleDelegate("t1", undefined, undefined, fakeSession(), defaultLimits, deps);
+    await handleDelegate("t2", undefined, undefined, fakeSession(), defaultLimits, deps);
     // Two calls — the injected fn is called each time (caching is the module-level default)
     assert.equal(catalogCalls, 2);
   });
