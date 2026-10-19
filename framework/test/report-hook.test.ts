@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, writeFileSync, readFileSync, readdirSync, rmSync } from "node:fs";
+import { mkdtempSync, writeFileSync, mkdirSync, readFileSync, readdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -13,7 +13,9 @@ const MSG = "<<RETURN_USER>>\ndone\n[bash:0 → returnUser]\n(Delivered to user.
 function setup() {
   const ws = mkdtempSync(join(tmpdir(), "ws-")), td = mkdtempSync(join(tmpdir(), "td-"));
   writeFileSync(join(ws, "a.py"), "x = 1\n");
-  const env = { ...process.env, BRANCH_TRACE_DIR: td };
+  const flagFile = join(td, "branch-flag");
+  writeFileSync(flagFile, "");
+  const env = { ...process.env, BRANCH_TRACE_DIR: td, BRANCH_TOGGLE_FLAG: flagFile };
   const run = (script: string, input: object) => {
     const r = spawnSync("node", [bin(script)], { input: JSON.stringify({ session_id: "s1", cwd: ws, ...input }), encoding: "utf8", env });
     assert.equal(r.status, 0, r.stderr);
@@ -29,7 +31,8 @@ test("Stop hook: systemMessage with diff + tests, no blocking fields", () => {
   try {
     t.run("report-hook.mjs", { hook_event_name: "UserPromptSubmit" });
     writeFileSync(join(t.ws, "a.py"), "x = 2\ny = 3\n"); // built-in Edit/Bash style change
-    process.env.BRANCH_TRACE_DIR = t.td; recordTests(t.ws, true);
+    const old = process.env.BRANCH_TRACE_DIR; process.env.BRANCH_TRACE_DIR = t.td;
+    try { recordTests(t.ws, true); } finally { if (old === undefined) delete process.env.BRANCH_TRACE_DIR; else process.env.BRANCH_TRACE_DIR = old; }
     const out = JSON.parse(t.run("report-hook.mjs", { hook_event_name: "Stop" }));
     assert.deepEqual(out, { systemMessage: "Changes: a.py (+2 −1) · tests: ok" });
     assert.deepEqual(t.traces().map((e) => [e.type, e.text]), [["report", out.systemMessage]]);
@@ -63,5 +66,16 @@ test("returnUser hook appends the report once; Stop hook then stays silent", () 
     t.run("report-hook.mjs", { hook_event_name: "UserPromptSubmit" });
     const out2 = JSON.parse(t.run("return-user-hook.mjs", { tool_response: MSG }));
     assert.equal(out2.stopReason, "done\n\nNo file changes.");
+  } finally { t.cleanup(); }
+});
+
+test("Stop hook with cd'd cwd reports real changes, not deletions", () => {
+  const t = setup();
+  try {
+    mkdirSync(join(t.ws, "sub")); writeFileSync(join(t.ws, "sub", "c.py"), "1\n");
+    t.run("report-hook.mjs", { hook_event_name: "UserPromptSubmit" });
+    writeFileSync(join(t.ws, "a.py"), "x = 2\n");
+    const out = JSON.parse(t.run("report-hook.mjs", { hook_event_name: "Stop", cwd: join(t.ws, "sub") }));
+    assert.equal(out.systemMessage, "Changes: a.py (+1 −1)");
   } finally { t.cleanup(); }
 });

@@ -1,0 +1,19 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "ai-workflow-local",
+  "description": "Local plugin marketplace for the ai-workflow project",
+  "owner": {
+    "name": "spiralsky"
+  },
+  "plugins": [
+    {
+      "name": "branch-framework",
+      "description": "Branch tool for agentic Claude Code sessions — structured multi-step reasoning, per-file change reports, and session-level branch mode toggle via /branch.",
+      "author": {
+        "name": "spiralsky"
+      },
+      "category": "development",
+      "source": "./framework"
+    }
+  ]
+}

@@ -1,0 +1,140 @@
+#!/usr/bin/env node
+// Generates or refreshes useCaseSummary for catalog entries that are missing one.
+// Calls the OpenAI-compatible API (OPENAI_API_KEY + OPENAI_BASE_URL) or falls back to 'claude -p'.
+// Usage: node framework/bin/gen-summaries [--force] [--dry-run] [--ids id1,id2,...]
+//
+// Writes updates back into catalog/primitives.ts and catalog/composites.ts.
+
+import { readFileSync, writeFileSync } from "node:fs";
+import { spawn } from "node:child_process";
+import { fileURLToPath } from "node:url";
+import { resolve, dirname } from "node:path";
+
+const __dir = dirname(fileURLToPath(import.meta.url));
+const fw = resolve(__dir, "..");
+
+const args = process.argv.slice(2);
+const force = args.includes("--force");
+const dryRun = args.includes("--dry-run");
+const onlyIds = args.find((a) => a.startsWith("--ids="))?.slice(6).split(",") ??
+  (args.includes("--ids") ? args[args.indexOf("--ids") + 1]?.split(",") : undefined);
+
+const SYSTEM =
+  "You are a precise technical writer. Output only what is asked: no preamble, no markdown fences.";
+
+const PROMPT_TEMPLATE = (name, description, schema) =>
+  `Given this software tool:\n\nName: ${name}\nDescription: ${description}\nInput schema: ${JSON.stringify(schema, null, 2)}\n\n` +
+  `Write 4-5 sentences describing the kinds of coding tasks and problems a developer would use this tool to solve. ` +
+  `Use varied vocabulary. Be concrete. Start with "Use ${name} when".`;
+
+async function callLLM(prompt) {
+  if (process.env.OPENAI_API_KEY) {
+    const baseUrl = (process.env.OPENAI_BASE_URL ?? "https://api.openai.com/v1").replace(/\/$/, "");
+    const model = process.env.BRANCH_WEAK_MODEL ?? "deepseek/deepseek-chat-v3-0324";
+    const res = await fetch(`${baseUrl}/chat/completions`, {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${process.env.OPENAI_API_KEY}`,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        model,
+        max_tokens: 400,
+        messages: [{ role: "system", content: SYSTEM }, { role: "user", content: prompt }],
+      }),
+    });
+    if (!res.ok) throw new Error(`API ${res.status}: ${await res.text()}`);
+    const j = await res.json();
+    return j.choices[0].message.content ?? "";
+  }
+  return new Promise((resolve, reject) => {
+    const args2 = ["-p", "--model", "haiku", "--system-prompt", SYSTEM,
+      "--tools", "", "--strict-mcp-config", "--setting-sources", "",
+      "--no-session-persistence", "--output-format", "json"];
+    const p = spawn(process.env.CLAUDE_BIN ?? "claude", args2, { env: { ...process.env }, cwd: "/tmp" });
+    let out = "", err = "";
+    p.stdout.on("data", (d) => (out += d));
+    p.stderr.on("data", (d) => (err += d));
+    p.stdin.end(prompt);
+    p.on("close", (code) => {
+      try {
+        const j = JSON.parse(out);
+        if (j.is_error) return reject(new Error("cli: " + String(j.result).slice(0, 200)));
+        resolve(j.result);
+      } catch { reject(new Error(`cli exit ${code}: ${(err || out).slice(0, 200)}`)); }
+    });
+  });
+}
+
+function patchCatalogFile(filePath, id, summary) {
+  const src = readFileSync(filePath, "utf8");
+  // Find the entry by id and inject/replace useCaseSummary.
+  // Use (?:(?!  \{)[\s\S])*? so the match cannot cross into the next array entry.
+  const entryBody = `(?:(?!  \\{)[\\s\\S])*?`;
+  const hasExisting = new RegExp(`id:\\s*"${id}"${entryBody}useCaseSummary:`).test(src);
+
+  if (hasExisting && !force) {
+    console.log(`  [skip] ${id} already has useCaseSummary (use --force to regenerate)`);
+    return false;
+  }
+
+  const escaped = summary.replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace(/\n/g, "\\n");
+  const summaryLine = `    useCaseSummary: "${escaped}",\n`;
+
+  let updated;
+  if (hasExisting) {
+    updated = src.replace(
+      new RegExp(`(id:\\s*"${id}"${entryBody})(    useCaseSummary:\\s*"[^"]*",\\n)`),
+      (_, pre) => pre + summaryLine,
+    );
+  } else {
+    // Insert after the tags: [...], line
+    updated = src.replace(
+      new RegExp(`(id:\\s*"${id}"${entryBody})(    tags:[^\\n]*,\\n)`),
+      (_, pre, tags) => pre + tags + summaryLine,
+    );
+  }
+
+  if (updated === src) {
+    console.warn(`  [warn] could not patch ${id} in ${filePath}`);
+    return false;
+  }
+  if (!dryRun) writeFileSync(filePath, updated, "utf8");
+  return true;
+}
+
+// Dynamically import catalog to find entries missing summaries
+const { primitives } = await import(`${fw}/catalog/primitives.js`).catch(() => ({ primitives: [] }));
+const { composites } = await import(`${fw}/catalog/composites.js`).catch(() => ({ composites: [] }));
+const allEntries = [...primitives, ...composites];
+
+const filePaths = {
+  ...Object.fromEntries(primitives.map((e) => [e.id, resolve(fw, "catalog/primitives.ts")])),
+  ...Object.fromEntries(composites.map((e) => [e.id, resolve(fw, "catalog/composites.ts")])),
+};
+
+const toProcess = allEntries.filter((e) => {
+  if (onlyIds && !onlyIds.includes(e.id)) return false;
+  if (!force && e.useCaseSummary) return false;
+  return true;
+});
+
+if (toProcess.length === 0) {
+  console.log("All entries have useCaseSummary. Pass --force to regenerate.");
+  process.exit(0);
+}
+
+console.log(`Generating summaries for ${toProcess.length} entries${dryRun ? " (dry run)" : ""}...`);
+for (const entry of toProcess) {
+  process.stdout.write(`  ${entry.id}... `);
+  try {
+    const summary = await callLLM(PROMPT_TEMPLATE(entry.name, entry.toolDef.description, entry.toolDef.inputSchema));
+    const clean = summary.trim().replace(/\n+/g, " ");
+    process.stdout.write("ok\n");
+    if (dryRun) { console.log(`    ${clean.slice(0, 120)}...`); }
+    else { patchCatalogFile(filePaths[entry.id], entry.id, clean); }
+  } catch (e) {
+    process.stdout.write(`ERROR: ${e.message}\n`);
+  }
+}
+console.log("Done.");

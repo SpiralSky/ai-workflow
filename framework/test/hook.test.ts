@@ -1,11 +1,18 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const hook = fileURLToPath(new URL("../bin/return-user-hook.mjs", import.meta.url));
 const run = (input: unknown) => {
-  const r = spawnSync("node", [hook], { input: typeof input === "string" ? input : JSON.stringify(input), encoding: "utf8" });
+  const td = mkdtempSync(join(tmpdir(), "td-"));
+  const flagFile = join(td, "branch-flag");
+  writeFileSync(flagFile, "");
+  const r = spawnSync("node", [hook], { input: typeof input === "string" ? input : JSON.stringify(input), encoding: "utf8", env: { ...process.env, BRANCH_TRACE_DIR: td, BRANCH_TOGGLE_FLAG: flagFile } });
+  rmSync(td, { recursive: true, force: true });
   assert.equal(r.status, 0);
   return r.stdout;
 };

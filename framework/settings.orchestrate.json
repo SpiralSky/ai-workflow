@@ -1,0 +1,6 @@
+{"permissions":{"allow":["mcp__branch__delegate"]},
+ "hooks":{
+  "UserPromptSubmit":[{"hooks":[{"type":"command","command":"node /home/spiralsky/projects/ai-workflow/framework/bin/report-hook.mjs"}]}],
+  "Stop":[{"hooks":[{"type":"command","command":"node /home/spiralsky/projects/ai-workflow/framework/bin/report-hook.mjs"}]}],
+  "PostToolUse":[{"matcher":"mcp__branch__delegate","hooks":[{"type":"command","command":"node /home/spiralsky/projects/ai-workflow/framework/bin/return-user-hook.mjs"}]}],
+  "PreToolUse":[{"matcher":"Edit|Write","hooks":[{"type":"command","command":"node /home/spiralsky/projects/ai-workflow/framework/bin/direct-tool-hook.mjs"}]}]}}

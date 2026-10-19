@@ -12,7 +12,20 @@ cd /some/scratch/dir && /path/to/framework/bin/claude-branch     # isolated run:
 ```
 `claude-branch` passes extra args through to `claude` (e.g. `-p "fix the bug"`).
 
-## Install into an existing project (project scope only)
+## On-demand (recommended for active development)
+```
+# Attach to your current project without any installation:
+/path/to/framework/bin/claude-branch --attach
+
+# Or generate a local script so you can just run ./claude-branch:
+bin/install-project <dir> --script
+./claude-branch
+```
+`--attach` keeps all your existing project settings and MCP servers — it just adds the branch tool and its system prompt on
+top via `--mcp-config` (additive) and `--settings` (merged). Nothing in your project config is changed. Close Claude when
+done; that's the whole cleanup.
+
+## Install into an existing project (project scope only, permanent)
 ```
 bin/install-project <dir> --dry-run [--report intent|none]   # preview
 bin/install-project <dir> [--report ...]                               # merge .mcp.json, .claude/settings.json, CLAUDE.md import
@@ -31,6 +44,6 @@ approve the project MCP server and the external `@import` on first use.
   `BRANCH_CLASSIFY_MODEL` / `BRANCH_WEAK_MODEL` / `BRANCH_STRONG_MODEL`, `ANTHROPIC_API_KEY` (else sub-calls use the `claude` CLI), `CLAUDE_BIN`.
 
 ## Layout
-`src/` server, runner, helpers, llm, report-core.mjs (shared with hooks), trace · `prompt/` system prompt parts (`.system.full.md` is generated) ·
+`src/` server, runner, helpers, llm, report-core.mjs (shared with hooks), trace · `prompt/` system prompt parts (`.system.<mode>.md` are generated) ·
 `bin/` claude-branch, build-prompt, gen-config, install-project, return-user-hook.mjs, report-hook.mjs · `*.template.json` (with `__FW__`) →
-generated `mcp.json`/`settings.json` · `test/` · `../eval/run.ts` benchmark (`npm run eval -- --help`).
+generated `mcp.json`/`settings.json` · `test/` · `../experiments/run.ts` benchmark (`npm run eval -- --help`).

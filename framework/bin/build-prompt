@@ -1,10 +1,24 @@
 #!/usr/bin/env bash
 # Builds the appended system prompt: tool rules + helper API + usage guidance. Prints the output path.
 # BRANCH_REPORT=intent (default) adds the per-file "what and why" rule for the final message; BRANCH_REPORT=none omits it.
+# BRANCH_SYSTEM=always|stub|orchestrate selects the usage-guidance section:
+#   always (or unset): system-always.md (branch is the only interface)
+#   stub:              system-stub.md (branch disabled; /branch loads full instructions)
+#   orchestrate:       delegate-tool.md (main LLM gets delegate tool spec; no helpers.d.ts)
 set -euo pipefail
 P="$(cd "$(dirname "${BASH_SOURCE[0]}")/../prompt" && pwd)"
+SYS_MODE="${BRANCH_SYSTEM:-always}"
+REPORT="${BRANCH_REPORT:-intent}"
+OUT="$P/.system.${SYS_MODE}-${REPORT}.md"
+if [ "$SYS_MODE" = "stub" ]; then
+  cp "$P/system-stub.md" "$OUT"; echo "$OUT"; exit 0
+fi
+if [ "$SYS_MODE" = "orchestrate" ]; then
+  cat "$P/delegate-tool.md" > "$OUT"; echo "$OUT"; exit 0
+fi
+SYS="$P/system-always.md"
 {
-  echo "# Branch tool"; cat "$P/tool.md" "$P/helpers.d.ts"; printf '```\n\n'; cat "$P/system.md"
-  if [ "${BRANCH_REPORT:-intent}" != "none" ]; then cat "$P/report-intent.md"; fi
-} > "$P/.system.full.md"
-echo "$P/.system.full.md"
+  echo "# Branch tool"; cat "$P/tool.md" "$P/helpers.d.ts"; printf '```\n\n'; cat "$SYS"
+  if [ "$REPORT" != "none" ]; then cat "$P/report-intent.md"; fi
+} > "$OUT"
+echo "$OUT"

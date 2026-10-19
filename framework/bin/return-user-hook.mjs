@@ -1,5 +1,8 @@
 #!/usr/bin/env node
 // PostToolUse hook: when the branch tool returned <<RETURN_USER>>, stop the turn and deliver the message once.
+import { existsSync } from "node:fs";
+import { homedir } from "node:os";
+import { join } from "node:path";
 import { takeReport } from "../src/report-core.mjs";
 const MARKER = "<<RETURN_USER>>";
 
@@ -8,6 +11,9 @@ for await (const c of process.stdin) raw += c;
 
 let input;
 try { input = JSON.parse(raw); } catch { process.exit(0); }
+
+const flagFile = process.env.BRANCH_TOGGLE_FLAG ?? join(homedir(), ".claude", "branch-flag");
+if (!existsSync(flagFile)) process.exit(0);
 
 const texts = (r) => {
   if (typeof r === "string") return [r];

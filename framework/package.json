@@ -2,10 +2,12 @@
   "name": "branch-framework",
   "private": true,
   "type": "module",
+  "engines": { "node": ">=22.13" },
   "scripts": {
     "server": "tsx src/server.ts",
     "test": "tsx --test test/*.test.ts",
-    "eval": "tsx ../eval/run.ts"
+    "eval": "tsx ../experiments/run.ts",
+    "view": "node ../experiments/viewer/build-data.mjs && echo 'Open: experiments/viewer/index.html'"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.32.1",

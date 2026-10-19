@@ -1,11 +1,64 @@
 #!/usr/bin/env bash
-# Run claude with only the branch framework config (user settings/MCP excluded).
+# Modes (mutually exclusive flags must come before all other args):
+#
+#   default     Isolated: strips user/project settings and MCP servers; only the framework
+#               config is active. Use this for reproducible, fully-controlled runs.
+#
+#   --attach    Additive: keeps user + project settings/MCP; adds framework MCP and settings
+#               on top (--mcp-config is additive without --strict-mcp-config). Nothing in
+#               your project config is changed. Close Claude when done; that's the whole cleanup.
+#
+#   --bare      Isolated + no system prompt; for truly one-shot tasks (saves ~15k tokens).
+#               Incompatible with --attach.
+#
+# By default no built-in tools; model must use branch for all work.
+# Override: BRANCH_TOOLS="Bash,Read,Edit,Write,Glob,Grep" to add built-ins (defeats enforcement).
 set -euo pipefail
 D="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-[ -f "$D/mcp.json" ] && [ -f "$D/settings.json" ] || "$D/bin/gen-config"
+"$D/bin/gen-config"  # cheap; keeps embedded paths in sync if the framework moved
+export BRANCH_FW="$D"
 export BRANCH_TRACE_DIR="${BRANCH_TRACE_DIR:-$PWD/.branch-traces}"
-# Tool search off so the branch tool is loaded (not deferred); small built-in tool set keeps context ~10k.
+export BRANCH_TOGGLE_FLAG="$BRANCH_TRACE_DIR/enabled"
+# Clear flag so every new session starts with branch mode off (default: /nobranch).
+rm -f "$BRANCH_TOGGLE_FLAG"
+# Pre-build the full instructions file for /branch to load (always mode + current report setting).
+BRANCH_SYSTEM=always BRANCH_REPORT="${BRANCH_REPORT:-intent}" "$D/bin/build-prompt" > /dev/null
+export BRANCH_FW_FULL_PROMPT="$D/prompt/.system.always-${BRANCH_REPORT:-intent}.md"
+# In orchestrate mode also build the delegate-tool prompt (no helpers.d.ts).
+if [ "${BRANCH_MODE:-branch}" = "orchestrate" ]; then
+  BRANCH_SYSTEM=orchestrate "$D/bin/build-prompt" > /dev/null
+fi
+# Tool search off so the branch tool is loaded (not deferred).
 export ENABLE_TOOL_SEARCH=false
-exec claude --setting-sources "" --tools "${BRANCH_TOOLS-Bash,Read,Edit,Write,Glob,Grep}" --settings "$D/settings.json" \
-  --strict-mcp-config --mcp-config "$D/mcp.json" \
-  --append-system-prompt-file "$("$D/bin/build-prompt")" "$@"
+
+# Pick the settings file based on BRANCH_MODE (default: branch).
+case "${BRANCH_MODE:-branch}" in
+  orchestrate) SETTINGS_FILE="$D/settings.orchestrate.json" ;;
+  *)           SETTINGS_FILE="$D/settings.json" ;;
+esac
+
+BARE=false
+ATTACH=false
+while true; do
+  case "${1:-}" in
+    --bare)   BARE=true;   shift ;;
+    --attach) ATTACH=true; shift ;;
+    *)        break ;;
+  esac
+done
+
+if [ "$BARE" = true ] && [ "$ATTACH" = true ]; then
+  echo "error: --bare and --attach are mutually exclusive" >&2
+  exit 1
+fi
+
+if [ "$BARE" = true ]; then
+  exec claude --setting-sources "" --tools "${BRANCH_TOOLS-}" --settings "$SETTINGS_FILE" \
+    --strict-mcp-config --mcp-config "$D/mcp.json" "$@"
+elif [ "$ATTACH" = true ]; then
+  exec claude --tools "${BRANCH_TOOLS-}" --settings "$SETTINGS_FILE" \
+    --mcp-config "$D/mcp.json" "$@"
+else
+  exec claude --setting-sources "" --tools "${BRANCH_TOOLS-}" --settings "$SETTINGS_FILE" \
+    --strict-mcp-config --mcp-config "$D/mcp.json" "$@"
+fi

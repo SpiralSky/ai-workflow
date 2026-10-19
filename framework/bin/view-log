@@ -1,0 +1,491 @@
+#!/usr/bin/env node
+// Experiment log viewer — serves a web UI for inspecting run details.
+// Usage: view-log [<runs-dir> | <run-dir>]   (default: experiments/runs/)
+import http from "node:http";
+import fs from "node:fs";
+import path from "node:path";
+import { execSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
+
+const HERE = path.dirname(fileURLToPath(import.meta.url));
+const ROOT = path.resolve(HERE, "../..");
+
+// ─── Parsing ────────────────────────────────────────────────────────────────
+
+function parseStreamJson(text) {
+  const lines = text.split("\n").filter(l => l.trim());
+  const events = [];
+  for (const l of lines) { try { events.push(JSON.parse(l)); } catch { /* skip */ } }
+
+  const init = events.find(e => e.type === "system" && e.subtype === "init") ?? {};
+  const result = events.find(e => e.type === "result") ?? {};
+
+  // Collect assistant messages: deduplicate by message.id, keep last (highest output_tokens = final chunk)
+  const msgMap = new Map();
+  for (const ev of events) {
+    if (ev.type !== "assistant" || !ev.message?.id) continue;
+    const prev = msgMap.get(ev.message.id);
+    if (!prev || (ev.message.usage?.output_tokens ?? 0) >= (prev.usage?.output_tokens ?? 0))
+      msgMap.set(ev.message.id, ev.message);
+  }
+
+  // Collect tool results: keyed by tool_use_id; also capture human text messages
+  const toolResults = new Map();
+  const humanMessages = [];
+  for (const ev of events) {
+    if (ev.type !== "user" || !Array.isArray(ev.message?.content)) continue;
+    const texts = [];
+    for (const c of ev.message.content) {
+      if (c.type === "tool_result") toolResults.set(c.tool_use_id, c);
+      else if (c.type === "text" && c.text?.trim()) texts.push(c.text);
+    }
+    if (texts.length) humanMessages.push({ text: texts.join("\n"), timestamp: ev.timestamp ?? "" });
+  }
+
+  // Build tool_use_id → tool_name map from assistant messages
+  const toolNames = new Map();
+  for (const msg of msgMap.values()) {
+    for (const c of (msg.content ?? [])) {
+      if (c.type === "tool_use") toolNames.set(c.id, c.name);
+    }
+  }
+
+  // Group into turns: each assistant message + its tool results
+  const turns = [];
+  for (const msg of msgMap.values()) {
+    const u = msg.usage ?? {};
+    const turn = {
+      msgId: msg.id,
+      model: msg.model ?? "",
+      timestamp: msg.created_at ?? "",
+      usage: {
+        input: u.input_tokens ?? 0,
+        output: u.output_tokens ?? 0,
+        cacheRead: u.cache_read_input_tokens ?? 0,
+        cacheWrite: u.cache_creation_input_tokens ?? 0,
+      },
+      content: msg.content ?? [],
+      toolResults: [],
+    };
+    for (const c of msg.content ?? []) {
+      if (c.type !== "tool_use") continue;
+      const tr = toolResults.get(c.id);
+      if (tr) turn.toolResults.push({ toolUseId: c.id, toolName: c.name, content: tr.content, isError: !!tr.is_error });
+    }
+    turns.push(turn);
+  }
+
+  return {
+    sessionId: init.session_id ?? result.session_id ?? "",
+    model: init.model ?? turns[0]?.model ?? "",
+    cwd: init.cwd ?? "",
+    humanMessages,
+    turns,
+    result: {
+      numTurns: result.num_turns ?? 0,
+      cost: result.total_cost_usd ?? 0,
+      durationMs: result.duration_ms ?? 0,
+      isError: !!result.is_error,
+      status: result.subtype ?? "",
+      totalUsage: {
+        input: result.usage?.input_tokens ?? 0,
+        output: result.usage?.output_tokens ?? 0,
+        cacheRead: result.usage?.cache_read_input_tokens ?? 0,
+        cacheWrite: result.usage?.cache_creation_input_tokens ?? 0,
+      },
+    },
+  };
+}
+
+function parseBranchTrace(text) {
+  const calls = [];
+  const lines = text.split("\n").filter(l => l.trim());
+  const helpers = [];
+  for (const l of lines) {
+    let ev; try { ev = JSON.parse(l); } catch { continue; }
+    if (ev.type === "call") {
+      helpers.push({ name: ev.name, args: ev.args, durationMs: ev.ms ?? 0, result: ev.result, error: ev.error });
+    } else if (ev.type === "branch") {
+      calls.push({ timestamp: ev.t ?? "", intent: ev.intent ?? "", kind: ev.kind ?? "return",
+        path: ev.path ?? "", durationMs: ev.ms ?? 0, code: ev.code ?? "", helpers: [...helpers] });
+      helpers.length = 0;
+    }
+  }
+  return calls;
+}
+
+function buildRunBundle(runDir, tag) {
+  const streamPath = path.join(runDir, `${tag}.jsonl`);
+  if (!fs.existsSync(streamPath)) return null;
+  const stream = fs.readFileSync(streamPath, "utf8");
+  const parsed = parseStreamJson(stream);
+
+  // Load branch traces: timestamp-named JSONL files (not tag.jsonl, not hook-*.jsonl)
+  const branchTraces = [];
+  for (const f of fs.readdirSync(runDir)) {
+    if (/^\d{4}-\d{2}.*-\d+\.jsonl$/.test(f)) {
+      branchTraces.push(...parseBranchTrace(fs.readFileSync(path.join(runDir, f), "utf8")));
+    }
+  }
+  branchTraces.sort((a, b) => a.timestamp.localeCompare(b.timestamp));
+
+  // Match branch traces to turns: each mcp__branch__* tool_use in a turn gets one BranchCall
+  let branchIdx = 0;
+  for (const turn of parsed.turns) {
+    const n = turn.content.filter(c => c.type === "tool_use" && c.name.startsWith("mcp__branch__")).length;
+    turn.branchCalls = branchTraces.slice(branchIdx, branchIdx + n);
+    branchIdx += n;
+  }
+
+  const systemPrompt = readOptional(path.join(runDir, `${tag}.prompt.txt`));
+  const sessionId = readOptional(path.join(runDir, `${tag}.session_id`))?.trim() ?? parsed.sessionId;
+  const testsResult = readOptional(path.join(runDir, `${tag}.tests.txt`));
+  const finalMsg = readOptional(path.join(runDir, `${tag}.final.txt`));
+
+  // Infer pass from tests result
+  const pass = testsResult ? (/OK\b/.test(testsResult) || /# pass \d/.test(testsResult)) && !/FAILED/.test(testsResult) && !/# fail [^0]/.test(testsResult) : null;
+
+  return { tag, parsed, systemPrompt, sessionId, pass, testsResult, finalMsg };
+}
+
+function readOptional(p) {
+  try { return fs.readFileSync(p, "utf8"); } catch { return null; }
+}
+
+function discoverBundles(targetPath) {
+  const bundles = [];
+  const stat = fs.statSync(targetPath);
+  if (!stat.isDirectory()) return bundles;
+
+  // Check if targetPath itself is a run dir (contains *.jsonl stream files)
+  const files = fs.readdirSync(targetPath);
+  const streamFiles = files.filter(f => /^[^.]+\.jsonl$/.test(f) && !/^\d{4}/.test(f) && !f.startsWith("hook-"));
+
+  if (streamFiles.length > 0) {
+    // Single run dir
+    for (const f of streamFiles) {
+      const tag = f.replace(/\.jsonl$/, "");
+      const b = buildRunBundle(targetPath, tag);
+      if (b) bundles.push(b);
+    }
+  } else {
+    // Directory of run dirs
+    for (const sub of files.sort().reverse()) {
+      const subPath = path.join(targetPath, sub);
+      if (!fs.statSync(subPath).isDirectory()) continue;
+      const subFiles = fs.readdirSync(subPath).filter(f => /^[^.]+\.jsonl$/.test(f) && !/^\d{4}/.test(f) && !f.startsWith("hook-"));
+      for (const f of subFiles) {
+        const tag = f.replace(/\.jsonl$/, "");
+        const b = buildRunBundle(subPath, tag);
+        if (b) bundles.push(b);
+      }
+    }
+  }
+
+  return bundles;
+}
+
+// ─── HTML ────────────────────────────────────────────────────────────────────
+
+function buildHTML(bundles) {
+  // Trim large content to avoid sending megabytes
+  const slim = bundles.map(b => {
+    const turns = (b.parsed?.turns ?? []).map(t => ({
+      ...t,
+      content: t.content.map(c => {
+        if (c.type === "tool_use") {
+          const inputStr = JSON.stringify(c.input ?? {}, null, 2);
+          return { ...c, inputStr: inputStr.length > 8000 ? inputStr.slice(0, 8000) + "\n// [truncated]" : inputStr };
+        }
+        if (c.type === "text") return { ...c, text: c.text };
+        if (c.type === "thinking") return { ...c, thinking: c.thinking?.slice(0, 2000) ?? "" };
+        return c;
+      }),
+      toolResults: t.toolResults.map(r => {
+        const ct = typeof r.content === "string" ? r.content
+          : Array.isArray(r.content) ? r.content.map(x => x.text ?? JSON.stringify(x)).join("\n")
+          : JSON.stringify(r.content ?? "");
+        return { ...r, contentStr: ct.length > 6000 ? ct.slice(0, 6000) + "\n[truncated]" : ct };
+      }),
+      branchCalls: (t.branchCalls ?? []).map(bc => ({
+        ...bc,
+        code: (bc.code ?? "").slice(0, 4000),
+        helpers: bc.helpers.map(h => ({
+          ...h,
+          argsStr: JSON.stringify(h.args ?? []).slice(0, 200),
+          resultStr: JSON.stringify(h.result ?? "").slice(0, 400),
+        })),
+      })),
+    }));
+    const humanMessages = (b.parsed?.humanMessages ?? []).map(m => ({
+      ...m, text: m.text.length > 10000 ? m.text.slice(0, 10000) + "\n[truncated]" : m.text,
+    }));
+    return { ...b, parsed: { ...b.parsed, turns, humanMessages }, systemPrompt: b.systemPrompt?.slice(0, 20000) };
+  });
+
+  return `<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Experiment Logs</title>
+<style>
+:root {
+  --bg: #f8f8f8; --bg2: #fff; --bg3: #f0f0f0; --border: #ddd;
+  --text: #111; --text2: #555; --text3: #888;
+  --green: #1a7a3a; --amber: #b35c00; --blue: #1155cc; --red: #c00;
+  --purple: #6b21a8; --teal: #0e7490;
+  --pill-bg: #e8f5e9; --pill-amber: #fff3e0; --pill-blue: #e3f2fd;
+  --branch-bar: #e9d5ff;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #111; --bg2: #1a1a1a; --bg3: #222; --border: #333;
+    --text: #e8e8e8; --text2: #aaa; --text3: #666;
+    --green: #4ade80; --amber: #fbbf24; --blue: #60a5fa; --red: #f87171;
+    --purple: #c084fc; --teal: #22d3ee;
+    --pill-bg: #14532d; --pill-amber: #451a03; --pill-blue: #1e3a5f;
+    --branch-bar: #3b0764;
+  }
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font: 13px/1.5 ui-monospace, monospace; background: var(--bg); color: var(--text); display: flex; height: 100vh; overflow: hidden; }
+#sidebar { width: 240px; min-width: 180px; background: var(--bg3); border-right: 1px solid var(--border); overflow-y: auto; flex-shrink: 0; }
+#sidebar h2 { padding: 10px 12px; font-size: 11px; text-transform: uppercase; color: var(--text3); letter-spacing: .05em; border-bottom: 1px solid var(--border); }
+.run-item { padding: 8px 12px; cursor: pointer; border-bottom: 1px solid var(--border); }
+.run-item:hover, .run-item.active { background: var(--bg2); }
+.run-item .run-tag { font-weight: 600; font-size: 12px; }
+.run-item .run-meta { font-size: 11px; color: var(--text3); margin-top: 2px; }
+.badge { display: inline-block; padding: 1px 5px; border-radius: 3px; font-size: 10px; font-weight: 700; }
+.badge.pass { background: var(--pill-bg); color: var(--green); }
+.badge.fail { background: #fee2e2; color: var(--red); }
+.badge.unknown { background: var(--bg3); color: var(--text3); }
+#content { flex: 1; overflow-y: auto; padding: 16px; }
+#run-header { margin-bottom: 12px; }
+#run-header h1 { font-size: 16px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.model-badge { background: var(--pill-blue); color: var(--blue); padding: 2px 7px; border-radius: 3px; font-size: 11px; }
+.total-stats { font-size: 11px; color: var(--text3); margin-top: 6px; }
+details.section { border: 1px solid var(--border); border-radius: 4px; margin-bottom: 10px; background: var(--bg2); }
+details.section > summary { padding: 7px 10px; cursor: pointer; font-weight: 600; font-size: 12px; list-style: none; display: flex; align-items: center; gap: 6px; }
+details.section > summary::before { content: "▸"; display: inline-block; transition: transform .1s; }
+details.section[open] > summary::before { transform: rotate(90deg); }
+details.section pre { padding: 10px; font-size: 12px; white-space: pre-wrap; word-break: break-word; overflow-x: auto; max-height: 400px; overflow-y: auto; border-top: 1px solid var(--border); }
+.turn { border: 1px solid var(--border); border-radius: 4px; margin-bottom: 10px; background: var(--bg2); }
+.msg-meta { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 7px 10px; border-bottom: 1px solid var(--border); font-size: 11px; }
+.tokens { display: flex; gap: 5px; align-items: center; }
+.tok { padding: 1px 6px; border-radius: 3px; font-size: 11px; font-weight: 600; }
+.tok.cr { background: var(--pill-bg); color: var(--green); }
+.tok.cw { background: var(--pill-amber); color: var(--amber); }
+.tok.out { background: var(--pill-blue); color: var(--blue); }
+.tok.inp { background: var(--bg3); color: var(--text2); }
+.text-block { padding: 8px 10px; white-space: pre-wrap; word-break: break-word; font-size: 13px; border-bottom: 1px solid var(--border); }
+.text-block:last-child { border-bottom: none; }
+details.tool-use, details.tool-result { border-top: 1px solid var(--border); }
+details.tool-use > summary, details.tool-result > summary { padding: 5px 10px; cursor: pointer; display: flex; align-items: center; gap: 6px; font-size: 12px; list-style: none; }
+details.tool-use > summary::before { content: "▸"; }
+details.tool-use[open] > summary::before { content: "▾"; }
+details.tool-result > summary::before { content: "▸"; }
+details.tool-result[open] > summary::before { content: "▾"; }
+.tool-name { font-weight: 700; }
+.tool-preview { color: var(--text3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 300px; }
+.ok-badge { color: var(--green); font-size: 10px; }
+.err-badge { color: var(--red); font-size: 10px; }
+details pre { padding: 8px 10px; font-size: 11px; white-space: pre-wrap; word-break: break-word; max-height: 300px; overflow-y: auto; background: var(--bg3); border-top: 1px solid var(--border); }
+.branch-trace { border-top: 2px solid var(--branch-bar); background: var(--bg2); }
+.branch-trace > summary { padding: 6px 10px; cursor: pointer; font-size: 12px; list-style: none; display: flex; align-items: center; gap: 8px; }
+.branch-trace > summary::before { content: "▸ ⚙"; }
+details.branch-trace[open] > summary::before { content: "▾ ⚙"; }
+.branch-path { padding: 4px 10px 4px 22px; font-size: 11px; color: var(--teal); font-weight: 600; }
+.branch-kind { padding: 1px 5px; border-radius: 3px; font-size: 10px; }
+.branch-kind.return { background: var(--pill-bg); color: var(--green); }
+.branch-kind.user { background: var(--pill-blue); color: var(--blue); }
+.branch-kind.error { background: #fee2e2; color: var(--red); }
+.branch-time { color: var(--text3); font-size: 10px; }
+.helper-calls { padding: 4px 10px 4px 22px; }
+.helper-call { font-size: 11px; display: flex; gap: 8px; padding: 2px 0; border-bottom: 1px solid var(--border); }
+.helper-call:last-child { border-bottom: none; }
+.helper-name { font-weight: 700; color: var(--purple); min-width: 80px; }
+.helper-args { color: var(--text2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
+.helper-ms { color: var(--text3); min-width: 50px; text-align: right; }
+details.branch-code pre { font-size: 11px; max-height: 400px; }
+.empty { padding: 40px; text-align: center; color: var(--text3); }
+.human-turn { border: 1px solid var(--border); border-left: 3px solid var(--text3); border-radius: 4px; margin-bottom: 10px; background: var(--bg2); }
+.human-meta { display: flex; align-items: center; gap: 8px; padding: 7px 10px; border-bottom: 1px solid var(--border); font-size: 11px; color: var(--text3); }
+.human-text { padding: 8px 10px; white-space: pre-wrap; word-break: break-word; font-size: 13px; }
+.helper-result { color: var(--teal); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
+.helper-err { color: var(--red); flex: 1; }
+.final-msg { border: 1px solid var(--border); border-left: 3px solid var(--green); border-radius: 4px; margin-bottom: 10px; background: var(--bg2); }
+.final-msg > summary { padding: 7px 10px; cursor: pointer; font-weight: 600; font-size: 12px; list-style: none; display: flex; align-items: center; gap: 6px; color: var(--green); }
+.final-msg > summary::before { content: "▸"; }
+.final-msg[open] > summary::before { content: "▾"; }
+.final-msg pre { padding: 10px; font-size: 12px; white-space: pre-wrap; word-break: break-word; border-top: 1px solid var(--border); max-height: 400px; overflow-y: auto; }
+</style>
+</head>
+<body>
+<nav id="sidebar">
+  <h2>Runs</h2>
+  <div id="run-list"></div>
+</nav>
+<main id="content">
+  <div class="empty" id="empty-state">Select a run from the sidebar</div>
+  <div id="run-view" style="display:none"></div>
+</main>
+
+<script>
+const RUNS = ${JSON.stringify(slim)};
+let selected = -1;
+
+function esc(s) {
+  return String(s ?? "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+}
+function fmtN(n) {
+  if (!n) return "0";
+  return n >= 1000 ? (n/1000).toFixed(1)+"k" : String(n);
+}
+function tokPills(u) {
+  if (!u) return "";
+  const parts = [];
+  if (u.cacheRead > 0) parts.push(\`<span class="tok cr" title="cache read">↩\${fmtN(u.cacheRead)}</span>\`);
+  if (u.cacheWrite > 0) parts.push(\`<span class="tok cw" title="cache write">⊕\${fmtN(u.cacheWrite)}</span>\`);
+  const uncached = Math.max(0, u.input - (u.cacheRead ?? 0) - (u.cacheWrite ?? 0));
+  if (uncached > 0) parts.push(\`<span class="tok inp" title="uncached input">→\${fmtN(uncached)}</span>\`);
+  if (u.output > 0) parts.push(\`<span class="tok out" title="output">↑\${fmtN(u.output)}</span>\`);
+  return \`<span class="tokens">\${parts.join("")}</span>\`;
+}
+function toolPreview(name, input) {
+  if (!input) return "";
+  const key = ["command","pattern","code","intent","query","file_path","path"].find(k => input[k] !== undefined) ?? Object.keys(input)[0];
+  if (!key) return "";
+  const val = String(input[key] ?? "").replace(/\\n/g," ").slice(0, 70);
+  return \`<span class="tool-preview">\${esc(val)}\${val.length >= 70 ? "…" : ""}</span>\`;
+}
+function renderContent(c) {
+  if (c.type === "text") return \`<div class="text-block">\${esc(c.text)}</div>\`;
+  if (c.type === "thinking") return \`<details class="tool-use"><summary><span class="tool-name">💭 Thinking</span></summary><pre>\${esc(c.thinking)}</pre></details>\`;
+  if (c.type === "tool_use") {
+    const inputJson = c.inputStr ?? JSON.stringify(c.input ?? {}, null, 2);
+    return \`<details class="tool-use"><summary><span class="tool-name">\${esc(c.name)}</span>\${toolPreview(c.name, c.input)}</summary><pre>\${esc(inputJson)}</pre></details>\`;
+  }
+  return "";
+}
+function renderToolResult(r) {
+  const badge = r.isError ? \`<span class="err-badge">error</span>\` : \`<span class="ok-badge">ok</span>\`;
+  return \`<details class="tool-result"><summary><span class="tool-name">\${esc(r.toolName)}</span>\${badge}</summary><pre>\${esc(r.contentStr ?? r.content ?? "")}</pre></details>\`;
+}
+function renderBranchCall(bc) {
+  if (!bc) return "";
+  const helpers = bc.helpers.map(h => {
+    const resultCol = h.error
+      ? \`<span class="helper-err">⚠ \${esc(String(h.error).slice(0,120))}</span>\`
+      : \`<span class="helper-result">\${esc(h.resultStr ?? "")}</span>\`;
+    return \`<div class="helper-call"><span class="helper-name">\${esc(h.name)}</span><span class="helper-args">\${esc(h.argsStr)}</span>\${resultCol}<span class="helper-ms">\${h.durationMs}ms</span></div>\`;
+  }).join("");
+  return \`<details class="branch-trace">
+    <summary>\${esc(bc.intent || "(no intent)")}<span class="branch-kind \${esc(bc.kind)}">\${esc(bc.kind)}</span><span class="branch-time">\${bc.durationMs}ms</span></summary>
+    <div class="branch-path">\${esc(bc.path)}</div>
+    \${helpers ? \`<div class="helper-calls">\${helpers}</div>\` : ""}
+    <details class="branch-code"><summary>Code</summary><pre>\${esc(bc.code)}</pre></details>
+  </details>\`;
+}
+function renderTurn(t, i) {
+  const meta = \`<div class="msg-meta">
+    <span class="badge model-badge">\${esc(t.model)}</span>
+    \${tokPills(t.usage)}
+    <span style="color:var(--text3);font-size:11px">Turn \${i+1}</span>
+  </div>\`;
+  const content = t.content.map(renderContent).join("");
+  const results = (t.toolResults ?? []).map(renderToolResult).join("");
+  const branch = (t.branchCalls ?? []).map(renderBranchCall).join("");
+  return \`<div class="turn">\${meta}\${content}\${results}\${branch}</div>\`;
+}
+function renderRun(b) {
+  const p = b.parsed ?? {};
+  const r = p.result ?? {};
+  const passBadge = b.pass === true ? \`<span class="badge pass">pass</span>\`
+    : b.pass === false ? \`<span class="badge fail">fail</span>\`
+    : \`<span class="badge unknown">?</span>\`;
+  const totalU = r.totalUsage ?? {};
+  const header = \`<div id="run-header">
+    <h1>\${esc(b.tag)} \${passBadge} <span class="model-badge">\${esc(p.model || r.model || "")}</span></h1>
+    <div class="total-stats">
+      turns: \${r.numTurns} · cost: $\${(r.cost ?? 0).toFixed(4)} · \${(r.durationMs/1000).toFixed(1)}s
+      · \${tokPills(totalU)}
+    </div>
+  </div>\`;
+  const prompt = b.systemPrompt
+    ? \`<details class="section"><summary>System Prompt</summary><pre>\${esc(b.systemPrompt)}</pre></details>\`
+    : "";
+  const humanMsgs = (p.humanMessages ?? []).map(m => {
+    const ts = m.timestamp ? \` · <span style="color:var(--text3)">\${esc(m.timestamp.slice(0,19).replace("T"," "))}</span>\` : "";
+    return \`<div class="human-turn"><div class="human-meta">🧑 User\${ts}</div><div class="human-text">\${esc(m.text)}</div></div>\`;
+  }).join("");
+  const turns = (p.turns ?? []).map((t, i) => renderTurn(t, i)).join("");
+  const finalSection = b.finalMsg
+    ? \`<details class="final-msg" open><summary>✓ Final answer</summary><pre>\${esc(b.finalMsg.trim())}</pre></details>\`
+    : "";
+  const testsSection = b.testsResult
+    ? \`<details class="section"><summary>Test output</summary><pre>\${esc(b.testsResult.trim())}</pre></details>\`
+    : "";
+  return header + prompt + humanMsgs + turns + finalSection + testsSection;
+}
+function buildSidebar() {
+  const list = document.getElementById("run-list");
+  list.innerHTML = RUNS.map((b, i) => {
+    const p = b.parsed?.result ?? {};
+    const passCls = b.pass === true ? "pass" : b.pass === false ? "fail" : "unknown";
+    return \`<div class="run-item" onclick="selectRun(\${i})">
+      <div class="run-tag">\${esc(b.tag)}</div>
+      <div class="run-meta"><span class="badge \${passCls}">\${b.pass === true ? "pass" : b.pass === false ? "fail" : "?"}</span>
+      turns:\${p.numTurns ?? "?"} $\${(p.cost ?? 0).toFixed(3)}</div>
+    </div>\`;
+  }).join("");
+}
+function selectRun(i) {
+  selected = i;
+  document.querySelectorAll(".run-item").forEach((el, j) => el.classList.toggle("active", j === i));
+  document.getElementById("empty-state").style.display = "none";
+  const view = document.getElementById("run-view");
+  view.style.display = "";
+  view.innerHTML = renderRun(RUNS[i]);
+}
+buildSidebar();
+if (RUNS.length > 0) selectRun(0);
+</script>
+</body>
+</html>`;
+}
+
+// ─── Server ──────────────────────────────────────────────────────────────────
+
+const arg = process.argv[2];
+const defaultRunsDir = path.join(ROOT, "experiments", "runs");
+const targetPath = arg ? path.resolve(arg) : (fs.existsSync(defaultRunsDir) ? defaultRunsDir : ROOT);
+
+let bundles;
+try {
+  bundles = discoverBundles(targetPath);
+} catch (e) {
+  console.error("Error loading runs:", e.message);
+  bundles = [];
+}
+
+if (bundles.length === 0) {
+  console.log(`No runs found in: ${targetPath}`);
+  process.exit(0);
+}
+
+console.log(`Loaded ${bundles.length} run(s) from: ${targetPath}`);
+
+const server = http.createServer((req, res) => {
+  res.setHeader("Content-Type", "text/html; charset=utf-8");
+  res.end(buildHTML(bundles));
+});
+
+server.listen(0, "127.0.0.1", () => {
+  const { port } = server.address();
+  const url = `http://127.0.0.1:${port}`;
+  console.log(`Viewer: ${url}`);
+  for (const cmd of ["xdg-open", "open"]) {
+    try { execSync(`${cmd} ${url} 2>/dev/null`); break; } catch { /* try next */ }
+  }
+});

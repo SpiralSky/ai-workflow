@@ -16,7 +16,7 @@ else
   echo "[setup] deps up to date"
 fi
 "$D/bin/gen-config" && echo "[setup] generated mcp.json settings.json for $D"
-"$D/bin/build-prompt" >/dev/null && echo "[setup] built prompt/.system.full.md (BRANCH_REPORT=${BRANCH_REPORT:-intent})"
+"$D/bin/build-prompt" >/dev/null && echo "[setup] built prompt/.system.${BRANCH_SYSTEM:-always}-${BRANCH_REPORT:-intent}.md (BRANCH_SYSTEM=${BRANCH_SYSTEM:-always} BRANCH_REPORT=${BRANCH_REPORT:-intent})"
 echo "[setup] npm test";  npm test --silent 2>&1 | tail -n 8
 echo "[setup] tsc";       npx tsc -p . 2>&1 | tail -n 20
 echo "[setup] OK. Try: $D/bin/claude-branch"

@@ -1,39 +1,128 @@
-# Handoff
+# AI Workflow — Handoff
 
-**Goal:** branching loop framework (see `docs/PLAN.md`), tested as an MCP tool inside a *separate* Claude Code instance, evaluated on `loop-testbed/`.
+> **To resume**: read this file. No pending tasks — eval is complete and harness is improved.
 
-**Built (Phase 0 + most of Phase 1/2):**
-- `framework/` — MCP stdio server exposing `branch({code})` (`src/server.ts`), node:vm runner (`src/runner.ts`), helpers
-  (`src/helpers.ts`), sub-LLM via `claude -p` CLI or API key (`src/llm.ts`), JSONL traces (`src/trace.ts`).
-  `prompt/` = tool description, helpers.d.ts, system.md. `npm test` (20 pass, no LLM), `npx tsc -p .` clean.
-- Separation from normal Claude Code: `--setting-sources "" --settings framework/settings.json --strict-mcp-config
-  --mcp-config framework/mcp.json --append-system-prompt-file framework/prompt/system.md` (verified: hooks in `--settings` fire,
-  no separate login needed). Wrapper: `framework/bin/claude-branch` (interactive use).
-- returnUser: server marks result `<<RETURN_USER>>`; PostToolUse hook `bin/return-user-hook.mjs` → `{"continue":false}`.
-- Eval: `cd framework && npm run eval -- --problem 01 --mode baseline|branch|branch-only|both|all --n 3 --model sonnet`.
-  Raw streams + branch traces in `eval/runs/<ts>/`. branch-only disables built-in file/shell tools.
-- Dev workflow: framework code is developed by delegating to `claude -p` (normal config) with specs in `dev/jobs/*.md` via `dev/run-job` (see README).
+---
 
-**Results (problem 01, n=1, sonnet, after fixes):** tool search off + `--tools Bash,Read,Edit,Write,Glob,Grep` in all modes
-(context 8k; branch adds 1.7k). baseline 4 turns $0.023; branch 3 turns $0.046 (still ignores branch when built-ins exist);
-branch-only 3 turns ~$0.025, 2 branches (read; edit → test → returnUser), turn ends via hook.
+## Current State (2026-10-18)
 
-**Gotchas fixed:** MCP tools are deferred by default (ENABLE_TOOL_SEARCH=false); long MCP descriptions get truncated (helper API
-lives in appended system prompt, built by `bin/build-prompt`); hook replaces tool output via `updatedMCPToolOutput` → "Delivered to
-user." and shows the message once as stopReason (TUI prefix "PostToolUse:… hook stopped continuation:" is unavoidable).
-`branch` takes `{intent, code}`.
+Clean eval run completed (`2026-10-18T05-39-00-582Z`), 81 jobs across all three modes × 9 problems × 3 runs:
 
-**Setup (done):** framework/ is relocatable: `setup.sh` generates mcp.json/settings.json from templates; `bin/install-project <dir>`
-(project scope, --dry-run/--uninstall); README.md, SETUP.md (agent instructions). Reports: auto change block
-(`Changes: f (+a −d) · tests: ok`) now comes from hooks every turn (UserPromptSubmit snapshot → Stop `systemMessage`; returnUser hook appends it to stopReason; once per turn; `src/report-core.mjs`, `bin/report-hook.mjs`, trace event `report`). BRANCH_REPORT=intent (default)|none = prompt rule only; `summarize` removed. eval: --report intent|none, --problem all, subCost (llm() calls), msgChars, *.final.txt (message + report block).
+| Mode | Pass rate | Notes |
+|------|-----------|-------|
+| baseline | 20/27 (74%) | DeepSeek v3; Claude would score higher |
+| branch-only | 12/27 (44%) | Single tool constraint is artificial |
+| orchestrate | 17/27 (63%) | Beats branch-only; below baseline |
 
-**Report eval (5 problems, n=1, sonnet, branch-only):** all 5/5 pass. auto $0.036 avg, 0/5 returnUser; intent $0.034, 3/5 returnUser
-(those runs cheapest, e.g. 05: $0.029 vs $0.040); summarize $0.038, 0/5 returnUser → summarizer never ran (untested).
-Finding: without returnUser the model ends with a normal prose message (extra turn) and the auto block is never shown.
+Viewer data is current — open `experiments/viewer/index.html` after `cd framework && npm run view`.
 
-**Next:**
-0. DONE (verified in -p eval: report on 5/5 turns, both paths; TUI display of Stop systemMessage still unchecked; "tests:" part missing on 02-04): hook-based report. Verify in a real run: Stop hook systemMessage is displayed, Stop does not
-   also fire after returnUser, and no extra turn is triggered; `npm run eval -- --problem all --mode branch-only --n 1`.
-1. Get the model to use branch when built-in tools are also available (branch mode); try one-branch read→fix when predictable.
-2. Run all problems with n≥3 (`--mode all`).
-3. Test check/classify/llm via CLI backend (untested with a real model).
+All older runs archived to `experiments/runs/archive/`.
+
+---
+
+## Architecture
+
+**Orchestrate mode flow:**
+1. Main LLM gets `delegate` tool only
+2. `delegate` → `orchestrate()` in `framework/src/orchestrator.ts`
+3. Secondary LLM writes TypeScript branch programs (helpers: readFile, edit, bash, runTests, etc.)
+4. BM25 shortlist selects composite tools; implementations injected before secondary's code
+5. `ORCHESTRATE_EXCLUDED` blocks writeFile/patchAndVerify/readAndSummarize from shortlist
+
+**Key constants (as of 2026-10-18):**
+- Orchestrator max turns: **15** (was 6) — `orchestrator.ts:18`, override with `BRANCH_ORCHESTRATE_MAX_TURNS`
+- Step observation cap: **6000 chars** (was 2000) — `orchestrator.ts:20`
+- Main loop turn cap: **40** (default) — configurable via `--turns N`
+- Delegate turn cap: **15** (default) — configurable via `--orch-turns N`
+
+**Key files:**
+- `framework/src/orchestrator.ts` — orchestrate loop, MAX_TURNS, STEP_CAP
+- `framework/prompt/orchestrate-system.md` — secondary LLM system prompt (problem-specific hints)
+- `framework/prompt/delegate-tool.md` — main LLM system prompt for orchestrate mode
+- `experiments/run.ts` — eval runner, all three modes, metrics, CLI flags
+- `experiments/viewer/build-data.mjs` — viewer data builder (reads enriched `.meta.json`)
+- `experiments/problems/` — 9 problem workspaces with hidden test dirs
+
+---
+
+## Metrics persisted per job (`.meta.json`)
+
+As of 2026-10-18, every job writes a full meta.json:
+```json
+{
+  "model": "...", "backend": "openai", "mode": "...",
+  "pass": true, "status": "ok",
+  "turns": 4, "cost": 0.0007, "subCost": 0.0,
+  "durationMs": 12000, "inputTok": 1800, "outputTok": 120,
+  "cacheRead": 0, "cacheCreate": 0,
+  "branchCalls": 0, "delegateCalls": 1, "orchestrateTurns": 3,
+  "returnUser": true, "msgChars": 280,
+  "failReason": "FAILED: test_chunk (test_chunks.ChunkTest)"
+}
+```
+`failReason` categories: `turn-limit`, `no-edit`, `wrong-edit`, `timeout`, `api-429`, or the first `FAILED:` test line.
+
+---
+
+## Prompt fixes applied (history)
+
+All fixes that made orchestrate mode reliable (2026-10-17/18):
+1. `patchAndVerify` exclusion — was causing writeFile loop (secondary called patchAndVerify → writeFile → threw DISABLED)
+2. No-prose rule for secondary LLM — was writing English before TypeScript → parse errors
+3. Deferred import for p06 (circular import) — never create utils.py, always move import inside method
+4. p06 ONLY models.py — secondary was touching both files, breaking services.py
+5. p04 rate check ordering — check must happen before `sent.append()`, not after
+6. p07 Lock requirement — hidden test uses `inspect.getsource()`, must use threading.Lock literally
+7. Main LLM "audit mode" fix — removed policy examples that caused exploration-without-fixing
+
+---
+
+## Next directions
+
+- Analyze `failReason` distribution across modes to identify structural failure patterns
+- Investigate p01 (0/3 orchestrate) and p09 (0/3 orchestrate) — new consistent failures in clean run
+- Consider: longer `--orch-turns` for hard problems; per-problem turn budget
+- Consider: adding more problems to the eval set
+
+---
+
+## Orchestrate redesign — design notes (2026-10-18)
+
+### The fairness problem
+~~`orchestrate-system.md` contains per-problem hardcoded hints (deferred import for p06, Lock for p07, rate-check ordering for p04, etc.). These were added incrementally to fix failures. The result: orchestrate doesn't win because of a better tool interface — it wins because it has better prompt engineering. The comparison is contaminated.~~
+
+**RESOLVED (2026-10-19):** Stripped the p04/p06/p07 per-problem hints from `orchestrate-system.md`. Neither mode now has problem-specific hints. **Rerun the eval on p04, p06, p07 (and ideally all problems) to get clean, uncontaminated scores before drawing conclusions.**
+
+### The structural improvement: active coordinator
+
+Current orchestrate architecture:
+1. Main LLM gets `delegate` tool only
+2. File listing pre-injected into the main LLM's prompt
+3. Secondary LLM gets BM25-shortlisted composite tools pre-injected
+
+The pre-injection is passive — the coordinator is handed context it didn't ask for. The cleaner design is **active**: the coordinator uses tools to discover what it needs, just as a human engineer would.
+
+**Proposed coordinator tool set (replace file-listing injection):**
+- `list_files` — raw file tree for orientation
+- `grep(pattern)` / `find_symbol(name)` — targeted location without reading contents
+- `get_structure(path)` — semantic digest of a module: exports, imports, class/function names. No file contents.
+- `delegate(task, context)` — hand off a precise subtask with exactly the context the executor needs
+
+No `read_file` for the coordinator. Tool availability is the constraint — if there's no read tool, the coordinator stays high-level without being told to. File contents only appear in the executor's context.
+
+**Why this is better:**
+- Coordinator context grows only when it actively searches, not always
+- The BM25 shortlist (currently pre-computed) becomes a live `grep` the coordinator calls when it needs it
+- No file-listing injection needed — coordinator discovers structure on demand
+- `get_structure` gives semantic orientation (exports, imports) without raw content noise
+
+**Executor:** unchanged in concept — secondary LLM with branch programs (or Python equivalent). The context it receives is constructed by the coordinator's `delegate(task, context)` call, not pre-injected.
+
+### Branch-only: Python instead of TypeScript
+Branch-only's failures are partly TypeScript cognitive overhead (syntax errors, `returnUser` misuse, import restrictions). The fix is to use Python as the execution language — models are trained on far more Python than custom TypeScript DSLs. Custom helpers map naturally to Python functions or simple bash utilities. The "done vs. continue" signal: no special `returnUser` needed — just check if the model stops calling the tool (no tool call = done).
+
+### Fairness baseline for next experiment
+Before running: ensure all three modes have equivalent prompt quality (same level of general guidance, no per-problem hints in any of them). Then compare:
+- baseline: standard atomic tool calls
+- branch-python: single tool, Python execution language
+- orchestrate-active: coordinator with `list_files` / `grep` / `get_structure` / `delegate`, no pre-injection

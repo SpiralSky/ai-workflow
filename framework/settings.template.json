@@ -2,4 +2,5 @@
  "hooks":{
   "UserPromptSubmit":[{"hooks":[{"type":"command","command":"node __FW__/bin/report-hook.mjs"}]}],
   "Stop":[{"hooks":[{"type":"command","command":"node __FW__/bin/report-hook.mjs"}]}],
-  "PostToolUse":[{"matcher":"mcp__branch__branch","hooks":[{"type":"command","command":"node __FW__/bin/return-user-hook.mjs"}]}]}}
+  "PostToolUse":[{"matcher":"mcp__branch__branch","hooks":[{"type":"command","command":"node __FW__/bin/return-user-hook.mjs"}]}],
+  "PreToolUse":[{"matcher":"Edit|Write","hooks":[{"type":"command","command":"node __FW__/bin/direct-tool-hook.mjs"}]}]}}

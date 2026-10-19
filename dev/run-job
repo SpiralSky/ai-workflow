@@ -2,18 +2,20 @@
 # Delegate a framework dev task to a headless `claude -p` (normal user config, NOT the branch framework).
 # Usage: dev/run-job <jobs/jobX.md | jobX> [extra claude args...]
 # Prompt = jobs/_common.md + the job spec. Result JSON → dev/out/<job>.out.json; prints the final report.
-# DEV_CLAUDE_FLAGS overrides the permission flags (default: --permission-mode acceptEdits).
+# DEV_CLAUDE_FLAGS overrides the permission flags (default: --permission-mode auto).
 set -euo pipefail
 D="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 [ $# -ge 1 ] || { sed -n 3,5p "$0"; exit 1; }
-spec="$1"; shift
+arg="$1"; shift
+spec="$arg"
 [ -f "$spec" ] || spec="$D/jobs/${spec%.md}.md"
-[ -f "$spec" ] || { echo "no such job spec: $1" >&2; exit 1; }
+[ -f "$spec" ] || { echo "no such job spec: $arg" >&2; exit 1; }
 name="$(basename "${spec%.md}")"
 out="$D/out/$name.out.json"
 mkdir -p "$D/out"
 cd "$D/.."
 # shellcheck disable=SC2086
-claude -p "$(cat "$D/jobs/_common.md" "$spec")" --output-format json ${DEV_CLAUDE_FLAGS:---permission-mode acceptEdits} "$@" > "$out"
+claude -p "$(cat "$D/jobs/_common.md" "$spec")" --output-format json ${DEV_CLAUDE_FLAGS:---permission-mode auto} "$@" > "$out.tmp"
+mv "$out.tmp" "$out" # keep the previous result if claude fails
 node -e 'const r=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));
 console.log(r.result); console.error(`[run-job] ${r.subtype} · turns ${r.num_turns} · $${(r.total_cost_usd??0).toFixed(3)} · ${process.argv[1]}`)' "$out"
