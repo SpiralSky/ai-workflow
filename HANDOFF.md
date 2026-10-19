@@ -121,6 +121,35 @@ No `read_file` for the coordinator. Tool availability is the constraint — if t
 ### Branch-only: Python instead of TypeScript
 Branch-only's failures are partly TypeScript cognitive overhead (syntax errors, `returnUser` misuse, import restrictions). The fix is to use Python as the execution language — models are trained on far more Python than custom TypeScript DSLs. Custom helpers map naturally to Python functions or simple bash utilities. The "done vs. continue" signal: no special `returnUser` needed — just check if the model stops calling the tool (no tool call = done).
 
+## Prompting improvements applied (2026-10-19)
+
+Two prompt changes addressing Issue 06 (cross-call state / task decomposition):
+
+1. **`framework/prompt/.system.orchestrate-intent.md`** — added `## What a single delegate call can do` block:
+   - Lists full secondary tool set (bash, readFile, readSymbol, findFiles, edit, writeFile, runTests, parallel)
+   - Instructs main LLM to prefer combined task strings ("find + rename" is one call, not two)
+   - Explains when splits are justified and requires re-passing prior findings explicitly in the next task string
+
+2. **`framework/prompt/orchestrate-system.md`** — replaced fixed return format with instruction-shaped rules:
+   - find → return locations found
+   - rename/edit → return what changed + confirm success
+   - check condition → return result + evidence
+   - find-then-act → return action outcome; locations are implementation detail unless asked for
+
+**Design decision:** Issue 06 is a prompting gap, not a framework architecture gap. The delegate-memo.md scratchpad approach was deferred — prompting changes address the common case first.
+
+**Next:** Rerun the eval (all 9 problems, orchestrate mode) to measure impact after hint removal + prompting improvements.
+
+## Issue 03 — BM25 tool selection improvements (2026-10-19)
+
+Two changes to `framework/src/delegate.ts` and `server.ts`:
+1. **TOP_K raised to 12** (was 8) — reduces shortlist misses on multi-tool tasks.
+2. **`tools?: string[]` override on `delegate`** — main LLM can bypass BM25 when it knows exactly which tools are needed (e.g. `tools: ["bash", "edit", "runTests"]`). Falls back to BM25 when omitted or empty.
+
+`delegate-tool.md` updated to document the new `tools` parameter. 94 tests pass.
+
+---
+
 ### Fairness baseline for next experiment
 Before running: ensure all three modes have equivalent prompt quality (same level of general guidance, no per-problem hints in any of them). Then compare:
 - baseline: standard atomic tool calls

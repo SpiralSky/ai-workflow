@@ -61,3 +61,35 @@ direct tool-use baseline gets "for free".
 Fixing Issues 01, 03, 05, 06 should each independently improve pass rate.
 Prioritize 01 first (get visibility), then 06 (state loss is likely the biggest
 single contributor), then 03 (tool selection).
+
+## Update (2026-10-19)
+
+Contributing factor #4 (task decomposition not guided) and #5 (no cross-call learning) are now partially addressed via prompting changes — see [Issue 06](06-cross-call-state.md) resolution. A clean rerun is needed to measure impact.
+
+Note: the existing 63% vs 74% scores are contaminated (per-problem hints were stripped 2026-10-19). Re-run before drawing conclusions from these numbers.
+
+## Plan
+
+**Design: replace `returnUser()` with plain `return` + text response**
+
+Root cause: models forget to call `returnUser()` because it's a custom abstraction. The harness already supports text response as a loop termination path (`response.tool_calls` empty → `finalAnswer = response.content`). Moving to native `return` removes the special concept entirely.
+
+Three files to change:
+
+1. **`experiments/run.ts`** — system prompt (branch-only mode):  
+   Change from: `"You are a skilled software engineer. Use the branch tool for all work."`  
+   To: `"You are a skilled software engineer. Use the branch tool for all work. When the task is fully done, write your final answer as a plain text response."`
+
+2. **`framework/prompt/branch-system.md`** — add at the very top (before the description):  
+   `"RULE: Every branch program MUST end with return <value>. Use return to pass results between turns. When all work is complete, write your final answer as a text response (not a branch call)."`  
+   — remove `returnUser()` from required-pattern framing in examples (keep the helper listed but not as required)
+
+3. **`framework/src/server.ts`** — change the plain-return tool result message:  
+   From: `"Returned — no changes delivered yet. Call branch again to apply changes, or returnUser once done."`  
+   To: `"Returned — no changes delivered yet. Call branch again to apply changes, or write your final answer when done."`
+
+`returnUser()` stays in the API for backwards compat but is no longer required or emphasized.
+
+**Expected outcome:** Writing text at the end becomes correct behavior (not a failure). The `(no return value)` failures disappear because the only way to fail is to have a branch program with no `return` statement — a TS syntax error, easily caught.
+
+**Verification:** Run fresh eval (branch-only, n=3, deepseek/deepseek-chat-v3-0324) and check pass rate ≥ baseline.

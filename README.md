@@ -29,7 +29,7 @@ flowchart LR
 |------|-------------|-----------------|
 | **baseline** | Standard atomic tools: Bash, Read, Edit, Write, Glob, Grep. Control condition. | No context isolation — every tool result appends to context. |
 | **branch-only** | Model writes a short TypeScript program as a single `branch` tool call. Raw output stays inside the sandbox; only the return value enters context. | TypeScript cognitive overhead causes syntax errors and `returnUser` misuse. |
-| **orchestrate** | Two-tier: coordinator LLM gets only `delegate`; secondary LLM writes branch programs. BM25 shortlist pre-injects relevant composite tools into secondary context. | File listing is pre-injected (passive) rather than discovered on demand. Secondary LLM token cost is currently untracked (see [issue 01](dev/issues/01-secondary-token-tracking.md)). |
+| **orchestrate** | Two-tier: coordinator LLM gets only `delegate`; secondary LLM writes branch programs. BM25 shortlist pre-injects relevant composite tools into secondary context. | File listing is pre-injected (passive) rather than discovered on demand. Task decomposition quality depends on main LLM writing self-contained task strings (see [issue 06](dev/issues/06-cross-call-state.md), addressed 2026-10-19). |
 
 ### Planned: orchestrate-active
 
