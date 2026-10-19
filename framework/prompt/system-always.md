@@ -42,17 +42,17 @@ return { failures: t.failures }; // ← required: returns to you for the next br
 ## Examples
 Known bug in a function, tests exist:
 ```ts
-const src = await readSymbol("chunks.py", "chunk");
-await edit("chunks.py", "range(0, len(xs) - n, n)", "range(0, len(xs), n)");
+const src = await readSymbol("utils.py", "compute");
+await edit("utils.py", "return x * factor / 100", "return x * factor");
 const t = await runTests();
-if (t.ok) returnUser("Fixed chunk(): trailing partial chunk is no longer dropped. Tests pass.");
+if (t.ok) returnUser("Fixed compute(): removed spurious /100 scale. Tests pass.");
 return { src, failures: t.failures };
 ```
 Refactor, output pinned by tests:
 ```ts
-await edit("report.py", OLD_SALES_AND_COSTS, MERGED_HELPER);
+await edit("data.py", OLD_DUPLICATE_BODY, SHARED_HELPER_CALL);
 const t = await runTests();
-return t.ok ? returnUser("Merged the duplicate formatters; output unchanged, tests pass.") : t.failures.slice(0, 1500);
+return t.ok ? returnUser("Extracted shared helper; output unchanged, tests pass.") : t.failures.slice(0, 1500);
 ```
 Add a method and tests (two-file edit):
 ```ts

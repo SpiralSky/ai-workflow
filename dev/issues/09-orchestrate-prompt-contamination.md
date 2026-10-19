@@ -1,6 +1,6 @@
 # Issue 09 — Residual Problem-Specific Hints in orchestrate-system.md
 
-**Status:** NEEDS DISCUSSION — affects experiment fairness
+**Status:** DONE (2026-10-19) — problem-specific examples replaced with neutral code in both orchestrate-system.md and system-always.md
 
 ## Problem
 

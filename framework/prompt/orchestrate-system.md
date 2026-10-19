@@ -107,15 +107,15 @@ Use template literals for **any** edit involving Python strings, function calls,
 The workspace file listing is provided above. **Read all potentially relevant files before deciding where the bug lives** — bugs often span multiple files (e.g. a config file, not just the main module). Do not assume the bug is in the most obvious file.
 
 **Diagnose with runTests() first**: If you haven't run the tests yet, do that on turn 1. The failure message (expected vs. actual values, tracebacks) tells you exactly what's wrong. For example:
-- `AssertionError: 99.85 != 85` means the price formula is applying a percentage discount where the value is already a fraction (0.15), dividing by 100 again unnecessarily.
-- `ImportError: cannot import name X` means a circular dependency — trace which file imports what (see circular import fix below).
+- `AssertionError: 2.5 != 2` — check whether a numeric value is being scaled (multiplied or divided) when it shouldn't be; read the config file to verify the units the value is stored in.
+- `ImportError: cannot import name X` means a circular dependency — trace which file imports what and add a deferred import (`import X` inside the function) to break the cycle.
 - `AttributeError: 'Foo' has no attribute 'bar'` means the method needs to be added to Foo.
-- `AssertionError: [[1, 2], [3, 4]] != [[1, 2], [3, 4], [5]]` (trailing items missing) — a `range`-based loop is dropping the trailing partial chunk. Fix: replace the loop with a list comprehension `[xs[i:i+n] for i in range(0, len(xs), n)]` — this naturally includes the trailing partial. Run tests to confirm.
-- `sales/costs formatters still copy-pasted` means two functions share the same body; extract a shared `_format_section(title, rows, show_total)` helper and call it from both.
-- `AttributeError: module 'X' has no attribute 'sent'` after you edited X — you overwrote the file and dropped the module-level variable `sent = []`. **Critical**: always use `edit()` to INSERT new code; never replace the whole file. The correct approach: `await edit("messenger.py", "sent = []\n", "sent = []\n\n<your new rate-limiting variables here>\n");` — this adds new variables AFTER the existing `sent = []` line rather than replacing the file.
+- `AssertionError: [1, 2] != [1, 2, 3]` (trailing items missing) — an off-by-one in a loop bound is dropping the last element(s). Check the loop range and adjust so it covers all items.
+- `AssertionError: … two functions produce identical output` — two functions likely share copy-pasted bodies; extract a shared helper and call it from both.
+- `AttributeError: module 'X' has no attribute 'counter'` after you edited X — you overwrote the file and dropped a module-level variable. **Critical**: always use `edit()` to INSERT new code; never replace the whole file. The correct approach: `await edit("module.py", "counter = 0\n", "counter = 0\n\n<your new variables here>\n");` — this adds new variables AFTER the existing line rather than replacing the file.
 
 **When visible tests pass but task involves specific requirements**: Do NOT assume the job is done just because `runTests()` returns ok. Read the task description carefully:
-- If the task involves a discount/pricing formula → read the config file to check the units. If config stores fractions like `0.15` (not `15`), and the formula does `price * (1 - pct / 100)`, the bug is the `/100` — change to `price * (1 - pct)`.
+- If the task involves a numeric formula → read any config or constants file to check the units. If the formula applies a scale factor that the value already incorporates, that scale factor is the bug.
 - If the no-edit-guard fires ("returnUser called but no files modified") → you must make an actual edit before calling returnUser.
 
 Read the test file to understand what values it expects. Then read every file that could contribute to those values before deciding which file to fix.
