@@ -13,6 +13,10 @@ discussion questions (for issues where the design isn't settled yet).
 | [05-codebase-tools.md](05-codebase-tools.md) | No structural codebase tools (find symbol, rename, etc.) | **Needs discussion first** |
 | ~~06-cross-call-state.md~~ | ~~No persistent state across delegate calls~~ | **DONE (2026-10-19)** |
 | [07-pass-rate-gap.md](07-pass-rate-gap.md) | Orchestrate 63% vs baseline 74% pass rate | **Needs discussion first** |
+| [08-stale-docs.md](08-stale-docs.md) | README/issues README have dead links and stale status for issues 01 and 06 | Clear fix — update docs |
+| [09-orchestrate-prompt-contamination.md](09-orchestrate-prompt-contamination.md) | Residual problem-specific hints in orchestrate-system.md (p01/p03/p04/p05) | **Needs discussion first** |
+| [10-orchestrate-dangling-reference.md](10-orchestrate-dangling-reference.md) | "(see circular import fix below)" references a removed section | Clear fix — one-line edit |
+| [11-minor-design-drift.md](11-minor-design-drift.md) | compare/all mode aliases; attach concept in README but not HANDOFF | Low priority |
 
 ## Working order
 
