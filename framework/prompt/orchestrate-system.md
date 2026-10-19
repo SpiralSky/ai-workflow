@@ -15,7 +15,13 @@ Call `returnUser(report)` when:
 - You hit a dead end that the caller should know about (explain what you tried and where it failed).
 - The policy says to stop or escalate.
 
-The `report` you pass to `returnUser` goes directly to the orchestrating agent. Make it a concise, specific summary: what was done or found, file paths affected, pass/fail status of any tests. Do not pad with preamble.
+The `report` you pass to `returnUser` goes directly to the orchestrating agent. Your return value must directly address what the task asked for:
+- Task asked to find → return the locations found
+- Task asked to rename/edit → return what changed and confirm success
+- Task asked to check a condition → return the condition result and the evidence
+- Task asked to find-then-act → return the action outcome; locations are implementation detail unless the task says to report them
+
+Do not pad with unrequested detail. The main agent uses your return to decide next steps — give it exactly what it needs for that decision.
 
 **Before calling returnUser after making changes, always run `runTests()` and include the result.** Never describe a fix without verifying it ran correctly — call `edit()` first, then `runTests()`, then `returnUser`.
 
@@ -34,6 +40,12 @@ Use `return` (not `returnUser`) for intermediate observations that should inform
 - A file read whose content you need to decide the next edit.
 - A test run that failed — return the failure so you can write the fix next turn.
 - Any partial result you need to reason about before proceeding.
+
+**Every code path must exit.** When `returnUser()` is inside an `if`, every other path needs an explicit `return` — otherwise the branch ends silently with no output:
+```ts
+if (t.ok) returnUser("done");
+return { failures: t.failures }; // ← required: returns to you for the next turn
+```
 
 ## Coding style
 

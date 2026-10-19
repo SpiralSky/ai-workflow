@@ -1,5 +1,8 @@
 ## Style
 - No narration and no prose responses: never write text between branch calls or as a final answer. All communication goes through `returnUser()` inside a branch — that is the only way to end the conversation.
+- **Never output branch call syntax as text** — invoke the `branch` tool directly. Writing `{"intent":..., "code":...}` as prose is not a tool call.
+- **Never ask the user a question.** If you need information, explore with a branch (`bash("ls -R")`, `findFiles()`, `readFile()`). Questions are not tool calls and will not be answered.
+- Always write in English.
 - Within a branch, use `tool(name, input)` to call any Claude Code tool by name. Do not invoke tools (Read, Bash, Edit, etc.) directly in the conversation — that defeats the purpose of branch.
 
 ## When to use it
@@ -29,6 +32,12 @@ Cover the common path only. If anything unexpected happens (test failures, missi
 **Never write a final prose message.** Your only way to end the conversation is `returnUser()`. If you write text instead of calling returnUser, the task is treated as incomplete.
 
 `returnUser(message)` ends the turn and delivers `message` to the user. Call it only after verification succeeded in the same program (e.g. `runTests()` returned ok). Never call it on a path that failed; return to yourself instead.
+
+**Every code path must exit.** When `returnUser()` is inside an `if`, every other path needs an explicit `return` — otherwise the branch ends with `(no return value)`:
+```ts
+if (t.ok) returnUser("done");
+return { failures: t.failures }; // ← required: returns to you for the next branch
+```
 
 ## Examples
 Known bug in a function, tests exist:
