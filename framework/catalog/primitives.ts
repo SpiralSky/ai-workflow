@@ -30,6 +30,8 @@ export const primitives: ToolEntry[] = [
       "It returns the command output and exit code so you can branch on success or failure. " +
       "Prefer it for exact-text searches, file-system operations, and any task where a single shell invocation suffices.",
     tags: ["shell", "command", "grep", "find", "run", "execute", "cli", "script", "lint", "compile"],
+    capability: "shell commands, file search, and any CLI invocation",
+    frameHint: "Fallback when no other helper covers the operation. Primary tool for grep, find, counting, and invoking arbitrary CLIs.",
     executionKind: "helper",
     tsDeclaration:
       "declare function bash(cmd: string, opts?: { timeoutMs?: number }): Promise<{ code: number; out: string }>;",
@@ -57,6 +59,8 @@ export const primitives: ToolEntry[] = [
       "Prefer readSymbol when you only need one function or class to avoid loading a large file. " +
       "Use readFile for small files, config files, or when you need to see the full context.",
     tags: ["file", "read", "contents", "source", "config", "inspect"],
+    capability: "full file reading",
+    frameHint: "Use for small files or when full context is needed. Prefer readSymbol when only one function or class is relevant.",
     executionKind: "helper",
     tsDeclaration: "declare function readFile(path: string): Promise<string>;",
   },
@@ -86,6 +90,8 @@ export const primitives: ToolEntry[] = [
       "inspecting a class's methods, verifying a type definition, or reading a helper before calling it. " +
       "Use it before editing a function to capture the exact old string for the edit call.",
     tags: ["function", "class", "symbol", "source", "read", "inspect", "definition", "implementation"],
+    capability: "extract one function or class by name without reading the whole file",
+    frameHint: "Covers the manual grep + content-scan loop for locating a symbol. If you know the file and symbol name, use this directly.",
     executionKind: "helper",
     tsDeclaration: "declare function readSymbol(path: string, name: string): Promise<string>;",
   },
@@ -111,6 +117,8 @@ export const primitives: ToolEntry[] = [
       "Returns a list of matching file paths. Combine with readFile or readSymbol to then inspect the found files. " +
       "Use bash with grep when you need to find files containing specific text rather than just matching by name.",
     tags: ["file", "search", "glob", "find", "list", "discover", "pattern"],
+    capability: "glob-based file discovery",
+    frameHint: "Use to locate files by name or extension. Use bash grep when searching by file content.",
     executionKind: "helper",
     tsDeclaration: "declare function findFiles(glob: string): Promise<string[]>;",
   },
@@ -142,6 +150,8 @@ export const primitives: ToolEntry[] = [
       "Always read the current content with readFile or readSymbol first to capture the exact old string. " +
       "The old string must appear exactly once in the file; include enough surrounding context to ensure uniqueness.",
     tags: ["edit", "modify", "fix", "patch", "change", "replace", "update", "file"],
+    capability: "surgical exact-string replacement in existing files",
+    frameHint: "Standard way to modify any existing file. Read the current text first if you do not already have the exact old string.",
     executionKind: "helper",
     tsDeclaration:
       "declare function edit(path: string, oldStr: string, newStr: string): Promise<void>;",
@@ -170,6 +180,8 @@ export const primitives: ToolEntry[] = [
       "It only works for files that do not yet exist; use edit to modify an existing file. " +
       "Combine with runTests to verify the new file integrates correctly.",
     tags: ["create", "write", "new", "file", "generate", "scaffold"],
+    capability: "create a new file with given content",
+    frameHint: "Only for files that do not yet exist; throws on existing files. Use edit for any modification to existing files.",
     executionKind: "helper",
     tsDeclaration: "declare function writeFile(path: string, content: string): Promise<void>;",
   },
@@ -201,6 +213,8 @@ export const primitives: ToolEntry[] = [
       "An optional filter narrows to specific test names (Python only). " +
       "Combine with edit in a single branch: edit the code, run tests, return pass/fail.",
     tags: ["test", "verify", "check", "pass", "fail", "suite", "run"],
+    capability: "run the project test suite and return pass/fail",
+    frameHint: "Covers locating and invoking the test runner — do not run tests via bash manually. Always call before returnUser after any edit.",
     executionKind: "helper",
     tsDeclaration:
       "declare function runTests(filter?: string): Promise<{ ok: boolean; failures: string }>;",
@@ -232,6 +246,8 @@ export const primitives: ToolEntry[] = [
       "It uses a cheap fast model. Prefer exit codes and grep for deterministic checks; " +
       "use check only when the question requires natural-language reasoning.",
     tags: ["llm", "judgment", "boolean", "question", "reason", "fuzzy", "classify"],
+    capability: "boolean fuzzy judgment on text via cheap LLM",
+    frameHint: "Use for yes/no questions that cannot be answered by exit codes or exact string matching.",
     executionKind: "helper",
     tsDeclaration:
       "declare function check(text: string, question: string): Promise<boolean>;",
@@ -266,6 +282,7 @@ export const primitives: ToolEntry[] = [
       "Provide clear label descriptions so the model can make an accurate choice. " +
       "Like check, prefer deterministic methods when possible.",
     tags: ["llm", "categorize", "label", "classify", "type", "category", "route"],
+    capability: "categorize text into named labels via cheap LLM",
     executionKind: "helper",
     tsDeclaration:
       "declare function classify<L extends string>(text: string, labels: Record<L, string>): Promise<L>;",
@@ -300,6 +317,8 @@ export const primitives: ToolEntry[] = [
       "reformatting text, translating between formats, or producing a one-paragraph explanation. " +
       "It uses a fast cheap model; use llm for tasks requiring better reasoning or more careful output.",
     tags: ["llm", "summarize", "generate", "extract", "explain", "rewrite", "cheap", "fast"],
+    capability: "cheap LLM for summarization, extraction, and simple generation",
+    frameHint: "Use for summarization, format conversion, or extracting structured info from prose. Cheaper and faster than llm.",
     executionKind: "helper",
     tsDeclaration:
       "declare function weakLLM(prompt: string, opts?: { ctx?: unknown[] }): Promise<string>;",
@@ -334,6 +353,8 @@ export const primitives: ToolEntry[] = [
       "planning how to approach a refactor, or producing output that needs to be accurate and well-structured. " +
       "It uses a more capable but slower model. Use weakLLM for simple summarization or extraction.",
     tags: ["llm", "reason", "analyze", "generate", "plan", "complex", "strong"],
+    capability: "capable LLM for complex analysis, reasoning, and generation",
+    frameHint: "Use when reasoning quality matters: root-cause analysis, non-trivial code generation, or complex explanation. Slower and more expensive than weakLLM.",
     executionKind: "helper",
     tsDeclaration:
       "declare function llm(prompt: string, opts?: { ctx?: unknown[] }): Promise<string>;",
@@ -367,6 +388,8 @@ export const primitives: ToolEntry[] = [
       "Particularly useful for WebFetch (fetching web pages or documentation) since there is no direct " +
       "web-fetch helper. Also useful when you want to use the same interface as Claude Code's own tools.",
     tags: ["builtin", "claude", "read", "write", "grep", "glob", "web", "fetch", "dispatch"],
+    capability: "Claude Code built-in tools: Read, Write, Edit, Bash, Glob, Grep, WebFetch",
+    frameHint: "Primary route for WebFetch (fetching URLs). Also exposes Glob and Grep as named alternatives to bash find/grep.",
     executionKind: "builtin",
     tsDeclaration: [
       'declare function tool(name: "Bash", input: { command: string; timeout?: number }): Promise<string>;',
@@ -407,6 +430,7 @@ export const primitives: ToolEntry[] = [
       "It returns a tuple of all results in the same order as the inputs. " +
       "Only use it for operations that do not depend on each other's results.",
     tags: ["parallel", "concurrent", "speed", "multiple", "simultaneous"],
+    capability: "run multiple async operations concurrently",
     executionKind: "helper",
     tsDeclaration:
       "declare function parallel<T extends readonly unknown[]>(...ps: T): Promise<{ [K in keyof T]: Awaited<T[K]> }>;",
@@ -435,6 +459,7 @@ export const primitives: ToolEntry[] = [
       "It ends execution immediately; nothing after it runs. " +
       "Use it only when the task is truly finished or when an escalation condition from the policy is met.",
     tags: ["done", "complete", "report", "end", "finish", "return", "signal"],
+    capability: "signal task completion and return final report to the caller",
     executionKind: "helper",
     tsDeclaration: "declare function returnUser(message: string): never;",
   },
@@ -461,8 +486,96 @@ export const primitives: ToolEntry[] = [
       "and was stored as a handle like $h1. Results that mention a handle ID must be expanded with " +
       "getHandle before their content can be used. Call it in a subsequent branch if the prior result was truncated.",
     tags: ["handle", "truncated", "retrieve", "large", "overflow"],
+    capability: "retrieve full content of a truncated result by handle ID",
     executionKind: "helper",
     tsDeclaration: "declare function getHandle(id: string): string;",
+  },
+
+  {
+    id: "findSymbol",
+    name: "findSymbol",
+    toolDef: {
+      name: "findSymbol",
+      description:
+        "Find where a function, class, or variable is defined. Returns file paths and line numbers.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          name: { type: "string", description: "The symbol name to search for" },
+        },
+        required: ["name"],
+      },
+    },
+    searchDescription:
+      "Locate a symbol definition, find where a function or class is declared, navigate to a definition.",
+    useCaseSummary:
+      "Use findSymbol to locate a symbol's definition before reading or editing it. " +
+      "Returns an array of { file, line, kind } objects. Faster than grep-scanning manually. " +
+      "Searches Python, TypeScript, and JavaScript files across the workspace.",
+    tags: ["search", "navigation", "symbol", "definition", "find", "locate"],
+    capability: "find where a function, class, or variable is defined across the workspace",
+    executionKind: "helper",
+    frameHint: "Use to locate a symbol's definition before reading or editing it. Faster than grep-scanning manually.",
+    tsDeclaration:
+      "declare function findSymbol(name: string): Promise<{ file: string; line: number; kind: string }[]>;",
+  },
+
+  {
+    id: "findCallers",
+    name: "findCallers",
+    toolDef: {
+      name: "findCallers",
+      description:
+        "Find all call sites of a function or symbol across the workspace.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          name: { type: "string", description: "The function or symbol name to search for call sites" },
+        },
+        required: ["name"],
+      },
+    },
+    searchDescription:
+      "Find all usages of a function, locate call sites, find where a symbol is called or referenced.",
+    useCaseSummary:
+      "Use findCallers before renaming or changing a function's signature to see all affected call sites. " +
+      "Returns an array of { file, line, context } objects where context is the matched line trimmed. " +
+      "Excludes node_modules, .git, and __pycache__.",
+    tags: ["search", "navigation", "callers", "usages", "references", "call", "sites"],
+    capability: "find all call sites of a function or symbol across the workspace",
+    executionKind: "helper",
+    frameHint: "Use before renaming or changing a function's signature to see all affected call sites.",
+    tsDeclaration:
+      "declare function findCallers(name: string): Promise<{ file: string; line: number; context: string }[]>;",
+  },
+
+  {
+    id: "listSymbols",
+    name: "listSymbols",
+    toolDef: {
+      name: "listSymbols",
+      description:
+        "List all top-level function and class definitions in a file.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          file: { type: "string", description: "Path to the file to inspect (workspace-relative)" },
+        },
+        required: ["file"],
+      },
+    },
+    searchDescription:
+      "List all functions and classes in a file, get a file outline, enumerate top-level symbols.",
+    useCaseSummary:
+      "Use listSymbols instead of readFile when you only need to know what symbols a file contains. " +
+      "Returns an array of { name, line, kind } objects for all top-level and method-level definitions. " +
+      "Works on Python, TypeScript, and JavaScript files.",
+    tags: ["search", "navigation", "outline", "list", "symbols", "functions", "classes"],
+    capability: "list all top-level function and class definitions in a file",
+    executionKind: "helper",
+    frameHint: "Use instead of readFile when you only need to know what symbols a file contains.",
+    tsDeclaration:
+      "declare function listSymbols(file: string): Promise<{ name: string; line: number; kind: string }[]>;",
   },
 
   {
@@ -486,6 +599,7 @@ export const primitives: ToolEntry[] = [
       "or track which files have already been processed. " +
       "Values must be JSON-serializable. State is lost if the branch times out.",
     tags: ["state", "persist", "store", "accumulate", "memory", "across", "turns"],
+    capability: "persist data across multiple branch turns",
     executionKind: "helper",
     tsDeclaration: "declare const state: Record<string, unknown>;",
   },

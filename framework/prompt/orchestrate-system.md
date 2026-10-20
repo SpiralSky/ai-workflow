@@ -102,6 +102,18 @@ Use template literals for **any** edit involving Python strings, function calls,
 - To replace **most or all of a file**: `const c = await readFile(path); await edit(path, c, newContent);`
 - To **create a brand-new file**: use `bash(\`cat > newfile.py << 'PYEOF'\n${content}\nPYEOF\`)`
 
+## Symbol-search helpers
+
+Three helpers provide grep-backed symbol navigation without requiring a full IDE integration:
+
+| Helper | Signature | Use when |
+|--------|-----------|----------|
+| `findSymbol` | `findSymbol(name) → { file, line, kind }[]` | You need to locate where a function/class/variable is defined before reading or editing it. |
+| `findCallers` | `findCallers(name) → { file, line, context }[]` | You need to find all call sites before renaming or changing a function's signature. |
+| `listSymbols` | `listSymbols(file) → { name, line, kind }[]` | You need a file outline — what symbols exist — without reading the whole file. |
+
+All three search Python, TypeScript, and JavaScript files. Results are limited (20 / 30 / 50) and workspace-relative.
+
 ## File discovery and diagnosis
 
 The workspace file listing is provided above. **Read all potentially relevant files before deciding where the bug lives** — bugs often span multiple files (e.g. a config file, not just the main module). Do not assume the bug is in the most obvious file.

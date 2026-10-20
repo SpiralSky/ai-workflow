@@ -125,6 +125,36 @@ export function makeHelpers(s: Session, limits: Limits, path: string[], signal: 
   const llm = (prompt: string, opts: { ctx?: unknown[] } = {}) =>
     timed("llm", { prompt }, async () => { llmStep(); return complete(s, MODELS.strong, withCtx(prompt, opts.ctx)); }, () => "llm(sub)");
 
+  const findSymbol = async (name: string) => {
+    const pattern = `(def |function |class |const |let |var )${name}[\\s(:{=]`;
+    const r = await sh(`grep -rn --include="*.py" --include="*.ts" --include="*.js" -E -- ${JSON.stringify(pattern)} . 2>/dev/null | head -20`, s.cwd, 10_000);
+    return r.out.trim().split("\n").filter(Boolean).slice(0, 20).map(line => {
+      const m = line.match(/^(.+?):(\d+):(.*)/);
+      if (!m) return null;
+      const kindMatch = m[3].match(/\b(def|function|class|const|let|var)\b/);
+      return { file: m[1], line: parseInt(m[2]), kind: kindMatch?.[1] ?? "symbol" };
+    }).filter(Boolean) as { file: string; line: number; kind: string }[];
+  };
+
+  const findCallers = async (name: string) => {
+    const pattern = `${name}[.(]`;
+    const r = await sh(`grep -rn --include="*.py" --include="*.ts" --include="*.js" -E -- ${JSON.stringify(pattern)} . 2>/dev/null | grep -v "node_modules\\|__pycache__\\|\\.git" | head -30`, s.cwd, 10_000);
+    return r.out.trim().split("\n").filter(Boolean).slice(0, 30).map(line => {
+      const m = line.match(/^(.+?):(\d+):(.*)/);
+      if (!m) return null;
+      return { file: m[1], line: parseInt(m[2]), context: m[3].trim() };
+    }).filter(Boolean) as { file: string; line: number; context: string }[];
+  };
+
+  const listSymbols = async (file: string) => {
+    const r = await sh(`grep -n -E "^(def |class |function |const |let |var |    def |  def )" ${JSON.stringify(file)} 2>/dev/null | head -50`, s.cwd, 5_000);
+    return r.out.trim().split("\n").filter(Boolean).slice(0, 50).map(line => {
+      const m = line.match(/^(\d+):\s*(def |class |function |const |let |var )\s*(\w+)/);
+      if (!m) return null;
+      return { name: m[3], line: parseInt(m[1]), kind: m[2].trim() };
+    }).filter(Boolean) as { name: string; line: number; kind: string }[];
+  };
+
   const parallel = (...ps: Promise<unknown>[]) => Promise.all(ps);
 
   const returnUser = (message: string): never => {
@@ -167,12 +197,13 @@ export function makeHelpers(s: Session, limits: Limits, path: string[], signal: 
     }
   };
 
-  return { bash, readFile, readSymbol, findFiles, edit, writeFile: writeNewFile, runTests, check, classify, weakLLM, llm, parallel, returnUser, getHandle, tool, state: s.state };
+  return { bash, readFile, readSymbol, findFiles, edit, writeFile: writeNewFile, runTests, check, classify, weakLLM, llm, findSymbol, findCallers, listSymbols, parallel, returnUser, getHandle, tool, state: s.state };
 }
 
 const FILTERABLE_HELPERS = new Set([
   "bash", "readFile", "readSymbol", "findFiles", "edit", "writeFile",
   "runTests", "check", "classify", "weakLLM", "llm", "tool",
+  "findSymbol", "findCallers", "listSymbols",
 ]);
 
 // makeFilteredHelpers wraps makeHelpers and stubs out any helper not in `allowed`.

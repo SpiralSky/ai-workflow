@@ -57,7 +57,7 @@ if (mode === "branch" || mode === "both") {
       const text =
         r.kind === "user" ? `${RETURN_USER_MARKER}\n${userMsg}\n${r.path}\n(Delivered to user. Do not repeat it; end your turn.)`
         : r.kind === "error" ? `ERROR: ${r.text}\n${r.path}`
-        : `${r.text}\n${r.path}\n(Returned — no changes delivered yet. Call branch again to apply changes, or returnUser once done.)`;
+        : `${r.text}\n${r.path}\nReturned — no changes delivered yet. Call branch again to apply changes, or write your final answer when done.`;
       return { content: [{ type: "text", text }], isError: r.kind === "error" };
     },
   );

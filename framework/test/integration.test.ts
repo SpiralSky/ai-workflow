@@ -130,13 +130,10 @@ describe("orchestrate integration", () => {
           branchCodeReceived = code;
           return { kind: "user" as const, text: "helpers.ts exports makeHelpers, makeFilteredHelpers, makeChildSession", path: "" };
         },
-        frameFn: async (_task, _steps, finalMessage) =>
-          `Report: ${finalMessage ?? "no message"}`,
         disableEditGuard: true,
       },
     );
 
-    // frameFn is not called when returnUser provides text directly — result is the returnUser message.
     assert.ok(result.includes("makeHelpers"), `expected returnUser text in result, got: ${result}`);
     assert.ok(result.includes("makeHelpers"), `report should include message content`);
     assert.ok(branchCodeReceived.length > 0, "branch code was executed");
@@ -165,7 +162,6 @@ describe("orchestrate integration", () => {
           codePassedToBranch = code;
           return { kind: "user" as const, text: "found 3 callers", path: "" };
         },
-        frameFn: async (_t, _s, msg) => msg ?? "",
       },
     );
 

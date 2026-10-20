@@ -109,6 +109,9 @@ export function search(task: string, index: BM25Index, topK = 8): ToolEntry[] {
 export function buildFilteredDecls(entries: ToolEntry[]): string {
   const lines: string[] = ["// Filtered tool declarations for this task"];
   for (const entry of entries) {
+    if (entry.frameHint) {
+      lines.push(`// Frame: ${entry.frameHint}`);
+    }
     if (entry.composite) {
       lines.push(entry.composite.declaration);
     } else if (entry.tsDeclaration) {
@@ -116,6 +119,15 @@ export function buildFilteredDecls(entries: ToolEntry[]): string {
     }
   }
   return lines.join("\n");
+}
+
+// Build a compact capability summary from shortlisted tools for Layer 1 framing.
+// Returns a " · "-joined list of capability phrases, or empty string if none have the field.
+export function buildCapabilityPreamble(entries: ToolEntry[]): string {
+  const caps = entries
+    .filter((e) => e.capability)
+    .map((e) => e.capability!);
+  return caps.join(" · ");
 }
 
 export function buildCompositePrelude(entries: ToolEntry[]): string {

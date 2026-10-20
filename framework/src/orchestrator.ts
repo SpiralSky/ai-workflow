@@ -8,14 +8,15 @@ import { complete, MODELS } from "./llm.js";
 import { runBranch, defaultLimits } from "./runner.js";
 import { makeChildSession } from "./helpers.js";
 import { trace } from "./trace.js";
-import { buildFilteredDecls, buildCompositePrelude } from "./catalog.js";
+import { buildFilteredDecls, buildCompositePrelude, buildCapabilityPreamble } from "./catalog.js";
 import type { Session } from "./helpers.js";
 import type { Limits } from "./runner.js";
 import type { ToolEntry } from "../catalog/types.js";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const SYSTEM_PROMPT_PATH = join(root, "prompt", "orchestrate-system.md");
-const MAX_TURNS = parseInt(process.env.BRANCH_ORCHESTRATE_MAX_TURNS ?? "15");
+// 4 is deliberately lax — tighten as the framework matures and branch reliability improves
+const MAX_TURNS = parseInt(process.env.BRANCH_ORCHESTRATE_MAX_TURNS ?? "4");
 const ORCHESTRATE_MODEL = process.env.BRANCH_ORCHESTRATE_MODEL ?? MODELS.strong;
 const STEP_CAP = 6000; // chars kept per step observation
 
@@ -110,8 +111,6 @@ function capStep(text: string, turn: number, kind: string): string {
 export interface OrchestratorDeps {
   completeFn?: (s: Session, model: string, prompt: string) => Promise<string>;
   runBranchFn?: typeof runBranch;
-  // frameFn overrides the final report-framing LLM call; useful in tests to avoid an extra completeFn call.
-  frameFn?: (task: string, steps: string[], finalMessage: string | undefined, filesChanged?: boolean) => Promise<string>;
   // disableEditGuard: skip the hallucinated-edit check (for tests with mocked runBranchFn).
   disableEditGuard?: boolean;
 }
@@ -132,17 +131,21 @@ export async function orchestrate(
   const parentTag = parentSession.traceFile ? basename(parentSession.traceFile, ".jsonl") : undefined;
   if (parentTag) trace(childSession, { type: "session", parentTag });
 
-  const doFrame = deps.frameFn
-    ? deps.frameFn
-    : (t: string, s: string[], f: string | undefined, fc?: boolean) => frameReport(t, s, f, completeFn, childSession, fc);
   // Strip excluded helpers from the shortlist before building decls and allowed set,
   // so they don't appear in the prompt at all.
   const prunedShortlist = shortlist.filter(e => !ORCHESTRATE_EXCLUDED.has(e.id));
+  const frameHints = prunedShortlist.map(e => e.frameHint).filter((h): h is string => !!h);
+  const framingBlock = frameHints.length > 0
+    ? `\n\n## Framing\n${frameHints.map(h => `- ${h}`).join("\n")}`
+    : "";
   const allowedSet = buildAllowedSet(prunedShortlist);
   const filteredDecls = buildFilteredDecls(prunedShortlist);
   const compositePrelude = buildCompositePrelude(prunedShortlist);
 
-  const toolBlock = `## Available helpers\n\`\`\`ts\n${filteredDecls || "(no helpers selected)"}\n\`\`\``;
+  const capPreamble = buildCapabilityPreamble(prunedShortlist);
+  const toolBlock =
+    (capPreamble ? `## Capabilities\n${capPreamble}\n\n` : "") +
+    `## Available helpers\n\`\`\`ts\n${filteredDecls || "(no helpers selected)"}\n\`\`\``;
   const policyBlock = policy ? `\n\n## Policy\n${policy}` : "";
 
   // Inject workspace file listing so the secondary LLM knows all files that exist.
@@ -161,7 +164,7 @@ export async function orchestrate(
       : "";
 
     const prompt =
-      `${systemPrompt()}\n\n${toolBlock}${fileListBlock}\n\n## Task\n${task}${policyBlock}${priorBlock}`;
+      `${systemPrompt()}${framingBlock}\n\n${toolBlock}${fileListBlock}\n\n## Task\n${task}${policyBlock}${priorBlock}`;
 
     let code: string;
     let llmErr: string | undefined;
@@ -208,51 +211,12 @@ export async function orchestrate(
         steps.push(`[turn ${turn + 1} / no-test-guard] returnUser was called but the report contains no test output. Run runTests() and include the result (pass count or failure details) before calling returnUser.`);
         continue;
       }
-      // Secondary LLM's returnUser message is already a concise report — skip the extra framing call.
-      return result.text || await doFrame(task, steps, undefined);
+      return result.text || steps.join("\n---\n") || "No output.";
     }
 
     steps.push(capStep(result.text, turn, result.kind));
   }
 
-  // Exhausted turns or broke early — frame whatever was collected
-  const filesChanged = anyFileChanged(mtimesBefore, parentSession.cwd);
-  return doFrame(task, steps, undefined, filesChanged);
-}
-
-async function frameReport(
-  task: string,
-  steps: string[],
-  finalMessage: string | undefined,
-  completeFn: (s: Session, model: string, prompt: string) => Promise<string>,
-  s: Session,
-  filesChanged = true,
-): Promise<string> {
-  const MAX_EVIDENCE = 12_000;
-  let evidenceStr = steps.join("\n---\n");
-  if (evidenceStr.length > MAX_EVIDENCE) {
-    evidenceStr = "…[earlier steps truncated]\n---\n" + evidenceStr.slice(-MAX_EVIDENCE);
-  }
-  const evidence = finalMessage
-    ? `Final result:\n${finalMessage}`
-    : steps.length > 0
-    ? `Step results:\n${evidenceStr}`
-    : "No steps were completed.";
-
-  const noEditNote = !filesChanged
-    ? "\n\nCRITICAL: No files were modified during this run. Do NOT describe any fix as having been applied. Report that the task could not be completed."
-    : "";
-
-  const prompt =
-    `Given the task: "${task}"\n\n${evidence}${noEditNote}\n\n` +
-    `Write a concise report (3-8 sentences) summarizing what was accomplished, ` +
-    `what was found or changed, and any remaining issues. ` +
-    `Include specific file paths and test results where relevant. ` +
-    `Do not pad with preamble.`;
-
-  try {
-    return await completeFn(s, MODELS.weak, prompt);
-  } catch {
-    return evidence; // fallback: return raw evidence if framing fails
-  }
+  // Exhausted turns or broke early — return raw step evidence
+  return steps.join("\n---\n") || "No output.";
 }

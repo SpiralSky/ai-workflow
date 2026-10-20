@@ -28,6 +28,10 @@ export interface ToolEntry {
   useCaseSummary?: string;        // LLM-generated use-case vocabulary for BM25
   tags: string[];
 
+  // Framing — injected into the secondary LLM's system prompt to shape approach
+  capability?: string;            // Layer 1: compact noun-phrase for capability preamble (no length limit; use a sentence when needed)
+  frameHint?: string;             // Layer 2: what standard approach this tool covers or replaces
+
   // Execution
   executionKind: ExecutionKind;
   tsDeclaration?: string;         // TypeScript declaration injected into filtered helpers.d.ts

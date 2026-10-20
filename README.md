@@ -31,6 +31,18 @@ flowchart LR
 | **branch-only** | Model writes a short TypeScript program as a single `branch` tool call. Raw output stays inside the sandbox; only the return value enters context. | TypeScript cognitive overhead causes syntax errors and `returnUser` misuse. |
 | **orchestrate** | Two-tier: coordinator LLM gets only `delegate`; secondary LLM writes branch programs. BM25 shortlist pre-injects relevant composite tools into secondary context. | File listing is pre-injected (passive) rather than discovered on demand. Task decomposition quality depends on main LLM writing self-contained task strings (cross-call state addressed 2026-10-19). |
 
+### Experiment scaffolding: symbol-search helpers
+
+The secondary LLM in orchestrate mode has three grep-backed symbol-search helpers added as experiment scaffolding. These give the executor a useful navigation surface without requiring IDE integration:
+
+| Helper | Signature | Description |
+|--------|-----------|-------------|
+| `findSymbol` | `findSymbol(name) → { file, line, kind }[]` | Find where a function, class, or variable is defined. |
+| `findCallers` | `findCallers(name) → { file, line, context }[]` | Find all call sites of a function or symbol. |
+| `listSymbols` | `listSymbols(file) → { name, line, kind }[]` | List all top-level function and class definitions in a file. |
+
+All three search Python, TypeScript, and JavaScript files via grep; results are workspace-relative and capped (20 / 30 / 50 entries). They are filterable helpers like `bash` and `readFile` — the orchestrate BM25 shortlist can inject them when relevant.
+
 ### Planned: orchestrate-active
 
 Replace passive file-listing injection with an active coordinator that uses a constrained tool set:

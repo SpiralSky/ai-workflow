@@ -35,6 +35,15 @@ Use `deepseek/deepseek-chat-v3-0324` only — strong instruction following, good
 - **both**        — shorthand for baseline + branch-only
 - **all**         — every mode in ALL_MODES; add new modes there and `--mode all` picks them up automatically
 
+## Commit practices
+
+- **Always run tests before committing framework changes:** `cd framework && npm test`
+- **One logical change per commit** — don't bundle issue fixes with unrelated cleanup
+- **Commit message format:** `fix(issue-NN): short description` for issue work; `feat:`, `docs:`, `refactor:` for other changes
+- **Never commit experiment run outputs** (`experiments/runs/`) — these are gitignored and expensive to regenerate
+- **Before starting a new eval run**, commit all framework changes first so results are reproducible against a known state
+- **Issue files:** mark closed issues DONE with a date, then delete the file on the next commit that touches issues
+
 ## --backend flag
 - `--backend openai` (default, only option): calls OpenAI chat-completions API directly
   - Set OPENAI_BASE_URL (e.g. https://openrouter.ai/api/v1) and OPENAI_API_KEY

@@ -35,9 +35,6 @@ function makeRunBranchFn(results: BranchResult[]): typeof import("../src/runner.
     results[i++] ?? { kind: "error", text: "no more results", path: "[]" };
 }
 
-// frameFn that returns a fixed string — short-circuits the final LLM framing call
-const noopFrameFn = async (_t: string, _s: string[], _f: string | undefined) => "report";
-
 // Default deps for unit tests: skip the edit guard (tests use mocked runBranchFn with no real file I/O).
 const testDeps = { disableEditGuard: true } as const;
 
@@ -49,7 +46,7 @@ describe("stripFences (via orchestrate single-turn)", () => {
     const result = await orchestrate("task", undefined, shortlist, fakeSession(), defaultLimits, {
       completeFn: async () => "```ts\nreturnUser(\"done\")\n```",
       runBranchFn: runFn,
-      frameFn: noopFrameFn, ...testDeps,
+      ...testDeps,
     });
     assert.ok(result.length > 0);
   });
@@ -59,7 +56,7 @@ describe("stripFences (via orchestrate single-turn)", () => {
     const result = await orchestrate("task", undefined, shortlist, fakeSession(), defaultLimits, {
       completeFn: async () => `returnUser("done")`,
       runBranchFn: runFn,
-      frameFn: noopFrameFn, ...testDeps,
+      ...testDeps,
     });
     assert.ok(result.length > 0);
   });
@@ -77,7 +74,7 @@ describe("loop termination", () => {
     await orchestrate("find the bug", undefined, shortlist, fakeSession(), defaultLimits, {
       completeFn: async () => `returnUser("found")`,
       runBranchFn: runFn,
-      frameFn: noopFrameFn, ...testDeps,
+      ...testDeps,
     });
     assert.equal(runs, 1);
   });
@@ -92,14 +89,14 @@ describe("loop termination", () => {
     await orchestrate("fix bug", undefined, shortlist, fakeSession(), defaultLimits, {
       completeFn: async () => `return "step"`,
       runBranchFn: runFn,
-      frameFn: noopFrameFn, ...testDeps,
+      ...testDeps,
     });
     assert.equal(runs, 2);
   });
 
   test("max turns: loop exits after BRANCH_ORCHESTRATE_MAX_TURNS", async () => {
-    // Default max is 15; all results are kind=return so loop runs full course
-    const MAX = 15;
+    // Default max is 4; all results are kind=return so loop runs full course
+    const MAX = 4;
     let runs = 0;
     const runFn: typeof import("../src/runner.js").runBranch = async () => {
       runs++;
@@ -108,7 +105,7 @@ describe("loop termination", () => {
     await orchestrate("task", undefined, shortlist, fakeSession(), defaultLimits, {
       completeFn: async () => `return "step"`,
       runBranchFn: runFn,
-      frameFn: noopFrameFn, ...testDeps,
+      ...testDeps,
     });
     assert.equal(runs, MAX);
   });
@@ -123,7 +120,7 @@ describe("loop termination", () => {
     await orchestrate("task", undefined, shortlist, fakeSession(), defaultLimits, {
       completeFn: async () => `return "x"`,
       runBranchFn: runFn,
-      frameFn: noopFrameFn, ...testDeps,
+      ...testDeps,
     });
     assert.equal(runs, 2);
   });
@@ -143,7 +140,7 @@ describe("step results", () => {
     await orchestrate("fix bug", undefined, shortlist, fakeSession(), defaultLimits, {
       completeFn: async (_s, _m, p) => { prompts.push(p); return `return "x"`; },
       runBranchFn: runFn,
-      frameFn: noopFrameFn, ...testDeps,
+      ...testDeps,
     });
     // Second turn prompt should include prior step
     assert.ok(prompts.length >= 2, "should have at least 2 prompts");
@@ -196,7 +193,7 @@ describe("composite prelude injection", () => {
         seenCode = code;
         return { kind: "user", text: "done", path: "[]" };
       },
-      frameFn: noopFrameFn, ...testDeps,
+      ...testDeps,
     });
 
     // The prelude defines composite functions — check for async function keyword
@@ -226,12 +223,12 @@ describe("child session isolation", () => {
     await orchestrate("task1", undefined, shortlist, parent, defaultLimits, {
       completeFn: async () => `returnUser("done")`,
       runBranchFn: runFn,
-      frameFn: noopFrameFn, ...testDeps,
+      ...testDeps,
     });
     await orchestrate("task2", undefined, shortlist, parent, defaultLimits, {
       completeFn: async () => `returnUser("done")`,
       runBranchFn: runFn,
-      frameFn: noopFrameFn, ...testDeps,
+      ...testDeps,
     });
 
     assert.equal(stateRefs.length, 2);
@@ -248,7 +245,7 @@ describe("child session isolation", () => {
     await orchestrate("task", undefined, shortlist, parent, defaultLimits, {
       completeFn: async () => `returnUser("done")`,
       runBranchFn: runFn,
-      frameFn: noopFrameFn, ...testDeps,
+      ...testDeps,
     });
     assert.equal(parent.handles.size, 0, "parent handles should be untouched");
   });
@@ -263,7 +260,7 @@ describe("policy injection", () => {
     await orchestrate("task", "stop after 2 steps", shortlist, fakeSession(), defaultLimits, {
       completeFn: async (_s, _m, p) => { seenPrompt = p; return `returnUser("done")`; },
       runBranchFn: runFn,
-      frameFn: noopFrameFn, ...testDeps,
+      ...testDeps,
     });
     assert.ok(seenPrompt.includes("stop after 2 steps"), "policy should appear in prompt");
     assert.ok(seenPrompt.includes("## Policy"), "policy section header should appear");
@@ -275,7 +272,7 @@ describe("policy injection", () => {
     await orchestrate("task", undefined, shortlist, fakeSession(), defaultLimits, {
       completeFn: async (_s, _m, p) => { seenPrompt = p; return `returnUser("done")`; },
       runBranchFn: runFn,
-      frameFn: noopFrameFn, ...testDeps,
+      ...testDeps,
     });
     assert.ok(!seenPrompt.includes("## Policy"), "should not have policy section when none given");
   });
@@ -292,7 +289,7 @@ describe("allowed set passed to runBranchFn", () => {
         capturedAllowed = allowed;
         return { kind: "user", text: "done", path: "[]" };
       },
-      frameFn: noopFrameFn, ...testDeps,
+      ...testDeps,
     });
     assert.ok(capturedAllowed?.has("bash"), "bash should always be allowed");
     assert.ok(capturedAllowed?.has("readFile"), "readFile should always be allowed");
