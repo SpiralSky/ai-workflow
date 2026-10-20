@@ -7,7 +7,8 @@
     "server": "tsx src/server.ts",
     "test": "tsx --test test/*.test.ts",
     "eval": "tsx ../experiments/run.ts",
-    "view": "node ../experiments/viewer/build-data.mjs && echo 'Open: experiments/viewer/index.html'"
+    "view": "node ../experiments/viewer/build-data.mjs && echo 'Open: experiments/viewer/index.html'",
+    "view:watch": "node ../experiments/viewer/build-data.mjs --watch"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.32.1",

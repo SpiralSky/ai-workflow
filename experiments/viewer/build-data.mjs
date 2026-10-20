@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // experiments/viewer/build-data.mjs
-import { readdirSync, readFileSync, existsSync, writeFileSync } from 'fs';
+import { readdirSync, readFileSync, existsSync, writeFileSync, statSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 
@@ -248,4 +248,36 @@ function buildData() {
   console.log(`  Open: ${join(__dirname, 'index.html')}`);
 }
 
+function latestMetaMtime(runsDir) {
+  let latest = 0;
+  try {
+    for (const runDir of readdirSync(runsDir)) {
+      const dir = join(runsDir, runDir);
+      try {
+        for (const f of readdirSync(dir)) {
+          if (f.endsWith('.meta.json')) {
+            const mt = statSync(join(dir, f)).mtimeMs;
+            if (mt > latest) latest = mt;
+          }
+        }
+      } catch {}
+    }
+  } catch {}
+  return latest;
+}
+
+const watchMode = process.argv.includes('--watch');
 buildData();
+
+if (watchMode) {
+  console.log('Watching for new runs every 3s… (Ctrl+C to stop)');
+  let lastMtime = latestMetaMtime(RUNS_DIR);
+  setInterval(() => {
+    const mtime = latestMetaMtime(RUNS_DIR);
+    if (mtime > lastMtime) {
+      lastMtime = mtime;
+      console.log(`[${new Date().toLocaleTimeString()}] Change detected, rebuilding…`);
+      try { buildData(); } catch (e) { console.error('Build error:', e.message); }
+    }
+  }, 3000);
+}

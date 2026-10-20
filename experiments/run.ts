@@ -488,7 +488,15 @@ async function main() {
     for (const mode of modes) for (let i = 1; i <= Number(a.n); i++) jobs.push({ dir, id, mode, i });
   }
   if (a['retry-failed']) {
-    const prevDir = join(HERE, 'runs', a['retry-failed']);
+    let retryTarget = a['retry-failed'];
+    if (retryTarget === 'last') {
+      const runsDir = join(HERE, 'runs');
+      const dirs = existsSync(runsDir) ? readdirSync(runsDir).filter(d => /^\d{4}-/.test(d)).sort() : [];
+      if (!dirs.length) { console.log('no run directories found'); return; }
+      retryTarget = dirs[dirs.length - 1];
+      console.log(`--retry-failed last → ${retryTarget}`);
+    }
+    const prevDir = join(HERE, 'runs', retryTarget);
     const metaFiles = readdirSync(prevDir).filter(f => f.endsWith('.meta.json'));
     const retryJobs: JobSpec[] = [];
     for (const mf of metaFiles) {
@@ -504,9 +512,9 @@ async function main() {
         if (dir) retryJobs.push({ dir, id: pid, mode, i: parseInt(n) });
       }
     }
-    if (!retryJobs.length) { console.log('no failed jobs found in', a['retry-failed']); return; }
+    if (!retryJobs.length) { console.log('no failed jobs found in', retryTarget); return; }
     jobs.splice(0, jobs.length, ...retryJobs);
-    console.log(`retrying ${jobs.length} failed job(s) from ${a['retry-failed']}`);
+    console.log(`retrying ${jobs.length} failed job(s) from ${retryTarget}`);
   }
 
   const sem = makeSemaphore(Number(a.concurrency));
