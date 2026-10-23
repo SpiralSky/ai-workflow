@@ -44,6 +44,7 @@ problems/<id>/
   task.json     metadata (§4)
   Dockerfile    job environment; the workspace is /work
   workspace/    starting files, copied to /work (built from a codebase + overlay for large problems, §6)
+  overlay/      large problems only: files added/replaced on top of the codebase (§6)
   checks/       hidden tests + check.sh (exit 0 = pass); never present during the job
   reference/    never present during the job or grading:
     solution.patch   a known-good solution
@@ -55,7 +56,7 @@ problems/<id>/
 | Field | Meaning |
 |-------|---------|
 | `id` | Folder name. |
-| `size` | `small` \| `large`. |
+| `size` | `small` \| `large` \| `smoke` (setup check only; not in `all`, never reported, §8.2). |
 | `codebase` | Shared codebase id (large problems only, §6). |
 | `turnLimit` | Base turn limit (framework-runner §4.4). |
 | `tags` | What it tests (`bugfix`, `feature`, `refactor`, `concurrency`, `multi-file`, `rename`, `move`, `signature`, `import-cycle`, `deep-cause`, …). Reports can group by tag. |
@@ -195,7 +196,7 @@ then large at both tiers.
 3. **Feature task on the large codebase.** All large problems are bug fixes or refactors; an
    end-to-end feature (a new field through model → storage → API → CLI) would add a fifth kind.
    Left out for budget.
-4. **Smoke test location.** `01` as a separate `smoke/` problem vs a flag in `task.json`.
+4. ~~**Smoke test location.**~~ Decided 2026-10-23: an ordinary problem with `size: "smoke"` (§4).
 
 ---
 

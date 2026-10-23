@@ -18,16 +18,6 @@ things easy to get wrong; the spec wins.
 - No backward compatibility with old run formats; delete stale runs rather than adapting to them.
 
 ## Running experiments
-```bash
-# From framework/ (OPENAI_BASE_URL + OPENAI_API_KEY required):
-OPENAI_BASE_URL=https://openrouter.ai/api/v1 OPENAI_API_KEY=<key> \
-  npm run eval -- --problem all --mode compare --n 3 --model deepseek/deepseek-v4-flash
-
-# Retry only failed jobs from a prior run:
-OPENAI_BASE_URL=https://openrouter.ai/api/v1 OPENAI_API_KEY=<key> \
-  npm run eval -- --retry-failed <run-dir-timestamp> --mode orchestrate --n 3 --model deepseek/deepseek-v4-flash
-```
-
 **Models:** never use Claude/Anthropic models via OpenRouter. Use `deepseek/deepseek-v4-flash` only.
 **Budget:** $0.50 total per key; max $0.10 per run if costs are tight.
 

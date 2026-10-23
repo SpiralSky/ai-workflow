@@ -1,6 +1,6 @@
 # Idea: Known-Good Hot Paths
 
-**Status:** Raw  
+**Status:** Adopted 2026-10-23 — see [orchestrate §9](../specifications/features/orchestrate.md) and [orchestrate-engine §4.5](../specifications/architecture/orchestrate-engine.md#45-hot-paths)  
 **Related spec:** [branching-framework.md](../specifications/features/branching-framework.md)
 
 ---

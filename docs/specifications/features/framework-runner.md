@@ -191,7 +191,7 @@ rendered execution trace and full event stream; orchestrate: handoff record per 
 
 The runner's own loop has no harness subagents; nested work comes only from frameworks (§5.1).
 When a framework is attached to a real harness (§8), a harness subagent has the same event-tree
-shape as orchestrate's `delegate` (a `tool` event with child `turn` and `tool` events), so rollups
+shape as orchestrate's `do` (a `tool` event with child `turn` and `tool` events), so rollups
 would treat both the same way.
 
 ### 5.6 Harness choice

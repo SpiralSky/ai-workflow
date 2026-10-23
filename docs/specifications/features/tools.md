@@ -12,7 +12,7 @@ One registry of tools, shared by every framework under test, offered in two **ti
 
 - **S (small)** — the usual coding-agent set (~6 tools). Enough to solve every problem.
 - **L (large)** — S plus structure-aware, code-graph, refactoring, test, VCS tools and a set of
-  realistic tools that no problem needs (~45 tools). Shaped like a real harness with several MCP
+  realistic tools that no problem needs (53 tools, §6.9). Shaped like a real harness with several MCP
   servers attached.
 
 The **catalog** (which tools exist) is held constant across frameworks within a run. **Exposure**
@@ -235,7 +235,7 @@ In addition to framework-runner and orchestrate §10 metrics, per tier and frame
    refactors that the LSP lacks (`moveSymbol`) done separately.
 2. **Description length.** Longer descriptions help choice but cost baseline/branch every turn.
    Fix a length budget per tool so that L's schema size is a known number.
-3. **Fixture realism for `external`.** Fixed canned responses or small per-problem fixtures
+3. ~~**Fixture realism for `external`.**~~ Decided 2026-10-23: canned only (tool-catalog §5). Fixed canned responses or small per-problem fixtures
    (e.g. an issue that restates the bug)? The latter makes some tools useful, which changes what
    L measures.
 4. **Medium tier.** Only if S/L results leave the crossover unclear.

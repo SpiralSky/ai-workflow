@@ -291,6 +291,8 @@ The record is for inspection only (framework-runner §5.4); §10 reads from it.
 Selection may also retrieve [known-good hot paths](../../ideas/known-good-hot-paths.md) — short
 branch snippets for common intent patterns — and include them in the executor prompt. Snippets
 are indexed like tools and can declare the tools they use, which are then added to the shortlist.
+The first version ships a seed set of snippets and an on/off switch so their effect is measured
+([orchestrate-engine §4.5](../architecture/orchestrate-engine.md#45-hot-paths)).
 
 ---
 

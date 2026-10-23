@@ -98,6 +98,9 @@ await tools.resolve({ ref: "@s1.c1", lines: [120, 180] });
 await tools.resolve({ ref: "@src/pricing.py#apply_discount" });   // just that function
 ```
 
+`ref` is a handle token (`"@s1.c1"`) or a live-ref object stored in state (branching-framework
+§4.4); the result is `{ text, stale }` in both cases.
+
 `resolve` is always available to executors and is not subject to tool selection.
 
 ### 5.3 Transitive references
@@ -179,9 +182,10 @@ pointed at. Two things keep that cheap:
 1. **Live code references to the smallest unit.** `@pricing.py#apply_discount` resolves to one
    function, not the 600-line file.
 2. **Structure-aware tools.** For files with structure (source code, JSON/YAML, Markdown), tools
-   that return an outline and read one unit at a time (`outline`, `readSymbol`, `readSection`)
-   let an executor take only what it needs. These are catalog tools, not part of this spec, but
-   references rely on them to be worthwhile.
+   that return an outline and read one unit at a time let an executor take only what it needs. These are catalog tools, not part of this spec, but
+   references rely on them to be worthwhile: `outline` (symbols, Markdown headings, JSON/YAML
+   keys, each with a line range) and `readSymbol` for one code symbol; a Markdown section or a
+   key is read by its line range.
 
 Unstructured content (logs, prose) falls back to slicing with `grep`/`lines` (§5.2).
 

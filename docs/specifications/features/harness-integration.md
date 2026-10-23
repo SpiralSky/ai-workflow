@@ -115,7 +115,7 @@ tells the model to call it through `branch`.
 | **Runner** | Experiments | The runner (its tool server in the job container) | Runner records each call as a child `tool` event (framework-runner §4.5) |
 | **MCP fallback** | Generic MCP clients, or harnesses with neither of the above | The framework server (§6.1) | Framework policy (§7.3); the harness sees only the framework call |
 
-The core is identical in all three; only the host differs.
+The core is identical in every host kind; only the host differs.
 
 ### 4.4 What a native host needs from a harness
 
