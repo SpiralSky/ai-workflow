@@ -1,51 +1,45 @@
 # AI Workflow — Project Instructions
 
-## Experiment visualization
-Always use the built-in viewer at `experiments/viewer/index.html`. Never use Claude artifacts for visualizing experiment results.
-To build and view: `cd framework && npm run view`, then open `experiments/viewer/index.html` in a browser.
-The viewer is a self-contained HTML/CSS/JS dashboard — no server required beyond `build-data.mjs`.
+## Specifications are the source of truth
+
+- `docs/specifications/features/` — feature specs, one per feature (index: its `README.md`)
+- `docs/specifications/architecture/` — architecture specs derived from features
+- `docs/ideas/` — rough exploratory notes; not scheduled or specced
+
+Before working on a feature (framework modes, runner, tools, problems, viewer, harness integration),
+read the relevant spec section. If this file, `HANDOFF.md`, memory, code comments or the code
+disagree with a spec, follow the spec and flag the conflict to the user. Notes below are a cache of
+things easy to get wrong; the spec wins.
+
+## Quick notes (cache)
+
+- `--mode` names: `baseline`, `branch-only`, `orchestrate`; `compare` = all three.
+- Visualize experiment results only with the project viewer (`docs/specifications/features/viewer.md`), never with Claude artifacts.
+- No backward compatibility with old run formats; delete stale runs rather than adapting to them.
 
 ## Running experiments
 ```bash
-# From the framework/ directory (OPENAI_BASE_URL + OPENAI_API_KEY required):
+# From framework/ (OPENAI_BASE_URL + OPENAI_API_KEY required):
 OPENAI_BASE_URL=https://openrouter.ai/api/v1 OPENAI_API_KEY=<key> \
-  npm run eval -- --problem all --mode compare --n 3 --model deepseek/deepseek-chat-v3-0324
-
-# New flags (2026-10-18):
-#   --turns <n>       max main-loop turns per job (default 40)
-#   --orch-turns <n>  max secondary-LLM turns per delegate call (default 15)
-# Both default to realistic values now; only set them to override.
+  npm run eval -- --problem all --mode compare --n 3 --model deepseek/deepseek-v4-flash
 
 # Retry only failed jobs from a prior run:
 OPENAI_BASE_URL=https://openrouter.ai/api/v1 OPENAI_API_KEY=<key> \
-  npm run eval -- --retry-failed <run-dir-timestamp> --mode orchestrate --n 3 --model deepseek/deepseek-chat-v3-0324
+  npm run eval -- --retry-failed <run-dir-timestamp> --mode orchestrate --n 3 --model deepseek/deepseek-v4-flash
 ```
 
-## Model choice for experiments (OpenRouter)
-**DO NOT use Claude/Anthropic models via OpenRouter** — they are expensive and burn the budget fast.
-Use `deepseek/deepseek-chat-v3-0324` only — strong instruction following, good function calling, reasonable cost.
+**Models:** never use Claude/Anthropic models via OpenRouter. Use `deepseek/deepseek-v4-flash` only.
+**Budget:** $0.50 total per key; max $0.10 per run if costs are tight.
 
-**Budget: $0.50 total per key, max $0.10 per individual run if costs are tight.**
-
-## Experimental modes (3 only)
-- **baseline**    — control: direct file tools (Bash/Read/Edit/Write/Glob/Grep), no branch tool
-- **branch-only** — primary test: branch MCP tool only; model writes short TS programs
-- **orchestrate** — two-tier: delegate tool → BM25 shortlist → secondary LLM branch loop
-- **compare**     — shorthand for baseline + branch-only + orchestrate (all three, default)
-- **both**        — shorthand for baseline + branch-only
-- **all**         — every mode in ALL_MODES; add new modes there and `--mode all` picks them up automatically
+## Code comments
+- Document functions with JSDoc/TSDoc (`/** ... */`) above the function: what it does, `@param`/`@returns`/`@throws` where they add information beyond the signature.
+- In TS, don't repeat types in tags (`@param name - meaning`, not `@param {string} name`).
+- Use plain `//` comments for implementation notes inside function bodies.
 
 ## Commit practices
-
-- **Always run tests before committing framework changes:** `cd framework && npm test`
-- **One logical change per commit** — don't bundle issue fixes with unrelated cleanup
-- **Commit message format:** `fix(issue-NN): short description` for issue work; `feat:`, `docs:`, `refactor:` for other changes
-- **Never commit experiment run outputs** (`experiments/runs/`) — these are gitignored and expensive to regenerate
-- **Before starting a new eval run**, commit all framework changes first so results are reproducible against a known state
-- **Issue files:** mark closed issues DONE with a date, then delete the file on the next commit that touches issues
-
-## --backend flag
-- `--backend openai` (default, only option): calls OpenAI chat-completions API directly
-  - Set OPENAI_BASE_URL (e.g. https://openrouter.ai/api/v1) and OPENAI_API_KEY
-  - All three modes work; branch/delegate tool execution runs via the same framework modules
-  - Sub-LLM calls inside orchestrate use the same OPENAI_API_KEY + OPENAI_BASE_URL as the main runner
+- Run `cd framework && npm test` before committing framework changes.
+- One logical change per commit.
+- Message format: `fix(issue-NN): ...` for issue work; `feat:`, `docs:`, `refactor:` otherwise.
+- Never commit experiment run outputs (`experiments/runs/`).
+- Commit framework changes before starting an eval run, so results map to a known state.
+- Issue files: mark closed issues DONE with a date, then delete the file on the next commit that touches issues.
