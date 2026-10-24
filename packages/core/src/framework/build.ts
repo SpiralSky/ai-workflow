@@ -1,4 +1,4 @@
-import { canonicalJSON, sha256, wrapTools } from "@aiw/telemetry";
+import { canonicalJSON, currentReporter, sha256, wrapTools } from "@aiw/telemetry";
 import { compileBranch } from "../branch/compile.ts";
 import { quickJSRuntime } from "../branch/engines/index.ts";
 import { renderTrace } from "../branch/render/index.ts";
@@ -6,7 +6,12 @@ import { runBranch } from "../branch/run.ts";
 import type { BranchFail, BranchTools, State } from "../branch/types.ts";
 import { bindTools } from "../host/bind.ts";
 import { capOutput, DEFAULT_OUTPUT_CAP } from "../host/cap.ts";
+import { DEFAULT_ESCALATION_LIMIT, META_DECLS } from "../orchestrate/executor.ts";
+import { doTool, plannerResolveTool } from "../orchestrate/planner-tools.ts";
+import { createSelector, llmReranker, noneReranker } from "../orchestrate/selection/index.ts";
+import { fsCodeReader, fsPathExists, Task } from "../orchestrate/task.ts";
 import { declarations } from "../registry/declarations.ts";
+import { padRegistry } from "../registry/distractors.ts";
 import type { Registry, ToolDecl } from "../registry/types.ts";
 import { loadPrompt } from "./prompts.ts";
 import type { BuildOptions, Framework, FrameworkCall, FrameworkKind, FrameworkResult, FrameworkTool } from "./types.ts";
@@ -62,13 +67,26 @@ function baselineTools(registry: Registry, opts: BuildOptions): FrameworkTool[] 
 
 /** Branch-only: one `branch` tool over all routed tools. Returns the tool and its session state. */
 function branchOnlyTool(registry: Registry, opts: BuildOptions, state: State): FrameworkTool {
-  const routed = registry.decls.filter((d) => d.routing === "routed");
-  const names = routed.map((d) => d.name);
+  const toolSearch = opts.variant?.toolSearch === true;
+  // toolSearch: only `findTools` at the start; found tools join `present` and stay for the session (orchestrate §10.2).
+  const routed = toolSearch ? [] : registry.decls.filter((d) => d.routing === "routed");
+  const present = new Set(routed.map((d) => d.name));
   const cap = { maxChars: opts.maxChars, priority: opts.priority };
-  let decls = declarations(routed, cap);
+  let decls = toolSearch ? declarations(META_DECLS.filter((d) => d.name === "findTools")) : declarations(routed, cap);
   // The `tools` inner call exists only when the cap actually omitted something; never itself capped.
-  const hasToolsCall = opts.maxChars !== undefined && decls !== declarations(routed);
+  const hasToolsCall = !toolSearch && opts.maxChars !== undefined && decls !== declarations(routed);
   if (hasToolsCall) decls += "\n" + declarations([TOOLS_DECL]);
+  // Same retrieval stage as orchestrate, without rerank (so the comparison isolates who selects).
+  const selector = createSelector({ reranker: noneReranker });
+  const findTools = async (a: Record<string, unknown>): Promise<string> => {
+    const need = typeof a.need === "string" ? a.need.trim() : "";
+    if (!need) throw new Error("findTools: `need` must be a non-empty string");
+    const sel = await selector.select({ instruction: need, exclude: present }, registry.decls);
+    const added = sel.tools.filter((d) => !present.has(d.name)).slice(0, DEFAULT_ESCALATION_LIMIT);
+    if (!added.length) return "No other tools match that need.";
+    for (const d of added) present.add(d.name);
+    return "Now callable:\n```ts\n" + declarations(added) + "\n```";
+  };
   const description = loadPrompt("branch-tool").trimEnd() + "\n\nTools:\n```ts\n" + decls + "\n```";
   const runtime = opts.runtime ?? quickJSRuntime;
   const serial = mutex();
@@ -95,7 +113,8 @@ function branchOnlyTool(registry: Registry, opts: BuildOptions, state: State): F
           const fail: BranchFail = { ok: false, error: "compile", message: program.message, line: program.line, trace: [] };
           return { text: render(fail), isError: true };
         }
-        const tools: BranchTools = bindTools(registry, opts.host, { reporter: call.reporter, names, outputCap: opts.outputCap });
+        const tools: BranchTools = bindTools(registry, opts.host, { reporter: call.reporter, names: [...present], outputCap: opts.outputCap });
+        if (toolSearch) Object.assign(tools, wrapTools({ findTools }, currentReporter() ?? call.reporter));
         if (hasToolsCall) {
           Object.assign(
             tools,
@@ -130,15 +149,16 @@ function branchOnlyTool(registry: Registry, opts: BuildOptions, state: State): F
  * Assembles the model-facing tools and prompt section of a framework (core-tools-and-hosts §6).
  * @param kind - which framework
  * @param registry - registered tools
- * @param opts - host, runtime, render mode, declaration cap, limits
- * @throws Error for `orchestrate`, the `toolSearch` and `catalog` variants (not built yet), or an unknown kind
+ * @param opts - also `variant` (`toolSearch` for branch-only, `catalog` padding for any framework) and `orchestrate` settings (required for `orchestrate`)
+ * @throws Error for `orchestrate` without `opts.orchestrate`, hot paths on, executor variant `calls`, `toolSearch` outside `branch-only`, or an unknown kind
  */
-export function buildFramework(kind: FrameworkKind, registry: Registry, opts: BuildOptions): Framework {
-  if (opts.variant?.toolSearch) throw new Error("toolSearch is not built yet (needs the orchestrate selection stage)");
-  if (opts.variant?.catalog !== undefined) throw new Error("catalog is not built yet (needs the orchestrate selection stage)");
-  const state: State = {};
+export function buildFramework(kind: FrameworkKind, realRegistry: Registry, opts: BuildOptions): Framework {
+  if (opts.variant?.toolSearch && kind !== "branch-only") throw new Error("variant toolSearch applies to branch-only only");
+  const registry = opts.variant?.catalog !== undefined ? padRegistry(realRegistry, opts.variant.catalog) : realRegistry;
+  let state: State = {};
   let instructions: string;
   let tools: FrameworkTool[];
+  let task: Task | undefined;
   if (kind === "baseline") {
     instructions = "";
     tools = baselineTools(registry, opts);
@@ -146,10 +166,29 @@ export function buildFramework(kind: FrameworkKind, registry: Registry, opts: Bu
     instructions = loadPrompt("branch-only");
     tools = [branchOnlyTool(registry, opts, state)];
   } else if (kind === "orchestrate") {
-    throw new Error("orchestrate is not built yet (needs the orchestrate selection stage)");
+    const o = opts.orchestrate;
+    if (!o) throw new Error("orchestrate needs opts.orchestrate (client, model, workspaceRoot)");
+    if (opts.variant?.hotPaths) throw new Error("hot paths not built yet");
+    if (opts.variant?.executor === "calls") throw new Error("executor variant `calls` is not built yet");
+    task = o.task ?? new Task({ workspaceRoot: o.workspaceRoot });
+    const reranker = (o.rerank ?? "llm") === "none" ? noneReranker : llmReranker(o.client, { model: o.rerankModel ?? o.model });
+    const planner = {
+      task, registry, host: opts.host, client: o.client, model: o.model, temperature: o.temperature, transcript: o.transcript,
+      selector: o.selector ?? createSelector({ reranker }),
+      reader: o.reader ?? fsCodeReader(o.workspaceRoot),
+      pathExists: o.pathExists ?? fsPathExists(o.workspaceRoot),
+      runtime: opts.runtime,
+      limits: {
+        turns: o.turns, reportMaxChars: o.reportMaxChars, outputCap: opts.outputCap, timeoutMs: opts.timeoutMs,
+        memoryMb: opts.memoryMb, branchContext: opts.branchContext,
+      },
+    };
+    instructions = loadPrompt("orchestrate");
+    tools = [doTool(planner), plannerResolveTool(planner)];
+    state = task.state;
   } else {
     throw new Error(`unknown framework kind: ${String(kind)}`);
   }
   const toolsHash = sha256(canonicalJSON(tools.map((t) => ({ name: t.name, description: t.description, inputSchema: t.inputSchema }))));
-  return { kind, instructions, tools, fingerprint: { promptHash: sha256(instructions), toolsHash }, state };
+  return { kind, instructions, tools, fingerprint: { promptHash: sha256(instructions), toolsHash }, state, ...(task ? { task } : {}) };
 }

@@ -100,11 +100,8 @@ test("maxChars cap adds the tools inner call", async () => {
   assert.ok(!fw2.tools[0]!.description.includes("tools(args"));
 });
 
-test("unbuilt frameworks and variants throw", async () => {
+test("unknown framework kinds throw", async () => {
   const { host, registry } = await setup([decl("a")]);
-  assert.throws(() => buildFramework("orchestrate", registry, { host }), /orchestrate is not built yet/);
-  assert.throws(() => buildFramework("baseline", registry, { host, variant: { toolSearch: true } }), /toolSearch is not built yet/);
-  assert.throws(() => buildFramework("baseline", registry, { host, variant: { catalog: 50 } }), /catalog is not built yet/);
   assert.throws(() => buildFramework("nope" as any, registry, { host }), /unknown framework/);
 });
 
