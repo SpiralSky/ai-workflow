@@ -238,8 +238,29 @@ function buildData() {
   // Also patch index.html to inline the data so file:// works in Chrome
   const htmlPath = join(__dirname, 'index.html');
   let html = readFileSync(htmlPath, 'utf8');
-  html = html.replace(/<script>\s*\/\/ --- inline data ---[\s\S]*?<\/script>/, '');
-  html = html.replace('<script>', `<script>\n// --- inline data ---\n${dataJs}\n</script>\n<script>`);
+  // Escape </script> in data so it doesn't prematurely terminate the script tag
+  const safeDataJs = dataJs.replace(/<\/script>/gi, '<\\/script>');
+  // Remove old inline data block using marker-based search (regex breaks on </script> in JSON data)
+  const INLINE_START = '<script>\n// --- inline data ---\n';
+  const startIdx = html.indexOf(INLINE_START);
+  if (startIdx !== -1) {
+    // Find the </script> that ends the inline data block: the one followed by \n<script>
+    let pos = startIdx + INLINE_START.length;
+    while (pos < html.length) {
+      const closeIdx = html.indexOf('</script>', pos);
+      if (closeIdx === -1) break;
+      if (html.slice(closeIdx + '</script>'.length, closeIdx + '</script>'.length + 9) === '\n<script>') {
+        // Skip </script>\n so the remaining slice starts with <script> (the app code's opening tag)
+        html = html.slice(0, startIdx) + html.slice(closeIdx + '</script>'.length + 1);
+        break;
+      }
+      pos = closeIdx + 1;
+    }
+  }
+  // Use a function replacement to prevent $' / $& / $` special patterns in safeDataJs
+  // from being interpreted as replacement directives by String.prototype.replace
+  const inlineBlock = `<script>\n// --- inline data ---\n${safeDataJs}\n</script>\n<script>`;
+  html = html.replace('<script>', () => inlineBlock);
   writeFileSync(htmlPath, html);
 
   const total = allRuns.length;
