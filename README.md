@@ -87,12 +87,13 @@ Related systems with similar ideas include Cloudflare Code Mode, CodeAct, smolag
 
 Specs in [docs/specifications/](docs/specifications/features/README.md) are the source of truth; the code is being rebuilt to match them.
 
-1. **Final spec check**: one checking pass over all specs, then mark them Final.
+1. ~~**Final spec check**~~: done 2026-10-24; all feature specs are Final.
 2. **Build to the architecture specs**, in dependency order ([system-overview §2](docs/specifications/architecture/system-overview.md)):
    telemetry → LLM client → core (branch runtime, tool registry and hosts, orchestrate engine) → tools (tier S, then L) →
    framework server → report + runner + problems → viewer → Claude Code plugin.
 3. **Clean comparison**: `compare` (baseline, branch-only, orchestrate) on the new runner with `deepseek/deepseek-v4-flash`.
    The results above come from the old framework and are superseded.
+   A new orchestrate idea (one extra mode) waits until this comparison is done.
 4. **Catalog-size scaling experiment**: `orchestrate` vs. `branch-only[toolSearch]` at 50, 200 and 1000 tools
    ([orchestrate §10.2](docs/specifications/features/orchestrate.md)).
 5. **Later**: [known-good hot paths](docs/ideas/known-good-hot-paths.md), fine-tuned role models (orchestrate §10.0),
