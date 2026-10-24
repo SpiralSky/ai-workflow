@@ -1,9 +1,13 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { runBranch } from "../src/branch/run.ts";
+import { runBranch as runWith } from "../src/branch/run.ts";
+import { engine, runtime } from "./engine.ts";
+import { selectRuntime } from "../src/branch/index.ts";
 import type { BranchTools, CompiledBranch, TraceEvent } from "../src/branch/types.ts";
 
 /** Hand-written compiled program: identity line map (js line N is original line N). */
+/** `runBranch` on the engine under test. */
+const runBranch = (p: CompiledBranch, t: BranchTools, s: Record<string, unknown>, o: Parameters<typeof runWith>[3] = {}) => runWith(p, t, s, o, runtime);
 const prog = (js: string): CompiledBranch => ({ js, lineMap: js.split("\n").map((_, i) => i + 1) });
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const tools: BranchTools = {
@@ -238,4 +242,61 @@ test("the isolate has no require, process or host globals", async () => {
   const r = await runBranch(prog(`async () => [typeof require, typeof process, typeof module, typeof __host, typeof __callRef]`), tools, {});
   assert.ok(r.ok);
   assert.deepEqual(r.value, Array(5).fill("undefined"));
+});
+
+test("synchronous infinite loop times out (timers are starved on host-thread engines)", async () => {
+  const t0 = Date.now();
+  const r = await runBranch(prog(`async () => {\n  for (;;) {}\n}`), tools, {}, { timeoutMs: 300 });
+  assert.ok(!r.ok && r.error === "timeout" && r.aborted === true && r.stateReverted === true);
+  assert.ok(Date.now() - t0 < 3000);
+});
+
+test("a program cannot catch or swallow the timeout", async () => {
+  const state = { n: 0 };
+  const r = await runBranch(prog(`async (tools, state) => {
+  state.n = 1;
+  for (let i = 0; i < 3; i++) {
+    try { while (true) {} } catch (e) { state.n = 99; } finally { state.n = 98; }
+  }
+  return "survived";
+}`), tools, state, { timeoutMs: 300 });
+  assert.ok(!r.ok && r.error === "timeout");
+  assert.equal(state.n, 0);
+});
+
+test("a timeout during a tool call's aftermath loop still reports partial trace", async () => {
+  const r = await runBranch(prog(`async (tools) => {\n  await tools.echo({});\n  while (true) {}\n}`), tools, {}, { timeoutMs: 300 });
+  assert.ok(!r.ok && r.error === "timeout");
+  assert.ok(calls(r.trace).length >= 1); // events still buffered in the isolate at kill time are lost (engine-dependent)
+});
+
+test("out of memory maps to the memory error even when the program catches it", async () => {
+  const state = { n: 1 };
+  const r = await runBranch(prog(`async (tools, state) => {
+  state.n = 2;
+  const a = [];
+  try { while (true) a.push(new Array(100000).fill(1)); } catch (e) { throw e; }
+}`), tools, state, { memoryMb: 8 });
+  assert.ok(!r.ok);
+  assert.equal(r.error, "memory");
+  assert.equal(state.n, 1);
+});
+
+test("dispose while host calls are pending is safe", async () => {
+  const r = await runBranch(prog(`async (tools) => Promise.all([tools.slow({ ms: 400 }), tools.slow({ ms: 400 })])`), tools, {}, { timeoutMs: 100 });
+  assert.ok(!r.ok && r.error === "timeout");
+  await sleep(600); // late host resolutions must be ignored
+});
+
+test("selectRuntime: quickjs is always available; auto falls back with a note without --no-node-snapshot", async () => {
+  assert.equal((await selectRuntime("quickjs")).engine, "quickjs");
+  const auto = await selectRuntime("auto");
+  const flagged = process.execArgv.includes("--no-node-snapshot") || /--no-node-snapshot/.test(process.env.NODE_OPTIONS ?? "");
+  if (flagged) assert.equal(auto.engine, "isolated-vm");
+  else {
+    assert.equal(auto.engine, "quickjs");
+    assert.match(auto.note ?? "", /--no-node-snapshot/);
+    await assert.rejects(selectRuntime("isolated-vm"), /isolated-vm/);
+  }
+  assert.ok(["quickjs", "isolated-vm"].includes(engine.engine));
 });

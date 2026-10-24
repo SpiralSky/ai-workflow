@@ -4,3 +4,5 @@ export { runBranch, DEFAULT_TIMEOUT_MS, DEFAULT_MEMORY_MB } from "./run.ts";
 export { renderTrace } from "./render/index.ts";
 export { renderFooter } from "./footer.ts";
 export type { IsolateRuntime } from "./isolate.ts";
+export { selectRuntime, quickJSRuntime, isolatedVMRuntime } from "./engines/index.ts";
+export type { EngineName } from "./engines/index.ts";

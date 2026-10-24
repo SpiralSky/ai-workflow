@@ -1,4 +1,5 @@
-import { isolatedVMRuntime, type Isolate, type IsolateRuntime } from "./isolate.ts";
+import type { Isolate, IsolateRuntime } from "./isolate.ts";
+import { quickJSRuntime } from "./engines/quickjs.ts";
 import { RECORDER_SOURCE } from "./recorder.ts";
 import type {
   BranchResult, BranchTools, CallCtx, CompiledBranch, ErrorCode, RunOptions, State, TraceEvent,
@@ -46,6 +47,12 @@ class Deadline {
     };
   }
 
+  /** True once the budget is used up (checked from the clock, so it works while timers are starved). */
+  expired(): boolean {
+    if (this.pauses > 0) return false;
+    return Date.now() - this.since >= this.left;
+  }
+
   stop(): void {
     this.stopped = true;
     clearTimeout(this.timer);
@@ -67,14 +74,14 @@ function writeBack(state: State, snap: Snapshot): void {
  * @param tools host-side tools, invoked with `(args, ctx)`
  * @param state persistent state; mutated in place on completion, error or kill (see BF §4.4)
  * @param opts timeout, memory limit, abort signal and event callback
- * @param runtime isolate engine (defaults to isolated-vm)
+ * @param runtime isolate engine (defaults to QuickJS)
  */
 export async function runBranch(
   program: CompiledBranch,
   tools: BranchTools,
   state: State,
   opts: RunOptions = {},
-  runtime: IsolateRuntime = isolatedVMRuntime,
+  runtime: IsolateRuntime = quickJSRuntime,
 ): Promise<BranchResult> {
   const timeoutMs = opts.timeoutMs ?? DEFAULT_TIMEOUT_MS;
   const memoryMb = opts.memoryMb ?? DEFAULT_MEMORY_MB;
@@ -119,6 +126,7 @@ export async function runBranch(
     resolveKill();
   };
   const deadline = new Deadline(timeoutMs, () => kill("timeout"));
+  const interrupt = () => killed !== undefined || deadline.expired();
   const onAbort = () => kill("aborted");
   opts.signal?.addEventListener("abort", onAbort, { once: true });
 
@@ -163,7 +171,7 @@ export async function runBranch(
   };
 
   try {
-    iso = runtime.create({ memoryMb });
+    iso = await runtime.create({ memoryMb, interrupt });
     iso.bridge({ call: hostCall, flush: (s) => (JSON.parse(s) as TraceEvent[]).forEach(emit) });
     const names = JSON.stringify(Object.keys(tools));
     const stateJSON = JSON.stringify(JSON.stringify(state));
@@ -183,8 +191,15 @@ export async function runBranch(
     } catch (e) {
       // not killed by us: the engine disposed itself (heap limit) or the script failed
       if (killed) raw = undefined;
+      else if (deadline.expired()) kill("timeout"); // the engine's interrupt handler fired (host-thread engines)
       else if (iso.disposed || /memory limit/i.test(String((e as Error)?.message))) kill("memory");
       else throw e;
+    }
+
+    if (!killed && raw !== undefined) {
+      // QuickJS reports heap exhaustion as a catchable InternalError rather than killing the isolate
+      const m = (JSON.parse(raw) as { ok: boolean; message?: string }).message;
+      if (m !== undefined && /^(InternalError: )?out of memory$/.test(m)) kill("memory");
     }
 
     if (killed) {

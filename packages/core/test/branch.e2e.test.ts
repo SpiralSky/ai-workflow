@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { runtime } from "./engine.ts";
 import { compileBranch, renderTrace, runBranch, type BranchTools, type CompiledBranch } from "../src/index.ts";
 
 const tools: BranchTools = {
@@ -14,7 +15,7 @@ const tools: BranchTools = {
 async function run(source: string, state: Record<string, unknown> = {}) {
   const c = compileBranch(source);
   assert.ok(!("error" in c), "compiles");
-  const result = await runBranch(c as CompiledBranch, tools, state);
+  const result = await runBranch(c as CompiledBranch, tools, state, {}, runtime);
   return { result, text: renderTrace(result, { mode: "trace", source, state }) };
 }
 

@@ -2,12 +2,21 @@
   "name": "@aiw/core",
   "private": true,
   "type": "module",
-  "exports": { ".": "./src/index.ts" },
+  "exports": {
+    ".": "./src/index.ts"
+  },
   "dependencies": {
     "@aiw/llm": "*",
     "@aiw/telemetry": "*",
-    "isolated-vm": "6.2.0",
+    "@jitl/quickjs-singlefile-mjs-release-sync": "0.32.0",
+    "quickjs-emscripten-core": "0.32.0",
     "typescript-api": "npm:typescript@5.9"
   },
-  "scripts": { "test": "NODE_OPTIONS=--no-node-snapshot tsx --test test/*.test.ts" }
+  "scripts": {
+    "test": "tsx --test test/*.test.ts",
+    "test:ivm": "AIW_ENGINE=isolated-vm NODE_OPTIONS=--no-node-snapshot tsx --test test/*.test.ts"
+  },
+  "optionalDependencies": {
+    "isolated-vm": "6.2.0"
+  }
 }
