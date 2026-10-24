@@ -63,7 +63,8 @@ Every tool throws `unsupported language: <lang>` for files the backend doesn't h
 >   `catalog(tier, { root, snapshot?, sidecar? })`; `L` throws until all 53 tools exist.
 > - **`cost`** is a 1–3 relative scale (1 cheap read, 3 shell/exec).
 > - **`bash`**: timeout → `code: 124`, abort → `code: 130`, with a note appended to `out`; the
->   process group is SIGKILLed. Env from `toolEnv` (strips `OPENAI_*`, `ANTHROPIC_*`,
+>   process group is SIGKILLed. Output over the cap keeps the first ~2 KB and last ~4 KB (line
+>   boundaries, UTF-8 safe) with `[N bytes cut]` between; the notes stay at the very end. Env from `toolEnv` (strips `OPENAI_*`, `ANTHROPIC_*`,
 >   `OPENROUTER_*` and names in `AIW_SECRET_NAMES`).
 > - **`readFile`**: `range: [start, end]` (1-based, inclusive), `cat -n` style numbering; over the
 >   cap it stops at a line boundary with `[truncated at line N of M; pass range to read more]`.

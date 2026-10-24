@@ -8,16 +8,26 @@ export const DEFAULT_TIMEOUT_MS = 60_000;
 export const TIMEOUT_CODE = 124;
 /** Exit code reported when the call was aborted (128 + SIGINT). */
 export const ABORT_CODE = 130;
-/** Bytes of output kept (the tail; errors are usually last). */
-const KEEP_BYTES = 6000;
+/** Bytes of output kept from the start. */
+const HEAD_BYTES = 2000;
+/** Bytes of output kept from the end (errors are usually last). */
+const TAIL_BYTES = 4000;
 
-/** Keeps the tail of `text` within `KEEP_BYTES`, noting the omission. */
-function tail(text: string): string {
+/** Keeps the head and tail of `text` within `HEAD_BYTES` + `TAIL_BYTES`, marking the cut bytes in the middle. UTF-8 safe; cuts at a line boundary when one is near. */
+function clip(text: string): string {
   const buf = Buffer.from(text, "utf8");
-  if (buf.length <= KEEP_BYTES) return text;
-  let start = buf.length - KEEP_BYTES;
-  while (start < buf.length && (buf[start]! & 0xc0) === 0x80) start++;
-  return `[output truncated: showing last ${buf.length - start} of ${buf.length} bytes; redirect to a file and use readFile/grep for the rest]\n${buf.subarray(start).toString("utf8")}`;
+  if (buf.length <= HEAD_BYTES + TAIL_BYTES) return text;
+  let headEnd = HEAD_BYTES;
+  while (headEnd > 0 && (buf[headEnd]! & 0xc0) === 0x80) headEnd--;
+  const nl = buf.lastIndexOf(10, headEnd - 1);
+  if (nl >= HEAD_BYTES / 2) headEnd = nl + 1;
+  let tailStart = buf.length - TAIL_BYTES;
+  while (tailStart < buf.length && (buf[tailStart]! & 0xc0) === 0x80) tailStart++;
+  const nl2 = buf.indexOf(10, tailStart);
+  if (nl2 >= 0 && nl2 - tailStart < TAIL_BYTES / 2) tailStart = nl2 + 1;
+  const head = buf.subarray(0, headEnd).toString("utf8");
+  const tail = buf.subarray(tailStart).toString("utf8");
+  return `${head}\n[${tailStart - headEnd} bytes cut]\n${tail}`;
 }
 
 /**
@@ -70,9 +80,9 @@ export const bash: ToolDef = {
         clearTimeout(timer);
         ctx.signal.removeEventListener("abort", onAbort);
         killGroup(); // reap stragglers that outlived the shell
-        if (ending === "timeout") return resolve({ code: TIMEOUT_CODE, out: tail(out) + `\n[timed out after ${timeoutMs} ms; process group killed]` });
-        if (ending === "abort") return resolve({ code: ABORT_CODE, out: tail(out) + "\n[aborted]" });
-        resolve({ code: code ?? 1, out: tail(out) });
+        if (ending === "timeout") return resolve({ code: TIMEOUT_CODE, out: clip(out) + `\n[timed out after ${timeoutMs} ms; process group killed]` });
+        if (ending === "abort") return resolve({ code: ABORT_CODE, out: clip(out) + "\n[aborted]" });
+        resolve({ code: code ?? 1, out: clip(out) });
       });
     });
   },

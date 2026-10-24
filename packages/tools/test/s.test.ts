@@ -78,6 +78,15 @@ test("bash: output, exit code, cwd", async () => {
   assert.ok(r.out.includes("out") && r.out.includes("err") && r.out.includes(root));
 });
 
+test("bash: long output keeps head and tail", async () => {
+  const r: any = await bash.fn({ cmd: "seq 1 5000; echo END" }, ctx());
+  assert.ok(r.out.startsWith("1\n2\n") && r.out.endsWith("5000\nEND\n"));
+  assert.match(r.out, /\n\[\d+ bytes cut\]\n/);
+  assert.ok(Buffer.byteLength(r.out) < 6100);
+  const t: any = await bash.fn({ cmd: "seq 1 5000; sleep 30", timeoutMs: 1500 }, ctx());
+  assert.ok(t.out.includes("bytes cut") && t.out.endsWith("process group killed]"));
+});
+
 test("bash: timeout kills the process group", async () => {
   const pidFile = join(root, "child.pid");
   const t0 = Date.now();
