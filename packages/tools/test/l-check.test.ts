@@ -15,12 +15,12 @@ const root = makeWorkspace({
   "pyproject.toml": "[tool.ruff.format]\nquote-style = \"double\"\n",
 });
 const sc = new Sidecar({ root, env: venvEnv() });
-const tools = Object.fromEntries(catalog("L", { root, sidecar: sc, partial: true }).map((t) => [t.name, t]));
+const tools = Object.fromEntries(catalog("L", { root, sidecar: sc }).map((t) => [t.name, t]));
 const run = (name: string, args: unknown, r = root) => tools[name]!.fn(args, ctxOf(r)) as Promise<any>;
 after(() => sc.close());
 
 test("check tools throw `no sidecar` without a sidecar", async () => {
-  const bare = catalog("L", { root, partial: true });
+  const bare = catalog("L", { root });
   await assert.rejects(bare.find((t) => t.name === "check")!.fn({}, ctxOf(root)), /no sidecar/);
   await assert.rejects(bare.find((t) => t.name === "format")!.fn({}, ctxOf(root)), /no sidecar/);
 });
@@ -53,7 +53,7 @@ test("check: caps diagnostics with a truncated hint", { skip: skipReason }, asyn
   const many = makeWorkspace({ "m.py": Array.from({ length: 70 }, (_, i) => `import mod${i}`).join("\n") + "\n" });
   const sc2 = new Sidecar({ root: many, env: venvEnv() });
   try {
-    const t = catalog("L", { root: many, sidecar: sc2, partial: true }).find((x) => x.name === "check")!;
+    const t = catalog("L", { root: many, sidecar: sc2 }).find((x) => x.name === "check")!;
     const r: any = await t.fn({ kinds: ["lint"] }, ctxOf(many));
     assert.ok(r.diagnostics.length <= 40);
     assert.match(r.truncated, /showing \d+ of 70/);
@@ -76,7 +76,7 @@ test("format: no formatter configured throws; black settings accepted", { skip: 
   const blk = makeWorkspace({ "a.py": "x=1\n", "pyproject.toml": "[tool.black]\nline-length = 100\n" });
   const [s1, s2] = [new Sidecar({ root: bare, env: venvEnv() }), new Sidecar({ root: blk, env: venvEnv() })];
   try {
-    const mk = (r: string, s: Sidecar) => catalog("L", { root: r, sidecar: s, partial: true }).find((x) => x.name === "format")!;
+    const mk = (r: string, s: Sidecar) => catalog("L", { root: r, sidecar: s }).find((x) => x.name === "format")!;
     await assert.rejects(mk(bare, s1).fn({}, ctxOf(bare)), /no formatter configured/);
     assert.equal(((await mk(blk, s2).fn({}, ctxOf(blk))) as any).files[0].path, "a.py");
   } finally { s1.close(); s2.close(); }

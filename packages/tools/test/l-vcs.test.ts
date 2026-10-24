@@ -40,7 +40,7 @@ test("diff and restore: no snapshot throws", async () => {
   const [d, r] = [makeDiff(), makeRestore()];
   await assert.rejects(d.fn({}, ctxOf(root)), /no snapshot/);
   await assert.rejects(r.fn({ path: "a" }, ctxOf(root)), /no snapshot/);
-  const tools = catalog("L", { root, partial: true });
+  const tools = catalog("L", { root });
   await assert.rejects(tools.find((t) => t.name === "diff")!.fn({}, ctxOf(root)), /no snapshot/);
 });
 

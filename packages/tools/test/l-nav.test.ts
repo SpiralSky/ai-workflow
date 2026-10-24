@@ -5,12 +5,12 @@ import { ctxOf, makeWorkspace, PKG, skipReason, venvEnv } from "./pyfixture.ts";
 
 const root = makeWorkspace(PKG);
 const sc = new Sidecar({ root, env: venvEnv() });
-const tools = Object.fromEntries(catalog("L", { root, sidecar: sc, partial: true }).map((t) => [t.name, t]));
+const tools = Object.fromEntries(catalog("L", { root, sidecar: sc }).map((t) => [t.name, t]));
 const run = (name: string, args: unknown) => tools[name]!.fn(args, ctxOf(root)) as Promise<any>;
 after(() => sc.close());
 
 test("nav tools throw `no sidecar` without a sidecar", async () => {
-  const bare = catalog("L", { root, partial: true }).find((t) => t.name === "outline")!;
+  const bare = catalog("L", { root }).find((t) => t.name === "outline")!;
   await assert.rejects(bare.fn({ path: "pkg/util.py" }, ctxOf(root)), /no sidecar/);
 });
 
@@ -78,7 +78,7 @@ test("findReferences caps long lists with a truncated hint", { skip: skipReason 
   const big = makeWorkspace({ "m.py": "def f():\n    pass\n\n" + Array.from({ length: 80 }, () => "f()").join("\n") + "\n" });
   const sc2 = new Sidecar({ root: big, env: venvEnv() });
   try {
-    const t = catalog("L", { root: big, sidecar: sc2, partial: true }).find((x) => x.name === "findReferences")!;
+    const t = catalog("L", { root: big, sidecar: sc2 }).find((x) => x.name === "findReferences")!;
     const r: any = await t.fn({ path: "m.py", name: "f" }, ctxOf(big));
     assert.ok(r.references.length <= 40);
     assert.match(r.truncated, /showing \d+ of 81/);

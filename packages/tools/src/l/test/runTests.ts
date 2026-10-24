@@ -1,7 +1,7 @@
 import { cutList } from "../../search.ts";
-import { relPath, resolveInRoot } from "../../paths.ts";
 import { needSidecar, type Sidecar } from "../../sidecar.ts";
 import { objectSchema, type ToolDef } from "../../types.ts";
+import { normTarget } from "./common.ts";
 
 /** `runTests`: runs unittest tests in a child process and returns structured results. */
 export function makeRunTests(sc?: Sidecar): ToolDef {
@@ -26,10 +26,7 @@ export function makeRunTests(sc?: Sidecar): ToolDef {
     async fn(args: { target?: string; failedOnly?: boolean; timeoutMs?: number }, ctx) {
       const sidecar = needSidecar(sc);
       const params: Record<string, unknown> = { failedOnly: args.failedOnly, timeoutMs: args.timeoutMs };
-      if (args.target) {
-        const [path, ...id] = args.target.split("#");
-        params.target = [relPath(ctx.root, resolveInRoot(ctx.root, path!)), ...id].join("#");
-      }
+      if (args.target) params.target = normTarget(ctx.root, args.target);
       const res = (await sidecar.call("runTests", params, ctx.signal)) as { passed: number; skipped: number; failed: unknown[]; truncated?: string };
       const { kept, truncated } = cutList(res.failed, 15, "run a single test (target) or failedOnly for the rest");
       const hint = truncated ?? res.truncated;

@@ -5,6 +5,8 @@ code: it reads test classes and methods from the syntax trees.
 """
 import ast
 import os
+import time
+from concurrent.futures import ThreadPoolExecutor
 
 from . import execution, graph
 from .common import SKIP_DIRS, is_python, rel, resolve, unsupported
@@ -157,6 +159,19 @@ def _units(root, params):
     return units
 
 
+def _result_of(r, what, timeout):
+    """Result of a child run that must produce one.
+
+    Raises ValueError on timeout or when the child died without a result.
+    """
+    if r["status"] == "timeout":
+        raise ValueError("%s timed out after %gs" % (what, timeout))
+    if r["result"] is None:
+        tail = (r["stderr"] or r["stdout"]).strip().splitlines()[-1:] or [""]
+        raise ValueError("%s process exited with code %s without a result: %s" % (what, r["code"], tail[0][:200]))
+    return r["result"]
+
+
 def run_tests(root, params):
     global _last_failed
     timeout = execution.timeout_of(params, TESTS_TIMEOUT, TESTS_TIMEOUT_MAX)
@@ -164,13 +179,7 @@ def run_tests(root, params):
     if not units:
         _last_failed = [] if params.get("failedOnly") else _last_failed
         return {"passed": 0, "skipped": 0, "failed": []}
-    r = execution.run_child(root, "tests", {"units": units}, timeout, out_cap=600)
-    if r["status"] == "timeout":
-        raise ValueError("tests timed out after %gs" % timeout)
-    if r["result"] is None:
-        tail = (r["stderr"] or r["stdout"]).strip().splitlines()[-1:] or [""]
-        raise ValueError("test process exited with code %s without a result: %s" % (r["code"], tail[0][:200]))
-    res = r["result"]
+    res = _result_of(execution.run_child(root, "tests", {"units": units}, timeout, out_cap=600), "tests", timeout)
     _last_failed = list(dict.fromkeys(f["id"] for f in res["failed"]))
     if len(res["failed"]) > MAX_FAILED:
         res["truncated"] = "showing %d of %d failures; use target to narrow" % (MAX_FAILED, len(res["failed"]))
@@ -197,9 +206,227 @@ def run_snippet(root, params):
     if "value" in res:
         out["value"] = execution.cap_text(res["value"].encode("utf-8"), VALUE_CAP)
     if "exception" in res:
-        out["exception"] = res["exception"]
-        out["exception"]["traceback"] = execution.cap_text(out["exception"]["traceback"].encode("utf-8"), 3000)
+        out["exception"] = _cap_exception(res["exception"])
     return out
 
 
-METHODS = {"runTests": run_tests, "listTests": list_tests, "runSnippet": run_snippet}
+def _cap_exception(exc):
+    exc["traceback"] = execution.cap_text(exc["traceback"].encode("utf-8"), 3000)
+    return exc
+
+
+# ---- coverage ------------------------------------------------------------------------------
+
+MAX_RANGES = 200
+COVERAGE_TIMEOUT_MAX = 600.0
+MAX_TRACE_SYMBOLS = 10
+TRACE_CAP = 100
+STRESS_MAX_RUNS = 200
+STRESS_MAX_PARALLEL = 16
+STRESS_MAX_DISTINCT = 5
+
+
+def _parse(root, path):
+    """(abs path, source, syntax tree) of a workspace Python file."""
+    if not is_python(path):
+        unsupported(path)
+    abs_path = resolve(root, path)
+    if not os.path.isfile(abs_path):
+        raise ValueError("no such file: %s" % path)
+    with open(abs_path, encoding="utf-8") as f:
+        src = f.read()
+    try:
+        return abs_path, src, ast.parse(src)
+    except SyntaxError:
+        raise ValueError("syntax error in %s" % path)
+
+
+def _find_def(tree, name):
+    """(node, `co_qualname`) of `Class.method` / `func` / nested `a.b` in a module tree, or None."""
+    body, qual = tree.body, ""
+    node = None
+    for part in name.split("."):
+        node = next((n for n in body if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)) and n.name == part), None)
+        if node is None:
+            return None
+        qual = part if not qual else qual + (".<locals>." if qual_is_func else ".") + part
+        qual_is_func = not isinstance(node, ast.ClassDef)
+        body = node.body
+    return node, qual
+
+
+def _span(node):
+    """First (including decorators) and last line of a definition."""
+    return min([node.lineno] + [d.lineno for d in getattr(node, "decorator_list", [])]), node.end_lineno
+
+
+def _executable_lines(src, path):
+    """Lines that carry bytecode, from the code objects of the compiled file (nothing is run)."""
+    lines = set()
+    stack = [compile(src, path, "exec")]
+    while stack:
+        code = stack.pop()
+        lines.update(ln for _, _, ln in code.co_lines() if ln)
+        stack += [c for c in code.co_consts if hasattr(c, "co_lines")]
+    return lines
+
+
+def _ranges(lines):
+    """Consecutive runs of an ordered list of line numbers as [start, end] pairs."""
+    out = []
+    for ln in lines:
+        if out and out[-1][1] == ln - 1:
+            out[-1][1] = ln
+        else:
+            out.append([ln, ln])
+    return out
+
+
+def coverage(root, params):
+    target = params.get("target")
+    if not isinstance(target, str) or not target:
+        raise ValueError("target must be a file or path#Name")
+    path, _, name = target.partition("#")
+    abs_path, src, tree = _parse(root, path)
+    lines = sorted(_executable_lines(src, path))
+    if name:
+        found = _find_def(tree, name)
+        if found is None:
+            raise ValueError("symbol not found: %s" % target)
+        lo, hi = _span(found[0])
+        lines = [ln for ln in lines if lo <= ln <= hi]
+    timeout = execution.timeout_of(params, TESTS_TIMEOUT, COVERAGE_TIMEOUT_MAX)
+    units = _units(root, {"target": params.get("tests")})
+    res = _result_of(execution.run_child(root, "coverage", {"units": units, "file": abs_path}, timeout, out_cap=600), "coverage run", timeout)
+    hit = set(res["covered"])
+    missing = [ln for ln in lines if ln not in hit]
+    out = {"path": rel(root, abs_path)}
+    if name:
+        out["symbol"] = target
+    out.update({"covered": len(lines) - len(missing), "total": len(lines),
+                "percent": round(100.0 * (len(lines) - len(missing)) / len(lines), 1) if lines else 100.0,
+                "uncovered": _ranges(missing), "tests": res["tests"]})
+    if len(out["uncovered"]) > MAX_RANGES:
+        out["truncated"] = "showing %d of %d uncovered ranges; pass a symbol to narrow" % (MAX_RANGES, len(out["uncovered"]))
+        out["uncovered"] = out["uncovered"][:MAX_RANGES]
+    return out
+
+
+# ---- traceCalls ----------------------------------------------------------------------------
+
+def _run_source(root, params):
+    """The child kind and request fields for a `snippet` or `test` argument (exactly one of them)."""
+    snippet, test = params.get("snippet"), params.get("test")
+    if bool(snippet) == bool(test):
+        raise ValueError("pass exactly one of snippet or test")
+    if snippet:
+        if not isinstance(snippet, str):
+            raise ValueError("snippet must be a string")
+        return "snippet", {"code": snippet}
+    return "tests", {"units": _units(root, {"target": test})}
+
+
+def trace_calls(root, params):
+    symbols = params.get("symbols")
+    if not isinstance(symbols, list) or not symbols or not all(isinstance(x, str) for x in symbols):
+        raise ValueError("symbols must be a non-empty list of path#Name")
+    if len(symbols) > MAX_TRACE_SYMBOLS:
+        raise ValueError("at most %d symbols" % MAX_TRACE_SYMBOLS)
+    targets = []
+    for sym in symbols:
+        path, _, name = sym.partition("#")
+        if not name:
+            raise ValueError("symbol must be path#Name: %s" % sym)
+        abs_path, _, tree = _parse(root, path)
+        found = _find_def(tree, name)
+        if found is None:
+            raise ValueError("symbol not found: %s" % sym)
+        node, qual = found
+        if isinstance(node, ast.ClassDef):  # a class is traced through its constructor
+            ctor = _find_def(tree, name + ".__init__")
+            if ctor is None:
+                raise ValueError("class has no __init__ to trace: %s" % sym)
+            qual = ctor[1]
+        targets.append({"file": abs_path, "qualname": qual, "symbol": sym})
+    kind, req = _run_source(root, params)
+    timeout = execution.timeout_of(params, TESTS_TIMEOUT, TESTS_TIMEOUT_MAX)
+    res = _result_of(execution.run_child(root, "trace", {**req, "targets": targets, "cap": TRACE_CAP}, timeout, out_cap=600), "traceCalls", timeout)
+    run = res["run"]
+    if "exception" in run:
+        run["exception"] = _cap_exception(run["exception"])
+    out = {"calls": res["calls"], "total": res["total"], "run": run}
+    if res["total"] > len(res["calls"]):
+        out["truncated"] = "showing first %d of %d calls; trace fewer symbols or a narrower run" % (len(res["calls"]), res["total"])
+    return out
+
+
+# ---- stressRun -----------------------------------------------------------------------------
+
+def _int_arg(params, key, default, maximum):
+    v = params.get(key)
+    if v is None:
+        return default
+    if not isinstance(v, int) or isinstance(v, bool) or v < 1:
+        raise ValueError("%s must be a positive integer" % key)
+    return min(v, maximum)
+
+
+def _failures_of(r, kind):
+    """Failure signatures of one finished run (empty when it passed): dicts with type, message, location, id?."""
+    if r["status"] == "timeout":
+        return [{"type": "Timeout", "message": "run did not finish in time", "location": None}]
+    res = r["result"]
+    if res is None:
+        tail = (r["stderr"] or r["stdout"]).strip().splitlines()[-1:] or [""]
+        return [{"type": "Crash", "message": "exit code %s: %s" % (r["code"], tail[0][:200]), "location": None}]
+    if kind == "snippet":
+        e = res.get("exception")
+        return [{"type": e["type"], "message": e["message"][:300], "location": e["location"]}] if e else []
+    return [{"type": f["message"].split(":", 1)[0], "message": f["message"], "location": f["location"], "id": f["id"]} for f in res["failed"]]
+
+
+def stress_run(root, params):
+    n = _int_arg(params, "n", 20, STRESS_MAX_RUNS)
+    workers = min(_int_arg(params, "parallel", 4, STRESS_MAX_PARALLEL), n)
+    overall = execution.timeout_of(params, 60.0, TESTS_TIMEOUT_MAX)
+    per_run = execution.timeout_of({"timeoutMs": params.get("runTimeoutMs")}, 30.0, TESTS_TIMEOUT_MAX)
+    kind, req = _run_source(root, params)
+    deadline = time.monotonic() + overall
+    done = [None] * n  # per run: list of failure signatures, or None when it did not complete
+
+    def work(i):
+        left = deadline - time.monotonic()
+        if left <= 0:
+            return
+        limit = min(per_run, left)
+        r = execution.run_child(root, kind, req, limit, out_cap=300)
+        if r["status"] == "timeout" and limit < per_run:
+            return  # cut short by the overall deadline, not a verdict
+        done[i] = _failures_of(r, kind)
+
+    with ThreadPoolExecutor(max_workers=workers) as pool:
+        for f in [pool.submit(work, i) for i in range(n)]:
+            f.result()  # an abort raises here
+    finished = [d for d in done if d is not None]
+    distinct = {}
+    for i, sigs in enumerate(done):
+        for sg in sigs or []:
+            loc = sg["location"]
+            key = (sg["type"], loc and loc["path"], loc and loc["line"], sg.get("id"))
+            if key in distinct:
+                distinct[key]["count"] += 1
+            else:
+                distinct[key] = {**sg, "count": 1, "firstRun": i + 1}
+    failed_runs = sum(1 for d in finished if d)
+    out = {"runs": len(finished), "failures": failed_runs,
+           "failureRate": round(failed_runs / len(finished), 3) if finished else 0.0,
+           "distinct": list(distinct.values())[:STRESS_MAX_DISTINCT]}
+    if len(distinct) > STRESS_MAX_DISTINCT:
+        out["truncated"] = "showing %d of %d distinct failures" % (STRESS_MAX_DISTINCT, len(distinct))
+    if len(finished) < n:
+        out["timedOut"] = True
+    return out
+
+
+METHODS = {"runTests": run_tests, "listTests": list_tests, "coverage": coverage, "runSnippet": run_snippet,
+           "traceCalls": trace_calls, "stressRun": stress_run}

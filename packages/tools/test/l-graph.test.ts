@@ -7,14 +7,14 @@ import { join } from "node:path";
 
 const root = makeWorkspace(GRAPH_PKG);
 const sc = new Sidecar({ root, env: venvEnv() });
-const tools = Object.fromEntries(catalog("L", { root, sidecar: sc, partial: true }).map((t) => [t.name, t]));
+const tools = Object.fromEntries(catalog("L", { root, sidecar: sc }).map((t) => [t.name, t]));
 const run = (name: string, args: unknown) => tools[name]!.fn(args, ctxOf(root)) as Promise<any>;
 after(() => sc.close());
 
 const SAVE = "app/store.py#Store.save";
 
 test("graph tools throw `no sidecar` without a sidecar", async () => {
-  const bare = catalog("L", { root, partial: true }).find((t) => t.name === "callGraph")!;
+  const bare = catalog("L", { root }).find((t) => t.name === "callGraph")!;
   await assert.rejects(bare.fn({ symbol: SAVE }, ctxOf(root)), /no sidecar/);
 });
 
@@ -111,14 +111,14 @@ test("index follows file changes and survives syntax errors", { skip: skipReason
   const ws = makeWorkspace(GRAPH_PKG);
   const sc2 = new Sidecar({ root: ws, env: venvEnv() });
   try {
-    const t = catalog("L", { root: ws, sidecar: sc2, partial: true }).find((x) => x.name === "callGraph")!;
+    const t = catalog("L", { root: ws, sidecar: sc2 }).find((x) => x.name === "callGraph")!;
     const call = (a: unknown) => t.fn(a, ctxOf(ws)) as Promise<any>;
     assert.equal((await call({ symbol: "app/core.py#run", direction: "out", depth: 1 })).nodes.length, 2);
     writeFileSync(join(ws, "app/core.py"), "def run(n):\n    return n\n");
     utimesSync(join(ws, "app/core.py"), new Date(), new Date(Date.now() + 5000));
     assert.equal((await call({ symbol: "app/core.py#run", direction: "out", depth: 1 })).nodes.length, 0);
     writeFileSync(join(ws, "app/broken.py"), "def (:\n");
-    const o: any = await (catalog("L", { root: ws, sidecar: sc2, partial: true }).find((x) => x.name === "overview")!.fn({}, ctxOf(ws)));
+    const o: any = await (catalog("L", { root: ws, sidecar: sc2 }).find((x) => x.name === "overview")!.fn({}, ctxOf(ws)));
     assert.deepEqual(o.unparsed, ["app/broken.py"]);
   } finally { sc2.close(); }
 });
@@ -127,7 +127,7 @@ test("duck-typed receiver with two candidate classes: approx edge to each, not o
   const ws = makeWorkspace({ "m.py": "class A:\n    def go(self): pass\nclass B:\n    def go(self): pass\ndef make(f):\n    return A() if f else B()\ndef use(f):\n    x = make(f)\n    x.go()\n" });
   const sc2 = new Sidecar({ root: ws, env: venvEnv() });
   try {
-    const t = catalog("L", { root: ws, sidecar: sc2, partial: true }).find((x) => x.name === "callGraph")!;
+    const t = catalog("L", { root: ws, sidecar: sc2 }).find((x) => x.name === "callGraph")!;
     const r: any = await t.fn({ symbol: "m.py#use", direction: "out", depth: 1 }, ctxOf(ws));
     const go = r.edges.filter((e: any) => e.to.endsWith(".go"));
     assert.deepEqual(go.map((e: any) => [e.to, e.approx, e.candidates]), [["m.py#A.go", true, 2], ["m.py#B.go", true, 2]]);
@@ -144,7 +144,7 @@ test("caps: long lists carry a truncated hint with the true total; overview stay
   const big = makeWorkspace(files);
   const sc2 = new Sidecar({ root: big, env: venvEnv() });
   try {
-    const by = Object.fromEntries(catalog("L", { root: big, sidecar: sc2, partial: true }).map((x) => [x.name, x]));
+    const by = Object.fromEntries(catalog("L", { root: big, sidecar: sc2 }).map((x) => [x.name, x]));
     const go = (n: string, a: unknown) => by[n]!.fn(a, ctxOf(big)) as Promise<any>;
     const cg = await go("callGraph", { symbol: "pkg/hub.py#hub", direction: "in", depth: 1 });
     assert.ok(cg.nodes.length <= 40);

@@ -25,7 +25,7 @@ function py(root: string, code: string): string {
 function setup(files: Record<string, string> = REFACTOR_PKG) {
   const root = makeWorkspace(files);
   const sc = new Sidecar({ root, env: venvEnv() });
-  const tools = Object.fromEntries(catalog("L", { root, sidecar: sc, partial: true }).map((t) => [t.name, t]));
+  const tools = Object.fromEntries(catalog("L", { root, sidecar: sc }).map((t) => [t.name, t]));
   const run = (name: string, args: unknown) => tools[name]!.fn(args, ctxOf(root)) as Promise<any>;
   return { root, run, done: () => sc.close() };
 }
@@ -44,7 +44,7 @@ const BASE_OUT = "ab_cd X 8";
 test("refactor tools throw `no sidecar` without a sidecar", async () => {
   const root = makeWorkspace(REFACTOR_PKG);
   const names = ["renameSymbol", "moveSymbol", "moveModule", "extractFunction", "inlineSymbol", "changeSignature", "extractVariable", "organizeImports"];
-  const tools = catalog("L", { root, partial: true }).filter((t) => t.meta.category === "refactor");
+  const tools = catalog("L", { root }).filter((t) => t.meta.category === "refactor");
   assert.deepEqual(tools.map((t) => t.name), names);
   assert.ok(tools.every((t) => t.meta.effect === "write"));
   for (const t of tools) await assert.rejects(t.fn({ path: "pkg/util.py", dryRun: true }, ctxOf(root)), /no sidecar/);

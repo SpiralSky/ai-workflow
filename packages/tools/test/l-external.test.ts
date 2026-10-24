@@ -11,7 +11,7 @@ test("14 external tools, each with a fixture file", () => {
   assert.equal(externalTools.length, 14);
   const files = readdirSync(new URL("../fixtures/external/", import.meta.url)).map((f) => f.replace(/\.json$/, "")).sort();
   assert.deepEqual(files, externalTools.map((t) => t.name).sort());
-  assert.deepEqual(catalog("L", { root: "/tmp", partial: true }).slice(-14), externalTools);
+  assert.deepEqual(catalog("L", { root: "/tmp" }).slice(-14), externalTools);
 });
 
 test("first matching case wins; string match is a case-insensitive substring; other values deep-equal", async () => {

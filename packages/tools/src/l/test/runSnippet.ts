@@ -10,7 +10,7 @@ export function makeRunSnippet(sc?: Sidecar): ToolDef {
       code: { type: "string", description: "Python source; a last expression is returned as value (repr)." },
       timeoutMs: { type: "integer", description: "Kill the process after this many ms (default 30000, max 300000)." },
     }, ["code"]),
-    returns: "{ stdout: string; stderr: string; value?: string; exception?: { type: string; message: string; traceback: string }; timedOut?: true; exitCode?: number | null }",
+    returns: "{ stdout: string; stderr: string; value?: string; exception?: { type: string; message: string; location: { path: string; line: number } | null; traceback: string }; timedOut?: true; exitCode?: number | null }",
     meta: {
       whenToUse: "Reproduce a bug or check what a function returns without writing a file.",
       whenNotToUse: "Not for running the test suite (use runTests) or shell commands (use bash).",

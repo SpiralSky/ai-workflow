@@ -8,6 +8,7 @@ import json
 import os
 import re
 import sys
+import threading
 import traceback
 import unittest
 
@@ -18,6 +19,8 @@ EXCERPT_LINES = 12
 
 def _rel(root, path):
     """Workspace-relative `/` path of a file, or None outside the workspace or in skipped directories."""
+    if not os.path.isabs(path):  # <frozen ...>, <string>
+        return None
     try:
         r = os.path.relpath(os.path.realpath(path), root)
     except ValueError:
@@ -171,11 +174,160 @@ def run_snippet(req):
         while tb is not None and tb.tb_frame.f_code.co_filename != "<snippet>":
             tb = tb.tb_next
         text = "".join(traceback.format_exception(type(e), e, tb)) if tb else "".join(traceback.format_exception_only(type(e), e))
-        out["exception"] = {"type": type(e).__name__, "message": str(e), "traceback": text.replace(req["root"] + os.sep, "")}
+        loc = None
+        for fs in traceback.extract_tb(tb):
+            r = "<snippet>" if fs.filename == "<snippet>" else _in_workspace(req, fs.filename)
+            if r:
+                loc = {"path": r, "line": fs.lineno}
+        out["exception"] = {"type": type(e).__name__, "message": str(e), "location": loc, "traceback": text.replace(req["root"] + os.sep, "")}
     return out
 
 
-KINDS = {"tests": run_tests, "snippet": run_snippet}
+# ---- sys.monitoring (3.12): coverage and call tracing --------------------------------------
+
+def _monitoring(tool_id, events, callbacks):
+    """Claims a monitoring tool id, registers `callbacks` ({event: fn}) and enables `events`; returns a stop function."""
+    mon = sys.monitoring
+    mon.use_tool_id(tool_id, "aiw")
+    for ev, fn in callbacks.items():
+        mon.register_callback(tool_id, ev, fn)
+
+    def stop():
+        mon.set_events(tool_id, 0)
+        for ev in callbacks:
+            mon.register_callback(tool_id, ev, None)
+        mon.free_tool_id(tool_id)
+
+    mon.set_events(tool_id, events)
+    return stop
+
+
+def run_coverage(req):
+    """Runs the tests under LINE monitoring and returns the executed line numbers of `file`, plus the test summary."""
+    mon = sys.monitoring
+    target = os.path.realpath(req["file"])
+    covered = set()
+    is_target = {}
+
+    def on_line(code, line):
+        fn = code.co_filename
+        hit = is_target.get(fn)
+        if hit is None:
+            hit = is_target[fn] = os.path.realpath(fn) == target
+        if hit:
+            covered.add(line)
+        return mon.DISABLE  # each location is only needed once
+
+    stop = _monitoring(mon.COVERAGE_ID, mon.events.LINE, {mon.events.LINE: on_line})
+    try:
+        tests = run_tests(req)
+    finally:
+        stop()
+    return {"tests": {"passed": tests["passed"], "skipped": tests["skipped"], "failed": len(tests["failed"])}, "covered": sorted(covered)}
+
+
+def _short(v, cap=80):
+    """Capped repr that never raises."""
+    try:
+        t = repr(v)
+    except BaseException as e:
+        t = "<repr failed: %s>" % type(e).__name__
+    return t if len(t) <= cap else t[:cap] + "..."
+
+
+def run_trace(req):
+    """Runs a snippet or tests while recording calls to the target functions; events are ordered by call start."""
+    mon = sys.monitoring
+    targets = {(os.path.realpath(t["file"]), t["qualname"]): t["symbol"] for t in req["targets"]}
+    cap = req["cap"]
+    lock = threading.Lock()
+    local = threading.local()
+    state = {"seq": 0, "total": 0}
+    events, pending, decided = [], {}, {}
+
+    def symbol_of(code):
+        s = decided.get(code, False)
+        if s is False:
+            s = decided[code] = targets.get((os.path.realpath(code.co_filename), code.co_qualname))
+        return s
+
+    def who():
+        t = threading.current_thread()
+        info = {"thread": {"id": t.ident, "name": t.name}}
+        aio = sys.modules.get("asyncio")
+        if aio is not None:
+            try:
+                task = aio.current_task()
+            except RuntimeError:
+                task = None
+            if task is not None:
+                info["task"] = task.get_name()
+        return info
+
+    def on_start(code, offset):
+        sym = symbol_of(code)
+        if sym is None:
+            return mon.DISABLE
+        if getattr(local, "busy", False):
+            return None
+        local.busy = True
+        try:
+            frame = sys._getframe(1)
+            n = code.co_argcount + code.co_kwonlyargcount + bool(code.co_flags & 4) + bool(code.co_flags & 8)
+            args = {name: _short(frame.f_locals.get(name)) for name in code.co_varnames[:n]}
+            ev = {"symbol": sym, "args": args, **who()}
+            with lock:
+                state["total"] += 1
+                if len(events) >= cap:
+                    return None
+                state["seq"] += 1
+                ev = {"seq": state["seq"], **ev}
+                events.append(ev)
+                pending[id(frame)] = ev
+        finally:
+            local.busy = False
+
+    def on_return(code, offset, value):
+        if symbol_of(code) is None:
+            return mon.DISABLE
+        if getattr(local, "busy", False):
+            return None
+        local.busy = True
+        try:
+            ev = pending.pop(id(sys._getframe(1)), None)
+            if ev is not None:
+                ev["returned"] = _short(value)
+        finally:
+            local.busy = False
+
+    def on_unwind(code, offset, exc):
+        if symbol_of(code) is None:
+            return None  # PY_UNWIND cannot be disabled
+        if getattr(local, "busy", False):
+            return None
+        local.busy = True
+        try:
+            ev = pending.pop(id(sys._getframe(1)), None)
+            if ev is not None:
+                ev["raised"] = _short("%s: %s" % (type(exc).__name__, exc), 120)
+        finally:
+            local.busy = False
+
+    E = mon.events
+    stop = _monitoring(mon.DEBUGGER_ID, E.PY_START | E.PY_RETURN | E.PY_UNWIND, {E.PY_START: on_start, E.PY_RETURN: on_return, E.PY_UNWIND: on_unwind})
+    run = {}
+    try:
+        if "code" in req:
+            run = run_snippet(req)
+        else:
+            t = run_tests(req)
+            run = {"tests": {"passed": t["passed"], "skipped": t["skipped"], "failed": [f["id"] for f in t["failed"]]}}
+    finally:
+        stop()
+    return {"calls": events, "total": state["total"], "run": run}
+
+
+KINDS = {"tests": run_tests, "snippet": run_snippet, "coverage": run_coverage, "trace": run_trace}
 
 
 def main(kind, req_file, res_file):
