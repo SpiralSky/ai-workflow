@@ -17,13 +17,14 @@ F1–F3 are resolved and committed (in the specs). The Anthropic comparison is i
 - Anthropic's numbers are frontier-model results; results on deepseek-v4-flash are an open gap worth reporting.
 - Consider rewriting branching-framework §1–2 to cite prior art and frame branch as the code-mode baseline/executor.
 
-F4–F5 resolved (commit 64ae458): dev set + temporary 90% failure gate, permanent setup gate, pilot runs,
-one-time $1 full run; tuning to pass the gate is a spec change needing approval (minor fixes excepted, overfitting
-checked twice). Cost estimate with caching: full rep ≈ $0.5–1 (large problems are the unknown; pilot runs measure it).
+All review findings F1–F20 are resolved and committed (latest 5e8798f). `review-handoff.md` now holds only §5
+(architecture amendments made directly, two marked ⚠ revising approved decisions), kept for the user to confirm.
 
-**Next:** user's new orchestrate idea (adds one mode) is still pending. Review continues at F6–F7 (already presented,
-awaiting decision: F6 hot paths confound → `hotPaths` off in comparisons or `branch-only[hotPaths]` variant; F7 power →
-full run detects only large effects, use paired comparisons, pre-state the claim threshold). Then F8–F20.
+**Next (in order):**
+1. User confirms §5 amendments → delete `docs/specifications/review-handoff.md` and its link in features/README.
+2. Final checking pass over all specs (user-led, this session or next); then flip features/README status to Final.
+3. User's new orchestrate idea (adds one mode) — still to be presented.
+
 Commit spec/README changes as `docs:` commits when the user approves.
 
 ---
