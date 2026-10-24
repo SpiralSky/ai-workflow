@@ -4,10 +4,9 @@
 
 ---
 
-## Spec review in progress: `docs/specifications/review-handoff.md`
+## Specs: review done, final check next
 
-Working through the review in small batches; each item is labelled with its source spec (feature/architecture + §).
-F1–F3 are resolved and committed (in the specs). The Anthropic comparison is in orchestrate §2.1 and §10.2 and in the README.
+The Anthropic prior-art comparison is in orchestrate §2.1 and §10.2 and in the README.
 
 **Open prior-art follow-ups:**
 - Orchestrate bets that delegation cost (tokens, latency, lossy reports) is outweighed by cheaper actions. `resolve`,
@@ -17,13 +16,11 @@ F1–F3 are resolved and committed (in the specs). The Anthropic comparison is i
 - Anthropic's numbers are frontier-model results; results on deepseek-v4-flash are an open gap worth reporting.
 - Consider rewriting branching-framework §1–2 to cite prior art and frame branch as the code-mode baseline/executor.
 
-All review findings F1–F20 are resolved and committed (latest 5e8798f). `review-handoff.md` now holds only §5
-(architecture amendments made directly, two marked ⚠ revising approved decisions), kept for the user to confirm.
+Spec review F1–F20 is complete; `review-handoff.md` was deleted after the user accepted its architecture amendments.
 
 **Next (in order):**
-1. User confirms §5 amendments → delete `docs/specifications/review-handoff.md` and its link in features/README.
-2. Final checking pass over all specs (user-led, this session or next); then flip features/README status to Final.
-3. User's new orchestrate idea (adds one mode) — still to be presented.
+1. Final checking pass over all specs (user-led, this session or next); then flip features/README status to Final.
+2. User's new orchestrate idea (adds one mode) — still to be presented.
 
 Commit spec/README changes as `docs:` commits when the user approves.
 

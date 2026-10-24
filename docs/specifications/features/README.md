@@ -23,5 +23,3 @@ Architecture specs (in `../architecture/`) follow from these and resolve the how
 
 - **Draft:** under review; may change freely.
 - **Final:** checked; changes are spec changes and need the user's approval.
-
-Open review findings awaiting decisions: [`../review-handoff.md`](../review-handoff.md).

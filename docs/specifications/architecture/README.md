@@ -41,10 +41,6 @@ When an item is resolved, replace the marker with the decision (and date) and re
 
 ---
 
-## Register
-
-Open problems found in review, and the architecture amendments made then, are in
-[`../review-handoff.md`](../review-handoff.md).
 
 ### Approvals
 

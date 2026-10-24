@@ -87,7 +87,7 @@ Related systems with similar ideas include Cloudflare Code Mode, CodeAct, smolag
 
 Specs in [docs/specifications/](docs/specifications/features/README.md) are the source of truth; the code is being rebuilt to match them.
 
-1. **Finish the spec review**: remaining items in [review-handoff.md](docs/specifications/review-handoff.md) (F4–F8 and onward).
+1. **Final spec check**: one checking pass over all specs, then mark them Final.
 2. **Build to the architecture specs**, in dependency order ([system-overview §2](docs/specifications/architecture/system-overview.md)):
    telemetry → LLM client → core (branch runtime, tool registry and hosts, orchestrate engine) → tools (tier S, then L) →
    framework server → report + runner + problems → viewer → Claude Code plugin.
