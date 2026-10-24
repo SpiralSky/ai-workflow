@@ -1,0 +1,8 @@
+{
+  "name": "@aiw/llm",
+  "private": true,
+  "type": "module",
+  "exports": { ".": "./src/index.ts" },
+  "dependencies": { "@aiw/telemetry": "*" },
+  "scripts": { "test": "tsx --test test/*.test.ts" }
+}

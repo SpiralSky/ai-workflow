@@ -25,7 +25,7 @@ per framework-runner §6.5 (CLAUDE.md updated); large dev problem deferred until
 **Next (in order):**
 1. ~~Sort out the uncommitted working tree~~ — done 2026-10-24 (tree clean).
 2. Rebuild the codebase to the architecture specs (README Roadmap step 2): ~~telemetry~~ (done 2026-10-24,
-   `packages/telemetry`) → **LLM client (`packages/llm`, next)** → core branch per architecture/core-branch.md.
+   `packages/telemetry`) → ~~LLM client~~ (done 2026-10-24, `packages/llm`) → **core branch per architecture/core-branch.md (next)**.
 3. Test the existing modes first: clean `compare` (baseline, branch-only, orchestrate) — Roadmap step 3.
 4. Only then: user's new orchestrate idea (adds one mode) — not yet presented; it goes through spec approval.
 
@@ -43,6 +43,10 @@ Telemetry choices not in the spec: `wrapTools` nests a tool's calls directly und
 event); the explicit reporter wins over `currentReporter()`; `fromMeta(meta, root)` derives from the server's root
 reporter so `s:n` ids stay unique; `wrapLLM` takes an `LLMClient` interface returning already-normalised usage
 (telemetry can't import `@aiw/llm`), so `@aiw/llm` must implement that interface.
+LLM choices not in the spec: `createChatClient({ baseURL, apiKey, timeoutMs=300 s })` does no retries (the runner
+restarts the job, runner §7); errors are `LLMError` with `kind` infra/context-limit/other (runner §4.4), context-limit
+detected by message regex; a caller's `signal` abort is rethrown unwrapped (not infra); `tools: []` is omitted
+from the body; OpenRouter is detected by base URL; `cacheWrite` read from `prompt_tokens_details.cache_write_tokens`.
 Workflow: the main session designs and orchestrates; subagents execute in small, self-contained steps. Use
 Sonnet subagents (`model: "sonnet"`) for implementation and Haiku (`model: "haiku"`, weaker) for simple mechanical
 tasks; the main agent reviews their output.
