@@ -27,9 +27,11 @@ per framework-runner §6.5 (CLAUDE.md updated); large dev problem deferred until
 2. Rebuild the codebase to the architecture specs (README Roadmap step 2): ~~telemetry~~ (done 2026-10-24,
    `packages/telemetry`) → ~~LLM client~~ (done 2026-10-24, `packages/llm`) → ~~core branch runtime~~ (done
    2026-10-24, `packages/core/src/branch`) → ~~core tool registry, hosts and wrappers~~ (done 2026-10-24,
-   `src/registry`, `src/host`, `src/selection/bm25.ts`; `buildFramework` + prompts not yet) →
-   **`buildFramework` + framework prompts (core-tools-and-hosts §6) next** (user-approved order), then
-   the orchestrate engine.
+   `src/registry`, `src/host`, `src/selection/bm25.ts`) → ~~`buildFramework` + prompts~~ (done 2026-10-24,
+   `src/framework`, `prompts/{base,branch-only,branch-tool}.md`; baseline + branch-only only) →
+   **orchestrate engine next**, which also completes `buildFramework`: `orchestrate`, `[toolSearch]`,
+   `catalog=N` (distractor set) currently throw "not built yet". Prompt texts were drafted without a
+   spec and await the user's review before any eval run (their hashes are in provenance).
    Engine packaging resolved 2026-10-24 (core-branch §4.1, I-11 revised): QuickJS-WASM default,
    isolated-vm optional, shipped beside the bundle; containers use `--engine isolated-vm`.
 3. Test the existing modes first: clean `compare` (baseline, branch-only, orchestrate) — Roadmap step 3.
