@@ -49,15 +49,31 @@ type Role = "main" | "secondary" | "selection";
 
 Helpers:
 
-- `wrapTools(tools, reporter)`: for each call, `id = newId()`, `toolStart`, call the tool with
-  `reporter.child(name, id)` available through an async-local context, then `tool({ id, … })`.
-- `wrapLLM(client, reporter, role)`: times the request, normalises usage (§6), writes `turn` and the
+- `wrapTools(tools, reporter)`: for each call, `id = newId()`, `toolStart`, call the tool with a
+  reporter scoped to `id` available through an async-local context, then `tool({ id, … })`. The
+  scoped reporter writes **no** `scope` event: the `tool` event itself is the parent, so each id
+  names one record (a `toolStart` is superseded by its `tool`). `child()` stays for scopes that are
+  not tool calls (e.g. an executor session).
+- `wrapLLM(client, reporter, role, { transcript?, session? })`: times the request, writes `turn` and the
   transcript entry (§5); the entry's `turnId` is the `turn` event id (there is no id on the `turn` event pointing back).
-- `fromMeta(meta)`: builds a reporter scoped to the parent id carried in MCP `_meta`
+  `client` is the `LLMClient` interface defined in `@aiw/telemetry`, whose `complete()` returns
+  `{ response, usage, costUsd?, cacheHit? }` with usage **already normalised**: `@aiw/llm`
+  implements it and applies `normaliseUsage` (§6) inside its client, since `telemetry` may not
+  depend on `llm` (system-overview §2). A failed request writes no `turn` (no API usage exists).
+- `fromMeta(meta, root)`: builds a reporter scoped to the parent id carried in MCP `_meta`
   (`aiw/parent`, `aiw/harnessId`) — how the server nests its events under the runner's tool event.
+  It derives from the server process's single root reporter, so all requests share one id counter
+  and `s:<n>` ids never collide.
+- `writeJobStart` / `writeJobEnd`: the runner's `job` and `end` lines (§3).
 
 Reporters are passed explicitly; an `AsyncLocalStorage` holds the current scope only so tool
 implementations that make nested calls (executor inside `do`) don't need it threaded through.
+When both exist, the **explicit reporter wins**: `wrapTools` records under the reporter it was
+given, and code reads `currentReporter()` only deliberately, to wrap the calls it nests. (Otherwise an
+executor's tools, wrapped with the executor's reporter, would attach under the enclosing `do`.)
+
+> **Decided A-27 (2026-10-24, approved):** the four helper details above (no scope event per tool
+> call, normalised-usage `LLMClient` interface, explicit reporter wins, shared server counter).
 
 ---
 
@@ -73,7 +89,7 @@ One JSON object per line. Common fields: `v` (schema version), `id`, `parent` (i
 | `turn` | `model`, `role`, `usage { input, output, cachedRead?, cacheWrite? }`, `costUsd?`, `cacheHit?`, `latencyMs` |
 | `toolStart` | `name`, `args`, `harnessId?` |
 | `tool` | `name`, `args`, `ok`, `error?`, `durationMs`, `startTs`, `harnessId?`, `resultBytes` |
-| `attach` | `key`, `data` (inline if < 64 KB, else `blob: <hash>`) |
+| `attach` | `key`, `data` (inline if its JSON is < 64 KB, else `blob: <hash>`) |
 | `end` | last line written by the runner: `outcome`, `reason?` |
 
 Missing API fields are omitted, never zero-filled (framework-runner §4.1). Ids are
@@ -138,8 +154,11 @@ provider reports cached tokens, otherwise omitted.
 
 ## 7. Tree and rollups
 
+`parseEvents(text)` drops a malformed last line with no trailing newline (a crash mid-write) and
+flags it as `truncatedTail`; any other malformed line is reported as an error.
 `buildTree(events)` links events by `parent`; orphans (parent never written, e.g. crash) attach to
-the root and are flagged. Rollups (framework-runner §4.5) written to `job.json`:
+the root and are flagged. A `toolStart` is replaced by the `tool` with the same id; one without a
+`tool` stays as an in-flight node. Rollups (framework-runner §4.5) written to `job.json`:
 
 | Rollup | Definition |
 |--------|------------|
@@ -147,7 +166,7 @@ the root and are flagged. Rollups (framework-runner §4.5) written to `job.json`
 | `mainTurns` / `secondaryTurns` | count of `turn` by `role` (`selection` counted under secondary) |
 | `topLevelToolCalls` | `tool` events whose parent is the root scope |
 | `leafToolCalls` | `tool` events with no `tool` descendants |
-| `tokens` | sums of usage fields per role |
+| `tokens` | sums of usage fields per role; all three roles always present (`input`/`output` 0 if no turns), `cachedRead`/`cacheWrite` only if some turn of that role reported them |
 | `toolTimeMs` / `modelTimeMs` | sums of `durationMs` (top level) and `latencyMs` |
 | `callsPerTool` | `tool` events by `name` |
 | `externalCalls` | `tool` events whose name is in the `external` group (tools §6.8) |
