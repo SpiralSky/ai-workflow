@@ -7,6 +7,7 @@ import { multiEdit } from "./l/fs/multiEdit.ts";
 import { graphTools } from "./l/graph/index.ts";
 import { navTools } from "./l/nav/index.ts";
 import { refactorTools } from "./l/refactor/index.ts";
+import { testTools } from "./l/test/index.ts";
 import { makeDiff } from "./l/vcs/diff.ts";
 import { history } from "./l/vcs/history.ts";
 import { makeRestore } from "./l/vcs/restore.ts";
@@ -28,7 +29,7 @@ export interface CatalogOpts {
   snapshot?: Snapshot;
   /** Python analysis sidecar for nav and check tools; without it they throw `no sidecar`. */
   sidecar?: Sidecar;
-  /** Internal, for tests: allow tier L with only the groups built so far (fs, nav, graph, refactor, check, vcs, external). */
+  /** Internal, for tests: allow tier L with only the groups built so far (fs, nav, graph, refactor, test (runTests, listTests, runSnippet), check, vcs, external). */
   partial?: boolean;
 }
 
@@ -42,7 +43,7 @@ export interface CatalogOpts {
 export function catalog(tier: "S" | "L", opts: CatalogOpts): ToolDef[] {
   const s = [bash, readFile, writeFile, edit, grep, findFiles];
   if (tier === "S") return s;
-  // test needs the Python sidecar: added in a later step
+  // the test group is half built (coverage, traceCalls, stressRun come later)
   if (!opts.partial) throw new Error("tier L not built yet");
   return [
     ...s,
@@ -50,6 +51,7 @@ export function catalog(tier: "S" | "L", opts: CatalogOpts): ToolDef[] {
     ...navTools(opts.sidecar),
     ...graphTools(opts.sidecar),
     ...refactorTools(opts.sidecar),
+    ...testTools(opts.sidecar),
     ...checkTools(opts.sidecar),
     makeDiff(opts.snapshot), history, makeRestore(opts.snapshot),
     ...externalTools,

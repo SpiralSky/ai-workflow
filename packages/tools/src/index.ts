@@ -24,3 +24,4 @@ export { navTools } from "./l/nav/index.ts";
 export { graphTools } from "./l/graph/index.ts";
 export { refactorTools } from "./l/refactor/index.ts";
 export { checkTools } from "./l/check/index.ts";
+export { testTools } from "./l/test/index.ts";

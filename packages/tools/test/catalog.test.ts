@@ -14,16 +14,17 @@ test("tier L is not built", () => {
   assert.throws(() => catalog("L", { root: "/tmp" }), /tier L not built yet/);
 });
 
-test("L partial: S objects unchanged, unique names, fs, nav, graph, refactor, check, vcs, external groups", () => {
+test("L partial: S objects unchanged, unique names, fs, nav, graph, refactor, test (3 of 6), check, vcs, external groups", () => {
   assert.deepEqual(partialL.slice(0, 6), tools);
   partialL.slice(0, 6).forEach((t, i) => assert.equal(t, tools[i]));
   assert.equal(new Set(partialL.map((t) => t.name)).size, partialL.length);
-  assert.equal(partialL.length, 6 + 4 + 5 + 5 + 8 + 2 + 3 + 14);
-  assert.deepEqual(partialL.slice(6, 33).map((t) => t.name), [
+  assert.equal(partialL.length, 6 + 4 + 5 + 5 + 8 + 3 + 2 + 3 + 14);
+  assert.deepEqual(partialL.slice(6, 36).map((t) => t.name), [
     "multiEdit", "moveFile", "deleteFile", "listDir",
     "outline", "readSymbol", "findDefinition", "findReferences", "signature",
     "overview", "callGraph", "importGraph", "impact", "dataFlow",
     "renameSymbol", "moveSymbol", "moveModule", "extractFunction", "inlineSymbol", "changeSignature", "extractVariable", "organizeImports",
+    "runTests", "listTests", "runSnippet",
     "check", "format",
     "diff", "history", "restore",
   ]);
@@ -68,5 +69,5 @@ test("measured S schema size", () => {
   assert.ok(chars > 0);
   const size = (ts: typeof partialL) => ts.map((t) => JSON.stringify({ name: t.name, description: t.description, parameters: t.parameters }).length).reduce((a, b) => a + b, 0);
   const l = size(partialL);
-  console.log(`tier L partial (${partialL.length} tools, fs+nav+graph+refactor+check+vcs+external): ${l} chars ~ ${Math.round(l / 4)} tokens`);
+  console.log(`tier L partial (${partialL.length} tools, fs+nav+graph+refactor+test(3/6)+check+vcs+external): ${l} chars ~ ${Math.round(l / 4)} tokens`);
 });

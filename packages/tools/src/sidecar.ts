@@ -80,7 +80,7 @@ export class Sidecar {
    * Calls a sidecar method (named like the tool).
    * @param method - method name
    * @param params - JSON params
-   * @param signal - abort rejects this call with `aborted` (the sidecar finishes the work and the reply is dropped)
+   * @param signal - abort rejects this call with `aborted` and sends the sidecar a cancel: exec tools kill their child, other work finishes and its reply is dropped
    * @throws `aborted`, `sidecar crashed`, or the sidecar's error message
    */
   call(method: string, params: Record<string, unknown>, signal?: AbortSignal): Promise<unknown> {
@@ -88,7 +88,11 @@ export class Sidecar {
     return new Promise((resolve, reject) => {
       const id = this.nextId++;
       const onAbort = () => {
-        if (this.pending.delete(id)) reject(new Error("aborted"));
+        const p = this.pending.get(id);
+        if (!p || !this.pending.delete(id)) return;
+        // tell the sidecar so a running exec tool kills its child (a queued request is dropped)
+        p.proc.stdin!.write(JSON.stringify({ method: "$cancel", params: { id } }) + "\n");
+        reject(new Error("aborted"));
       };
       signal?.addEventListener("abort", onAbort, { once: true });
       const done = <T>(f: (v: T) => void) => (v: T) => {

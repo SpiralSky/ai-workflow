@@ -1,14 +1,20 @@
 """Newline-delimited JSON-RPC loop: `{id, method, params}` -> `{id, result | error: {message}}`.
 
 Requests are served one at a time, in arrival order. The workspace root is argv[1] (default: cwd).
+A reader thread takes requests off stdin so that a `$cancel` notification (`params.id`) can reach
+a request that is already running: exec tools watch `execution.CANCEL` and kill their child. A
+request cancelled before it started is dropped. Cancelled requests get no reply (the client
+already rejected them).
 """
 import json
 import os
+import queue
 import sys
+import threading
 import time
 import traceback
 
-from . import check, graph, nav, refactor
+from . import check, execution, graph, nav, refactor, testing
 
 
 def ping(root, params):
@@ -23,6 +29,7 @@ def handlers():
     table.update(graph.METHODS)
     table.update(refactor.METHODS)
     table.update(check.METHODS)
+    table.update(testing.METHODS)
     return table
 
 
@@ -31,14 +38,42 @@ def main():
     os.chdir(root)
     table = handlers()
     out = sys.stdout
-    for line in sys.stdin:
-        line = line.strip()
-        if not line:
-            continue
-        rid = None
+    inbox = queue.Queue()
+    lock = threading.Lock()
+    state = {"current": None, "cancelled": set()}
+
+    def reader():
+        for line in sys.stdin:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                req = json.loads(line)
+            except ValueError:
+                req = {"id": None, "method": None, "bad": True}
+            if req.get("method") == "$cancel":
+                cid = (req.get("params") or {}).get("id")
+                with lock:
+                    state["cancelled"].add(cid)
+                    if state["current"] == cid:
+                        execution.CANCEL.set()
+                continue
+            inbox.put(req)
+        inbox.put(None)
+
+    threading.Thread(target=reader, daemon=True).start()
+    while True:
+        req = inbox.get()
+        if req is None:
+            return
+        rid = req.get("id")
+        with lock:
+            if rid in state["cancelled"]:
+                state["cancelled"].discard(rid)
+                continue
+            state["current"] = rid
+            execution.CANCEL.clear()
         try:
-            req = json.loads(line)
-            rid = req.get("id")
             fn = table.get(req.get("method"))
             if fn is None:
                 raise ValueError("unknown method: %s" % req.get("method"))
@@ -47,5 +82,8 @@ def main():
             if os.environ.get("AIW_SIDECAR_DEBUG"):
                 traceback.print_exc(file=sys.stderr)
             resp = {"id": rid, "error": {"message": str(e) or type(e).__name__}}
+        with lock:
+            state["current"] = None
+            state["cancelled"].discard(rid)
         out.write(json.dumps(resp) + "\n")
         out.flush()
