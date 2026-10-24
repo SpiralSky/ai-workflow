@@ -4,7 +4,7 @@
 
 ---
 
-## Specs: review done, final check next
+## Specs: Final
 
 The Anthropic prior-art comparison is in orchestrate §2.1 and §10.2 and in the README.
 
@@ -16,11 +16,15 @@ The Anthropic prior-art comparison is in orchestrate §2.1 and §10.2 and in the
 - Anthropic's numbers are frontier-model results; results on deepseek-v4-flash are an open gap worth reporting.
 - Consider rewriting branching-framework §1–2 to cite prior art and frame branch as the code-mode baseline/executor.
 
-Spec review F1–F20 is complete; `review-handoff.md` was deleted after the user accepted its architecture amendments.
+Spec review F1–F20 and the final check (2026-10-24) are complete; all feature specs are **Final**
+(changes now need the user's approval). Notable final-check decisions: Claude Code plugin uses a
+hooks module (prompt.compose / tool.call routing / tool.describe deferral) instead of agents +
+settings.json; read-only mode denies non-read calls; task.md is the first user message; budget
+per framework-runner §6.5 (CLAUDE.md updated); large dev problem deferred until `fulfil` exists.
 
 **Next (in order):**
-1. Final checking pass over all specs (user-led, this session or next); then flip features/README status to Final.
-2. User's new orchestrate idea (adds one mode) — still to be presented.
+1. User's new orchestrate idea (adds one mode) — still to be presented.
+2. Rebuild `framework/core/branch` per architecture/core-branch.md.
 
 Commit spec/README changes as `docs:` commits when the user approves.
 
