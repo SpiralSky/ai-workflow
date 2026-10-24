@@ -79,7 +79,7 @@ Every tool throws `unsupported language: <lang>` for files the backend doesn't h
 >   directory size = total bytes below it; symlinks skipped.
 > - **`vcs`**: the pristine snapshot is a tar in `os.tmpdir()/aiw-snapshot-*` (excluding `.git` and
 >   `node_modules`), extracted lazily, removed on exit; without one `diff`/`restore` throw
->   `no snapshot`. `restore` also deletes files added since the snapshot. `history` takes
+>   `no snapshot`. `restore` keeps files added since the snapshot unless `deleteAdded: true`. `history` takes
 >   `range: [start, end]` or `symbol` (`Name` or `path#Name`; `git log -L :Name:path`).
 > - **Parameter-doc budget** (I-04) is checked for top-level parameters only.
 

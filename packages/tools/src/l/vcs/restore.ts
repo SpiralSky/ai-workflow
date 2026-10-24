@@ -6,8 +6,8 @@ import { objectSchema, type ToolDef } from "../../types.ts";
 import { currentFiles, scope } from "./common.ts";
 
 /**
- * Builds `restore`: puts a file or directory back to its pristine contents from the startup snapshot
- * and deletes files added since. Change summary: one entry per file touched (restored files diff
+ * Builds `restore`: puts a file or directory back to its pristine contents from the startup snapshot.
+ * Files added since are kept unless `deleteAdded` is true (like `git restore`, not `git clean`). Change summary: one entry per file touched (restored files diff
  * against their current content, deleted files count all lines as removed). Throws `no snapshot`
  * when the server took none.
  * @param snapshot - the startup snapshot, if the server took one
@@ -15,8 +15,14 @@ import { currentFiles, scope } from "./common.ts";
 export function makeRestore(snapshot?: Snapshot): ToolDef {
   return {
     name: "restore",
-    description: "Undo changes to a file or directory: restore the contents it had when the job started and delete files added since. Returns a change summary.",
-    parameters: objectSchema({ path: { type: "string", description: "File or directory to restore, relative to the workspace root." } }, ["path"]),
+    description: "Undo changes to a file or directory: restore the contents it had when the job started. New files are kept unless deleteAdded. Returns a change summary.",
+    parameters: objectSchema(
+      {
+        path: { type: "string", description: "File or directory to restore, relative to the workspace root." },
+        deleteAdded: { type: "boolean", description: "Also delete files created since the job started (default false)." },
+      },
+      ["path"],
+    ),
     returns: "{ files: { path: string; added: number; removed: number }[]; diff?: string }",
     meta: {
       whenToUse: "Throw away a bad edit or an experiment and get a file or directory back to its starting state.",
@@ -27,7 +33,7 @@ export function makeRestore(snapshot?: Snapshot): ToolDef {
       requires: [],
       cost: 2,
     },
-    async fn(args: { path: string }, ctx) {
+    async fn(args: { path: string; deleteAdded?: boolean }, ctx) {
       if (!snapshot) throw new Error("no snapshot");
       const sc = scope(ctx.root, args.path);
       const pristine = (await snapshot.list()).filter(sc.has);
@@ -42,6 +48,7 @@ export function makeRestore(snapshot?: Snapshot): ToolDef {
         });
         if (before && cur && before.equals(cur)) continue;
         if (!before) {
+          if (!args.deleteAdded) continue;
           await rm(abs);
           parts.push(summarizeChange(ctx.root, abs, cur!.toString("utf8"), ""));
           // drop directories emptied by the deletion

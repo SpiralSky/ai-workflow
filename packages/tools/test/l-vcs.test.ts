@@ -91,13 +91,18 @@ test("diff and restore work without .git", async () => {
     // restore a deleted file
     await restore.fn({ path: "gone.txt" }, c);
     assert.equal(readFileSync(join(root, "gone.txt"), "utf8"), "bye\n");
-    // restore a directory that only has an added file: removed, and emptied dirs go too
-    const r3: any = await restore.fn({ path: "new" }, c);
+    // added files are kept by default
+    assert.deepEqual(((await restore.fn({ path: "new" }, c)) as any).files, []);
+    assert.equal(existsSync(join(root, "new/dir/n.txt")), true);
+    // deleteAdded removes them, and emptied dirs go too
+    const r3: any = await restore.fn({ path: "new", deleteAdded: true }, c);
     assert.deepEqual(r3.files, [{ path: "new/dir/n.txt", added: 0, removed: 2 }]);
     assert.equal(existsSync(join(root, "new")), false);
     // restore the whole tree
     put(root, "extra.txt", "e\n");
     await restore.fn({ path: "." }, c);
+    assert.equal(existsSync(join(root, "extra.txt")), true);
+    await restore.fn({ path: ".", deleteAdded: true }, c);
     assert.deepEqual(await diff.fn({}, c), { status: [], diff: "" });
     assert.equal(existsSync(join(root, "extra.txt")), false);
     assert.equal(readFileSync(join(root, "pkg/x.py"), "utf8"), "x = 1\n");
