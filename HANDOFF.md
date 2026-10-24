@@ -36,7 +36,19 @@ per framework-runner §6.5 (CLAUDE.md updated); large dev problem deferred until
    verbs with per-domain vocabulary and fields; 0 near-duplicate warnings up to N=1200 (wording repeats beyond).
    **Not built yet:** hot paths (`hotPaths: on` throws; arch §4.5), `orchestrate[executor=calls]`,
    declaration cap / `tools` inner call inside executors (core-tools-and-hosts §6 row `orchestrate`).
-   **Next:** the runner / server that consume `buildFramework` (README Roadmap), then step 3.
+   **`@aiw/tools` (in progress, 2026-10-24):** built + committed: S (6), L groups fs, vcs, external, nav,
+   graph, check + Python sidecar (`packages/tools/python/aiw_sidecar`, dev venv `packages/tools/.venv` via
+   `npm run setup:venv`; tests use `AIW_VENV` → repo `.venv` → `/opt/aiw/venv`). Choices recorded in
+   tool-catalog A-30–A-33. `catalog("L")` throws until all 53 exist (`partial: true` for tests).
+   **Remaining, in order:**
+   a. `refactor` group (8, rope) — a subagent was building it, uncommitted; check `git status`, finish/verify
+      (`cd packages/tools && npm test`), record its choices as A-34 in tool-catalog.md, commit.
+   b. User-approved changes (2026-10-24): `bash` output over the cap keeps head + tail with
+      `[N bytes cut]` in the middle (currently tail-only, 6 KB); `grep`/`findFiles` respect `.gitignore`
+      and skip hidden files like rg defaults (JS fallback must match). Update A-30 accordingly.
+   c. `test` group (6: runTests, listTests, coverage, runSnippet, traceCalls, stressRun) — executes workspace
+      code in a child process (tool-catalog §3–4); then make `catalog("L")` return all 53 and drop `partial`.
+   **Then:** the server (`LocalHost` wraps the catalog) and runner that consume `buildFramework`, then step 3.
    Engine packaging resolved 2026-10-24 (core-branch §4.1, I-11 revised): QuickJS-WASM default,
    isolated-vm optional, shipped beside the bundle; containers use `--engine isolated-vm`.
 3. Test the existing modes first: clean `compare` (baseline, branch-only, orchestrate) — Roadmap step 3.
