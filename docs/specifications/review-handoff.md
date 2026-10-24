@@ -7,17 +7,6 @@ when it is empty.
 
 ---
 
-## 2. Experimental validity (decision needed)
-
-**F6. Hot paths and reranker only in orchestrate.** Known-good snippets (orchestrate §9) give
-orchestrate prompt content the others lack, confounding the comparison. Proposal: `hotPaths` off by
-default in comparisons, or a `branch-only[hotPaths]` variant. (The reranker's model was fixed to
-the main model in architecture, §5.)
-
-**F7. Statistical power.** Default 1 rep over 10 problems gives very wide Wilson intervals
-(framework-runner §6.2). Proposal: state a target rep count (or minimum detectable difference)
-before claims are made.
-
 ## 3. Contradictions and gaps in feature specs
 
 **F10. Job outcome reasons.** framework-runner §6.1 lists "timeout" as an infra error (not counted,

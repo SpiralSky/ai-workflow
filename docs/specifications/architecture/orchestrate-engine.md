@@ -128,7 +128,8 @@ agents and harness docs, found by web research) and from failure patterns in our
 against a fake host in a unit test that exercises its anticipated outcome.
 
 **Measurement.** Included snippet ids are recorded (`hotPaths`, orchestrate §8). A config switch
-`hotPaths: on|off` makes them an ablation variant, so their effect is measured, not assumed.
+`hotPaths: on|off` (default `off`; variant `orchestrate[hotPaths]`) makes them an ablation, so
+their effect is measured, not assumed; `compare` runs leave it off (orchestrate §9).
 
 ---
 

@@ -250,6 +250,10 @@ Per framework, over all jobs in the evaluation (§6.6):
 - **Cost per successful job** — the headline number for the cost claim.
 - **Paired per-problem comparison** (e.g. branch vs. baseline on the same problem), so a few hard
   problems do not dominate the aggregate.
+- **Claim rule (stated before the full run).** With one repetition the full run can detect only
+  large differences. The report computes the minimum detectable difference for the run's size,
+  and a difference is claimed only if the paired comparison exceeds it; smaller differences are
+  reported as inconclusive, never as wins.
 
 ### 6.3 Action log
 

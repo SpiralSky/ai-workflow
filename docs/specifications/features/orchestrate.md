@@ -327,6 +327,12 @@ are indexed like tools and can declare the tools they use, which are then added 
 The first version ships a seed set of snippets and an on/off switch so their effect is measured
 ([orchestrate-engine §4.5](../architecture/orchestrate-engine.md#45-hot-paths)).
 
+- **Generic only.** Snippets encode general patterns (e.g. "run tests, read the first failure,
+  fix, rerun"), never knowledge of a specific problem (framework-runner §6.6 overfitting rule).
+- **Off by default.** Snippets are prompt content the other modes lack, so the cross-mode
+  comparison (baseline vs. branch-only vs. orchestrate) runs without them. Their effect is
+  measured separately as the ablation `orchestrate[hotPaths]` vs. `orchestrate`.
+
 ---
 
 ## 10. Learning from runs
