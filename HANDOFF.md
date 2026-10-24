@@ -26,8 +26,9 @@ per framework-runner §6.5 (CLAUDE.md updated); large dev problem deferred until
 1. ~~Sort out the uncommitted working tree~~ — done 2026-10-24 (tree clean).
 2. Rebuild the codebase to the architecture specs (README Roadmap step 2): ~~telemetry~~ (done 2026-10-24,
    `packages/telemetry`) → ~~LLM client~~ (done 2026-10-24, `packages/llm`) → ~~core branch runtime~~ (done
-   2026-10-24, `packages/core/src/branch`) → **core tool registry, hosts and wrappers per
-   architecture/core-tools-and-hosts.md (next)** → orchestrate engine.
+   2026-10-24, `packages/core/src/branch`) → ~~core tool registry, hosts and wrappers~~ (done 2026-10-24,
+   `src/registry`, `src/host`, `src/selection/bm25.ts`; `buildFramework` + prompts not yet) →
+   **`buildFramework` (core-tools-and-hosts §6) and/or orchestrate engine (next)**.
    Engine packaging resolved 2026-10-24 (core-branch §4.1, I-11 revised): QuickJS-WASM default,
    isolated-vm optional, shipped beside the bundle; containers use `--engine isolated-vm`.
 3. Test the existing modes first: clean `compare` (baseline, branch-only, orchestrate) — Roadmap step 3.
@@ -45,6 +46,15 @@ root-only `return` events, render details, engines). Engines in `src/branch/engi
 (`quickJSRuntime` default, `isolatedVMRuntime`, `selectRuntime`). `npm test` runs QuickJS;
 `npm run test:ivm` runs isolated-vm. Not yet built: the server's `--engine` flag, plugin packaging
 of isolated-vm and the first-session note (framework-server §7.1), `engine` in run provenance.
+
+Tool layer (core-tools-and-hosts) choices not in the spec, pending user approval to record in the spec:
+`HostToolDecl` = `{ name, description, inputSchema, returns?, routing?, capsOutput?, meta? }`; `capsOutput`
+lets self-capping hosts skip `capOutput`; over-cap structured results become truncated JSON text plus
+note; `normalizeName` lowercases only the first char (`Bash`→`bash`); `CheckedHost(inner, checker,
+{ session(), approve? })` denies read-only before the checker, no `approve` → ask denied; `bindTools`
+takes the call id from `currentReporter().scope` inside `wrapTools` (telemetry now forwards ctx).
+**Spec conflict to resolve:** framework-server §3 says CompositeHost "first wins on name conflict";
+core-tools-and-hosts §4 and branching-framework §6.2 say collisions are errors — implemented as error.
 
 ### Old `framework/core/branch/`
 
