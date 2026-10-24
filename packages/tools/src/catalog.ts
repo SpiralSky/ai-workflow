@@ -4,6 +4,7 @@ import { deleteFile } from "./l/fs/deleteFile.ts";
 import { listDir } from "./l/fs/listDir.ts";
 import { moveFile } from "./l/fs/moveFile.ts";
 import { multiEdit } from "./l/fs/multiEdit.ts";
+import { graphTools } from "./l/graph/index.ts";
 import { navTools } from "./l/nav/index.ts";
 import { makeDiff } from "./l/vcs/diff.ts";
 import { history } from "./l/vcs/history.ts";
@@ -26,7 +27,7 @@ export interface CatalogOpts {
   snapshot?: Snapshot;
   /** Python analysis sidecar for nav and check tools; without it they throw `no sidecar`. */
   sidecar?: Sidecar;
-  /** Internal, for tests: allow tier L with only the groups built so far (fs, nav, check, vcs, external). */
+  /** Internal, for tests: allow tier L with only the groups built so far (fs, nav, graph, check, vcs, external). */
   partial?: boolean;
 }
 
@@ -40,12 +41,13 @@ export interface CatalogOpts {
 export function catalog(tier: "S" | "L", opts: CatalogOpts): ToolDef[] {
   const s = [bash, readFile, writeFile, edit, grep, findFiles];
   if (tier === "S") return s;
-  // graph, refactor, test need the Python sidecar: added in a later step
+  // refactor, test need the Python sidecar: added in a later step
   if (!opts.partial) throw new Error("tier L not built yet");
   return [
     ...s,
     multiEdit, moveFile, deleteFile, listDir,
     ...navTools(opts.sidecar),
+    ...graphTools(opts.sidecar),
     ...checkTools(opts.sidecar),
     makeDiff(opts.snapshot), history, makeRestore(opts.snapshot),
     ...externalTools,

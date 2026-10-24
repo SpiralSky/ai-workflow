@@ -21,4 +21,5 @@ export { externalTools } from "./l/external/index.ts";
 export { fixtureResult } from "./l/external/fixtures.ts";
 export { Sidecar, type SidecarOpts } from "./sidecar.ts";
 export { navTools } from "./l/nav/index.ts";
+export { graphTools } from "./l/graph/index.ts";
 export { checkTools } from "./l/check/index.ts";
