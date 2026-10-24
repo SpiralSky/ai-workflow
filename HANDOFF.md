@@ -29,9 +29,15 @@ per framework-runner §6.5 (CLAUDE.md updated); large dev problem deferred until
    2026-10-24, `packages/core/src/branch`) → ~~core tool registry, hosts and wrappers~~ (done 2026-10-24,
    `src/registry`, `src/host`, `src/selection/bm25.ts`) → ~~`buildFramework` + prompts~~ (done 2026-10-24,
    `src/framework`, `prompts/{base,branch-only,branch-tool}.md`; baseline + branch-only only) →
-   **orchestrate engine next**, which also completes `buildFramework`: `orchestrate`, `[toolSearch]`,
-   `catalog=N` (distractor set) currently throw "not built yet". Prompt texts approved by the user
-   2026-10-24.
+   ~~orchestrate engine~~ (done 2026-10-24, `src/orchestrate/`, `src/refs/`, `src/registry/distractors.ts`;
+   `buildFramework` now builds `orchestrate`, `branch-only[toolSearch]`, `catalog=N`).
+   **Pending user approval** (committed as drafts): prompts `rerank.md`, `executor.md`, `orchestrate.md`,
+   `do-tool.md`, `resolve-tool.md`, and the executor's fixed `branch` description (`executorBranchDescription()`).
+   Also flag: distractor set is generated in code (50 business domains × 24 verbs); distinct from real tools
+   but near-duplicates of each other at N≥200 (spec §6.1 only requires vs real tools).
+   **Not built yet:** hot paths (`hotPaths: on` throws; arch §4.5), `orchestrate[executor=calls]`,
+   declaration cap / `tools` inner call inside executors (core-tools-and-hosts §6 row `orchestrate`).
+   **Next:** the runner / server that consume `buildFramework` (README Roadmap), then step 3.
    Engine packaging resolved 2026-10-24 (core-branch §4.1, I-11 revised): QuickJS-WASM default,
    isolated-vm optional, shipped beside the bundle; containers use `--engine isolated-vm`.
 3. Test the existing modes first: clean `compare` (baseline, branch-only, orchestrate) — Roadmap step 3.
