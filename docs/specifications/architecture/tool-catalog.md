@@ -56,6 +56,33 @@ orchestrate §6 metadata. `catalog(tier, { root, sidecar })` returns the registe
 
 Every tool throws `unsupported language: <lang>` for files the backend doesn't handle (tools §4).
 
+> **Decided A-30 (2026-10-24):** Implementation details where tools.md is silent:
+> - **`ToolDef`** = `{ name, description, parameters, returns?, meta, fn(args, ctx) }`, `ctx = { root,
+>   signal, env? }`. Catalog tools set `capsOutput: false`; core `capOutput` enforces the 8 KB cap.
+>   List results cut earlier (count and ~6 KB) and set `truncated` to a hint string.
+>   `catalog(tier, { root, snapshot?, sidecar? })`; `L` throws until all 53 tools exist.
+> - **`cost`** is a 1–3 relative scale (1 cheap read, 3 shell/exec).
+> - **`bash`**: timeout → `code: 124`, abort → `code: 130`, with a note appended to `out`; the
+>   process group is SIGKILLed. Env from `toolEnv` (strips `OPENAI_*`, `ANTHROPIC_*`,
+>   `OPENROUTER_*` and names in `AIW_SECRET_NAMES`).
+> - **`readFile`**: `range: [start, end]` (1-based, inclusive), `cat -n` style numbering; over the
+>   cap it stops at a line boundary with `[truncated at line N of M; pass range to read more]`.
+> - **`grep`** returns `{ matches: [{ path, line, text }] }`; the matching line is the line of
+>   context (clipped to 200 chars). `rg` is primary (always in the base image); the JS walk is a
+>   dev fallback and uses JS `RegExp`, so exotic regex syntax can differ between them. A glob
+>   without `/` matches basenames at any depth.
+> - **Write summaries**: unified diff (3 context lines) included when ≤ 2 KB. `moveFile` and
+>   `deleteFile` act on single files only; a move counts all source lines `removed` and all target
+>   lines `added`; a delete counts all lines `removed`. `moveFile` refuses to overwrite unless
+>   `overwrite: true`.
+> - **`listDir`** returns a flat pre-order `{ entries: [{ path, type, size }] }`, default depth 2,
+>   directory size = total bytes below it; symlinks skipped.
+> - **`vcs`**: the pristine snapshot is a tar in `os.tmpdir()/aiw-snapshot-*` (excluding `.git` and
+>   `node_modules`), extracted lazily, removed on exit; without one `diff`/`restore` throw
+>   `no snapshot`. `restore` also deletes files added since the snapshot. `history` takes
+>   `range: [start, end]` or `symbol` (`Name` or `path#Name`; `git log -L :Name:path`).
+> - **Parameter-doc budget** (I-04) is checked for top-level parameters only.
+
 ---
 
 ## 4. Python analysis sidecar
@@ -82,6 +109,12 @@ One sidecar per server session; restarted on crash (the in-flight call throws `s
 `fixtures/external/<tool>.json` holds canned responses selected by simple argument matching
 (first match on a list of `{ match: {...}, result }`, else a generic plausible default). Every
 response is deterministic.
+
+> **Decided A-31 (2026-10-24):** File shape `{ cases: [{ match, result }], default }`. A case
+> matches when every `match` key fits: a string matches a string argument as a case-insensitive
+> substring; other values must be JSON-equal; a missing argument never matches. Result strings may
+> use `{{argName}}` placeholders filled from the call, so defaults echo their input. `sqlQuery`
+> rejects non-read statements; `installPackage` installs nothing.
 
 > **Decided I-03 (2026-10-23):** Canned fixtures only, shared by all problems, so "no problem needs
 > these" stays true and every `external` call is pure overhead. Per-problem fixtures would mix
