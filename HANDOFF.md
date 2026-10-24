@@ -28,8 +28,9 @@ Working through the review in small batches; each item is labelled with its sour
 - Anthropic keeps tools in the lead because delegation costs tokens/latency and reports are lossy. Orchestrate bets
   against that; `resolve`, conditional intents and the re-read / planner-vs-executor token metrics (orchestrate §10.1)
   must show which cost dominates if it loses. Coding steps are interdependent (Anthropic: weaker fit for multi-agent).
-- Add an "Anthropic-style" baseline: one agent with its tools plus tool search (e.g. `branch-only[toolSearch]`).
-  Ties into F5 (budget) and F6 (hot paths only in orchestrate).
+- DONE (specced): orchestrate §2/§2.1 states the goal (cheaper actions via a large purpose-built catalog) and the
+  comparison to Tool Search (worst case = tool search via `findTools`); §10.2 adds the catalog-size scaling experiment
+  (`catalog=N` padding, `branch-only[toolSearch]` baseline); README related-work has Anthropic rows. Budget ties to F5.
 - Anthropic's numbers are frontier-model results; results on deepseek-v4-flash are an open gap worth reporting.
 - Consider rewriting branching-framework §1–2 to cite prior art and frame branch as the code-mode baseline/executor.
 

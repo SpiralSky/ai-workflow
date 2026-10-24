@@ -105,7 +105,11 @@ One function per framework, used by the server in every host configuration:
 |-----------|--------------------|-------------------|
 | `baseline` | every routed tool as its own MCP tool (JSON Schema, same description) | — |
 | `branch-only` | `branch` | all routed tools |
+| `branch-only[toolSearch]` | `branch` | `findTools` only at start; found tools are added and kept for the session (orchestrate §10.2) |
 | `orchestrate` | `do`, `resolve` | per executor: shortlist + `findTools`, `resolve`, `save`, `refSymbol` ([orchestrate-engine](orchestrate-engine.md)) |
+
+Any framework accepts the variant key `catalog=N`, which pads the registry with the fixed
+distractor set to N tools before assembly (orchestrate §10.2).
 
 The prompt section for each framework is a static Markdown file in `@aiw/core/prompts/<framework>.md`
 delivered as the server's MCP `instructions` (harness-integration §9.1) and as the system-prompt

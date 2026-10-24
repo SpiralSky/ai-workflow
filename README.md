@@ -70,10 +70,13 @@ No `read_file` for the coordinator — the tool set enforces the constraint.
 
 ## How this differs from related work
 
-Related systems with similar ideas include Cloudflare Code Mode, CodeAct, smolagents, ReWOO, LLMCompiler and RLM. Anthropic's programmatic tool calling (with its Tool Search Tool and Skills) is also similar, but this project was developed independently of it. The table below describes where the design makes different choices.
+Related systems with similar ideas include Cloudflare Code Mode, CodeAct, smolagents, ReWOO, LLMCompiler and RLM. Anthropic's programmatic tool calling (with its Tool Search Tool and Skills) and its multi-agent research system are also similar, but this project was developed independently of them. The table below describes where the design makes different choices.
 
 | Prior work | How it differs here |
 |---|---|
+| **Anthropic Tool Search Tool** | The executing model searches a deferred catalog and loads definitions itself. Each search costs a model turn, and in a long session loaded definitions stay in the history and are re-read every turn. Here the framework selects a small shortlist per intent before the executor starts: retrieval costs no model tokens, and the executor's tool set stays about the same size however large the catalog is. The executor's `findTools` fallback works like tool search, so the worst case matches it ([orchestrate §2.1](docs/specifications/features/orchestrate.md)). |
+| **Anthropic multi-agent research system** | An orchestrator with tools delegates to subagents that choose their own tools; the gain comes from spending more tokens in parallel on independent subtasks. Here the planner has no tools, and the goal is a cheaper action, not parallel breadth: a large catalog of purpose-built tools (and merged composites for actions that always occur together) replaces repeated reasoning. |
+| **Anthropic programmatic tool calling** | Similar code-mode execution. Here the model also sees a line-level execution trace of its program, not only what it logs or returns. |
 | **Claude Code subagents** | The parent session retains its full tool set; each subagent accumulates raw tool output in its own context. Here the executor writes programs that contain output inside a sandbox — only the return value leaves. |
 | **Aider architect/editor mode** | The architect reasons over full file contents and has no tools; the split is reasoning vs. edit formatting. Here the coordinator is constrained by its tool set, not by prompt instruction. |
 | **OpenHands DelegatorAgent** | A fixed state machine routes tasks to specialist agents; delegates use ordinary tools. Here the coordinator is itself an LLM and delegates write sandboxed programs. |

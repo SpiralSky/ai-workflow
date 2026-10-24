@@ -39,6 +39,39 @@ Orchestrate addresses all three: tool schemas are only shown to an executor and 
 selected tools; raw output stays in the executor and is discarded after its report; planning and
 execution are separate prompts that can use separate models.
 
+The goal is to lower the **tokens and intelligence needed per action**. The catalog is meant to grow
+as large as needed: every discrete action (a refactor, a symbol lookup, a test run) gets a tool designed
+for it, and actions that always occur together are merged into one tool (§6.1). Repeated actions then
+need tool choice, not reasoning: a kind of muscle memory without retraining the model. Future tools may
+pair small models with deterministic algorithms to reduce the intelligence required further.
+This only pays off if cost per turn stays flat as the catalog grows, which is what selection (§7)
+must deliver.
+
+### 2.1 Relation to prior art
+
+Similar ideas exist. This design was developed independently of them:
+
+- **Subagent delegation** (e.g. Anthropic's multi-agent research system, Claude Code subagents): a
+  lead agent with its own tools spawns workers that also choose their own tools. The gain comes
+  from spending more tokens in parallel, in separate contexts, on independent subtasks. Orchestrate
+  uses executors too, but its aim is a cheaper action, not parallel breadth. The planner has no tools.
+- **On-demand tool loading** (e.g. Anthropic's Tool Search Tool with deferred tools): the
+  *executing model* searches the catalog and loads definitions as it goes. Every search is a model
+  turn: output tokens plus a re-read of the whole context. In a long-lived session, loaded
+  definitions stay in the history and are re-read (as cache reads) on every later turn.
+
+Orchestrate moves the first selection out of the model. Retrieval (§7.1) costs no model tokens, the
+optional rerank (§7.2) is one cheap call over a fixed *K*, and the executor sees a shortlist of
+roughly constant size whatever the catalog size. When that first pass misses, `findTools` (§7.4)
+is the same mechanism as a tool search. So **the worst case is tool search**, and every
+first-pass hit is cheaper. The claim fails if first-pass recall drops as the catalog grows,
+because each miss then adds an escalation turn. §10.2 tests this.
+
+Caching: a shortlist is a fresh prompt suffix, so its definitions are usually uncached input. Order
+the executor prompt as stable instructions first, shortlist last, so the stable part stays cached.
+Canonical tool ordering is not used: §7.2 orders by fit, and tools that are always used together
+should be merged rather than cached as a pair.
+
 ---
 
 ## 3. Concepts
@@ -326,6 +359,28 @@ Reported per run in addition to [framework-runner.md](framework-runner.md) metri
 - **Intents per task.**
 - **Planner `resolve` calls per task**, and tokens returned by them.
 - **Re-read tokens:** content returned again for an unchanged file or symbol within one task (§11.3).
+- **Tool-definition tokens** per task, split into cached and uncached input.
+- **Escalation turns** (`findTools` calls) per task, and the output tokens they cost.
+
+### 10.2 Catalog-size scaling experiment
+
+Tests the §2.1 claim that orchestrate's cost per task stays flat as the catalog grows, while
+model-driven tool search does not.
+
+- **Baseline `branch-only[toolSearch]`:** one session with the branch tool, the stable prompt and
+  a `findTools` meta-tool, but no other tools up front. Tools that `findTools` finds join its `Tools`
+  map and stay there for the rest of the session. `findTools` uses the same retrieval stage (§7.1)
+  as orchestrate, without rerank, so the comparison isolates *who selects* (framework vs. executing model).
+- **Catalog padding:** the variant key `catalog=N` pads the real catalog with distractor tools up
+  to N tools. Distractors are plausible but unneeded for the problem set, and they still obey §6.1 (no
+  near-duplicates of real tools). They are generated once and fixed, so runs stay comparable.
+- **Grid:** `orchestrate[catalog=N]` vs. `branch-only[toolSearch,catalog=N]` for N = 50, 200, 1000,
+  on the same problems.
+- **Report per N:** pass rate, cost per successful job, selection recall (first pass), escalation
+  turns, tool-definition tokens (cached/uncached), and output tokens spent on searching.
+
+The claim holds if orchestrate's selection recall and cost per successful job stay roughly flat in N,
+and tool search's cost grows faster at a similar pass rate.
 
 ---
 
