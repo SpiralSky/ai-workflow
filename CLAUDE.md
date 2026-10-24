@@ -29,7 +29,7 @@ things easy to get wrong; the spec wins.
 - Use plain `//` comments for implementation notes inside function bodies.
 
 ## Commit practices
-- Run `cd framework && npm test` before committing framework changes.
+- Run `npm test` (repo root, `packages/*`) before committing package changes; `cd framework && npm test` for the old `framework/` until it is removed.
 - One logical change per commit.
 - Message format: `fix(issue-NN): ...` for issue work; `feat:`, `docs:`, `refactor:` otherwise.
 - Never commit experiment run outputs (`experiments/runs/`).

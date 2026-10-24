@@ -24,8 +24,8 @@ per framework-runner §6.5 (CLAUDE.md updated); large dev problem deferred until
 
 **Next (in order):**
 1. ~~Sort out the uncommitted working tree~~ — done 2026-10-24 (tree clean).
-2. Rebuild the codebase to the architecture specs (README Roadmap step 2), starting with telemetry → LLM client →
-   `framework/core/branch` per architecture/core-branch.md.
+2. Rebuild the codebase to the architecture specs (README Roadmap step 2): ~~telemetry~~ (done 2026-10-24,
+   `packages/telemetry`) → **LLM client (`packages/llm`, next)** → core branch per architecture/core-branch.md.
 3. Test the existing modes first: clean `compare` (baseline, branch-only, orchestrate) — Roadmap step 3.
 4. Only then: user's new orchestrate idea (adds one mode) — not yet presented; it goes through spec approval.
 
@@ -38,7 +38,11 @@ Commit spec/README changes as `docs:` commits when the user approves.
 `branch.ts` (+ `framework/test/core-branch.test.ts`, committed 3f6aeb9) is an early in-process runner from 2026-10-21. It
 predates the architecture specs and does not match them (no isolate, instrumentation, recorder, `state` or renderers).
 Rebuild it per architecture/core-branch.md rather than patching it; the old `src/runner.ts` path is replaced afterwards.
-When the `packages/` layout (A-02) lands, update CLAUDE.md's `cd framework && npm test`.
+npm workspaces root (A-02) exists: `npm test` / `npm run typecheck` at the repo root; `framework/` is not a workspace.
+Telemetry choices not in the spec: `wrapTools` nests a tool's calls directly under its tool id (no `scope`
+event); the explicit reporter wins over `currentReporter()`; `fromMeta(meta, root)` derives from the server's root
+reporter so `s:n` ids stay unique; `wrapLlm` takes an `LlmClient` interface returning already-normalised usage
+(telemetry can't import `@aiw/llm`), so `@aiw/llm` must implement that interface.
 Workflow: the main session designs and orchestrates; subagents execute in small, self-contained steps. Use
 Sonnet subagents (`model: "sonnet"`) for implementation and Haiku (`model: "haiku"`, weaker) for simple mechanical
 tasks; the main agent reviews their output.

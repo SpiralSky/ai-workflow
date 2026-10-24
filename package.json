@@ -1,0 +1,1 @@
+{"name":"aiw","private":true,"type":"module","workspaces":["packages/*","plugins/*"],"engines":{"node":">=22.13"},"scripts":{"test":"npm test --workspaces --if-present","typecheck":"tsc -p tsconfig.json"},"devDependencies":{"@types/node":"^26.6.4","tsx":"^4.23.15","typescript":"^7.0.2"}}

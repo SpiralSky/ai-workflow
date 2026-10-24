@@ -1,0 +1,120 @@
+import { runWithReporter } from "./context.ts";
+import { ReporterImpl, type Reporter } from "./reporter.ts";
+import type { Role, Usage } from "./schema.ts";
+import type { TranscriptWriter } from "./transcript.ts";
+
+type ToolFn = (args: any) => Promise<unknown> | unknown;
+
+function resultBytes(result: unknown): number {
+  if (typeof result === "string") return Buffer.byteLength(result);
+  const json = JSON.stringify(result);
+  return json === undefined ? 0 : Buffer.byteLength(json);
+}
+
+/**
+ * Wraps tool functions so each call writes `toolStart` then `tool`, and runs with a reporter
+ * scoped to the tool's id available via `currentReporter()`. Nested wrapped calls therefore nest
+ * under the outer tool. Errors are recorded (`ok: false`) and rethrown unchanged.
+ *
+ * The scoped reporter uses `scopedTo(id)` and writes no `scope` event: the tool event itself is
+ * the parent. The explicit `reporter` always wins over `currentReporter()` (telemetry §2: reporters
+ * are passed explicitly); a tool that nests calls reads `currentReporter()` to wrap them.
+ * @param tools - name to function map
+ * @param reporter - reporter the calls are recorded under
+ */
+export function wrapTools<T extends Record<string, ToolFn>>(tools: T, reporter: Reporter): T {
+  const out: Record<string, ToolFn> = {};
+  for (const [name, fn] of Object.entries(tools)) {
+    out[name] = async (args: unknown) => {
+      const base = reporter;
+      const id = base.newId();
+      base.toolStart({ id, name, args });
+      const scoped = base instanceof ReporterImpl ? base.scopedTo(id) : base.child(name, id);
+      const startTs = Date.now();
+      const t0 = performance.now();
+      try {
+        const result = await runWithReporter(scoped, () => fn(args));
+        base.tool({
+          id, name, args, ok: true, startTs,
+          durationMs: Math.round(performance.now() - t0),
+          resultBytes: resultBytes(result),
+        });
+        return result;
+      } catch (e) {
+        base.tool({
+          id, name, args, ok: false, startTs,
+          durationMs: Math.round(performance.now() - t0),
+          error: e instanceof Error ? e.message : String(e),
+          resultBytes: 0,
+        });
+        throw e;
+      }
+    };
+  }
+  return out as T;
+}
+
+/**
+ * Builds a reporter for one MCP request: scoped to `aiw/parent` (or root) with `aiw/harnessId`.
+ * Derived from the process's root reporter so ids stay unique across requests.
+ * @param meta - request `_meta`, may be undefined
+ * @param root - the server process's root reporter
+ */
+export function fromMeta(meta: Record<string, unknown> | undefined, root: ReporterImpl): Reporter {
+  const parent = meta?.["aiw/parent"];
+  const harnessId = meta?.["aiw/harnessId"];
+  return root.scopedTo(
+    typeof parent === "string" ? parent : null,
+    typeof harnessId === "string" ? harnessId : undefined,
+  );
+}
+
+export interface LlmCompletion {
+  response: unknown;
+  usage: Usage;
+  costUsd?: number;
+  cacheHit?: boolean;
+}
+
+export interface LlmClient {
+  complete(req: {
+    model: string;
+    system: string;
+    tools: unknown[];
+    messages: unknown[];
+    [k: string]: unknown;
+  }): Promise<LlmCompletion>;
+}
+
+/**
+ * Wraps an LLM client: times each request, writes a `turn` event and, when a transcript writer
+ * and session are given, the transcript entry keyed by the turn id. Failed requests write nothing.
+ * @param client - client to wrap
+ * @param reporter - reporter receiving `turn` events
+ * @param role - role recorded on every turn
+ * @param opts - optional transcript writer and session name
+ */
+export function wrapLlm(
+  client: LlmClient,
+  reporter: Reporter,
+  role: Role,
+  opts: { transcript?: TranscriptWriter; session?: string } = {},
+): LlmClient {
+  return {
+    async complete(req) {
+      const t0 = performance.now();
+      const res = await client.complete(req);
+      const latencyMs = Math.round(performance.now() - t0);
+      const turnId = reporter.turn({
+        model: req.model, role, usage: res.usage, costUsd: res.costUsd, cacheHit: res.cacheHit, latencyMs,
+      });
+      if (opts.transcript && opts.session) {
+        opts.transcript.record({
+          turnId, session: opts.session, system: req.system, tools: req.tools,
+          messages: req.messages, response: res.response,
+        });
+      }
+      return res;
+    },
+  };
+}
