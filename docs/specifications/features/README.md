@@ -18,3 +18,5 @@ Architecture specs (in `../architecture/`) follow from these and resolve the how
 | [problems.md](problems.md) | Problem set: folder layout, quality rules, validation; small set trimmed, large problems on a shared codebase | Draft |
 | [viewer.md](viewer.md) | Browser UI for run groups, framework comparison and message-by-message conversations with branch/orchestrate renderers | Draft |
 | [harness-integration.md](harness-integration.md) | Core sends inner tool calls to a host (harness natively, runner, or MCP fallback); thin per-harness plugins | Draft |
+
+Open review findings awaiting decisions: [`../review-handoff.md`](../review-handoff.md).

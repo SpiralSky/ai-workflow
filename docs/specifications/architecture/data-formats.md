@@ -12,7 +12,8 @@ runs (project rule).
 
 Layout exactly as framework-runner §7. Job directory name: `<problem>.<framework-id>.<rep>`, where
 `framework-id` is the canonical variant string with `[`/`]`/`,`/`=` kept (all valid on Linux; the
-indexer URL-encodes them).
+indexer URL-encodes them). Readers take problem, framework and rep from `job.json` (or the `job`
+event), never by splitting the directory name, since variant values may contain `.`.
 
 ### 1.1 `run.json`
 
@@ -27,7 +28,9 @@ indexer URL-encodes them).
               "limits": { "valueChars": 200, "loopCollapse": 3, "eventBudget": 60 } } },
   "provenance": {
     "commit": "…", "dirty": false, "runnerVersion": "…",
-    "frameworks": { "<framework-id>": { "prompt": "<sha256>", "tools": "<sha256>" } },
+    "basePrompt": "<sha256>",
+    "frameworks": { "<framework-id>": { "prompt": "<sha256>", "tools": "<sha256>",
+                    "extra": { "executor": "<sha256>", "rerank": "<sha256>", "hotPaths": "<sha256>" } } },
     "images": { "<problem>": "sha256:…" },
     "problems": { "<problem>": { "taskHash": "…", "turnLimit": 20 } }
   },

@@ -148,12 +148,12 @@ All update every reference, import and re-export, take `dryRun`, and return a ch
 
 | Tool | Effect | Purpose |
 |------|--------|---------|
-| `runTests` | read | Run tests (all, a file, a `path#test` id, or `failedOnly`). Returns `{ passed, failed: [{ id, message, location, excerpt }] }` — never the raw log. |
+| `runTests` | exec | Run tests (all, a file, a `path#test` id, or `failedOnly`). Returns `{ passed, failed: [{ id, message, location, excerpt }] }` — never the raw log. |
 | `listTests` | read | Test ids, optionally filtered to tests that reach a symbol. |
-| `coverage` | read | Lines/branches of a file or symbol executed by a test run; marks uncovered lines. |
-| `runSnippet` | read | Run a short Python snippet with the workspace importable; returns stdout, stderr, return value or exception with traceback. For reproducing a bug without writing a file. |
-| `traceCalls` | read | Run a snippet or test and record calls to chosen symbols: arguments, return value or exception, thread/task id, order. For race conditions and "wrong value reaches X" bugs. |
-| `stressRun` | read | Run a test or snippet *n* times (optionally in parallel) and report the failure rate and first distinct failures. For flaky/concurrency bugs. |
+| `coverage` | exec | Lines/branches of a file or symbol executed by a test run; marks uncovered lines. |
+| `runSnippet` | exec | Run a short Python snippet with the workspace importable; returns stdout, stderr, return value or exception with traceback. For reproducing a bug without writing a file. |
+| `traceCalls` | exec | Run a snippet or test and record calls to chosen symbols: arguments, return value or exception, thread/task id, order. For race conditions and "wrong value reaches X" bugs. |
+| `stressRun` | exec | Run a test or snippet *n* times (optionally in parallel) and report the failure rate and first distinct failures. For flaky/concurrency bugs. |
 
 `runTests` and `bash` overlap in ability (bash can run pytest) but not in output; `runTests`
 `whenToUse` says it is the default for tests and `bash`'s says it is not.

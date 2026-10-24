@@ -70,7 +70,7 @@ No `read_file` for the coordinator — the tool set enforces the constraint.
 
 ## How this differs from related work
 
-This project draws on ideas from several prior systems — Cloudflare Code Mode, Anthropic programmatic tool calling, CodeAct, smolagents, ReWOO, LLMCompiler, and RLM — detailed in [docs/PLAN.md](docs/PLAN.md). The table below describes where the design makes different choices.
+Related systems with similar ideas include Cloudflare Code Mode, CodeAct, smolagents, ReWOO, LLMCompiler and RLM. Anthropic's programmatic tool calling (with its Tool Search Tool and Skills) is also similar, but this project was developed independently of it. The table below describes where the design makes different choices.
 
 | Prior work | How it differs here |
 |---|---|

@@ -1,7 +1,7 @@
 # Architecture: System Overview
 
 **Derived from:** all feature specs  
-**Status:** Draft — contains items needing approval (see [README](README.md#register))
+**Status:** Draft
 
 ---
 
@@ -40,7 +40,8 @@
 - `server` composes `core` + `tools` + hosts. It is the only package that knows MCP.
 - `runner` never imports `core` at job time: it talks to the server over MCP like any harness
   would. This keeps the measured path identical to the deployed path (harness-integration §2).
-  The runner imports `core` only to read prompt/declaration strings for provenance hashes.
+  The runner imports `core` only to read the shared base prompt (`prompts/base.md`); framework
+  fingerprints come from a running server (runner §9).
 - `viewer` reads files only; it imports `report` for aggregation and nothing from the job path.
 
 ---
@@ -74,12 +75,9 @@
   tool declarations the model sees are therefore byte-identical in experiments and in harnesses.
 
 > **Decided A-03 (2026-10-23, approved):** Run the framework server inside the job container, so the orchestrate
-> executor loop (and its LLM calls) also runs there. Consequences: the container needs outbound
-> network and the API key (passed at `docker exec` time, never in the image); tools still make no
-> network calls (tools §3.6).
-> *Alternative:* the executor loop runs in the runner and only branch programs run in the
-> container. That keeps keys and network out of the container, but splits the orchestrate engine
-> across two processes and makes the experiment path differ from the harness path.
+> executor loop (and its LLM calls) also runs there. Consequence: the container needs a route to
+> the LLM API. It gets one only through the runner's egress proxy, which holds the API key, so the
+> key never enters the container and tools still have no network (runner §5.1; amended 2026-10-24).
 
 ### 3.2 In a harness
 
@@ -127,9 +125,8 @@ Shared conventions:
 
 ## 6. Repository layout
 
-> **Decided A-02 (2026-10-23, approved):** Replace the current `framework/` + `experiments/run.ts` structure with npm
-> workspaces. Existing code is migrated into the packages below (or deleted); old run formats are
-> not kept (project rule). Run commands were removed from `CLAUDE.md` (2026-10-23); the user adds the new ones.
+> **Decided A-02 (2026-10-23, approved):** npm workspaces with the layout below; old run formats are not kept (project
+> rule).
 
 ```
 package.json                 workspaces: packages/*, plugins/*
@@ -160,9 +157,13 @@ docs/
 ## 7. Configuration and secrets
 
 - Run configuration comes from CLI flags (runner §2) and is written verbatim to `run.json`.
-- `OPENAI_BASE_URL` / `OPENAI_API_KEY` are read from the environment by the runner and passed to the
-  container with `docker exec -e` only when the framework needs them (orchestrate). Never written
-  to run files, images or logs.
+- `OPENAI_BASE_URL` / `OPENAI_API_KEY` are read from the environment by the runner. In jobs the key
+  stays in the egress proxy (runner §5.1); the container gets only the proxy URL. Never written to
+  run files, images or logs.
+- Where the server itself holds a key (harnesses), it reads it once at startup and deletes it from
+  `process.env`. Tool child processes (`bash`, sidecar, test runs) get an environment with
+  `OPENAI_*` and other configured secret names stripped. This keeps keys out of easy reach of
+  model-written code; it is not a sandbox (branch isolation: branching-framework §5.2).
 - Model ids: experiments use `deepseek/deepseek-v4-flash` (project rule). The runner refuses
   `anthropic/*` model ids on OpenRouter.
 

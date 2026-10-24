@@ -62,7 +62,8 @@ Every tool takes a single argument object: `tools.readFile({ path: "a.ts" })`, `
 
 - The function must be an `async` arrow function or expression (no `function` keyword at the top level).
 - It may use any standard TypeScript/JavaScript language features.
-- It may not import modules — the only external interface is `tools`.
+- It may not import modules — the only external interface is `tools`. The isolate enforces this
+  (§5.2); imports are also rejected at compile time so the model gets a clear error.
 - It may call tools in sequence or in parallel (`Promise.all`).
 - It should return a value meaningful to the model; it appears in the execution trace (see §7). Returning `undefined` is valid.
 - **A branch never ends the turn.** Its result always goes back to the model that called it, which
@@ -101,10 +102,14 @@ data across branch calls without routing it through the model's context, the run
 - `state` is a plain object (`Record<string, unknown>`). The program reads and writes it directly:
   `state.files = await Promise.all(...)`.
 - The layer above owns `state` and decides its lifetime (e.g. per task or per session). The runner
-  only passes it through; it is mutated in place and kept even if the branch fails.
+  copies it into the isolate (§5.2) and copies the program's version back after every tool call and
+  when the branch ends, so changes are kept even if the branch fails.
+- If the branch is killed (timeout or abort), `state` reverts to the snapshot taken at the last
+  tool call; changes made after it are lost, and the result says so.
 - `state` is invisible to the model unless reported, so every trace ends with a **state footer**
   listing its keys and value sizes (see §7.3).
-- Values should be JSON-serialisable so state can be logged, snapshotted, and size-reported.
+- Values must be JSON data: they cross the isolate boundary (§5.2) and are logged, snapshotted and
+  size-reported.
 
 **Prefer references over copies.** A copy of a file or symbol goes stale when something else
 changes it. Where possible, store a *reference* (where the thing lives, plus a version such as a
@@ -139,21 +144,35 @@ The runner receives a branch program string, compiles it, and executes it agains
 3. Execute with an optional `AbortSignal` for timeout and an optional `onEvent` callback (§5.4).
 4. Return a `BranchResult`. Both variants carry the execution trace (§7):
    - **Success:** `{ ok: true, value: unknown, trace }`
-   - **Failure:** `{ ok: false, error: string, message: string, line?: number, aborted?: boolean, trace }`
+   - **Failure:** `{ ok: false, error: string, message: string, line?: number, aborted?: boolean, stateReverted?: boolean, trace }`
 
 ### 5.2 Isolation
 
-The runner itself is **not sandboxed**. Tool isolation is the responsibility of the environment:
+Each branch program runs in a **fresh V8 isolate** (`isolated-vm`), created for that call and
+disposed after it. The isolate holds only standard JavaScript built-ins plus what the runner injects
+(`tools`, `state`, `console`): no `process`, `require`, `import()`, Node modules, environment
+variables or references to host objects. A tool call is therefore the only way a program can affect
+anything outside itself, and every tool call goes through the layer above (for example the
+harness's checks, [harness-integration §1](harness-integration.md)).
 
-- In production/MCP contexts, the environment may wrap tools with path containment, resource limits, or network restrictions before passing them to the runner.
-- In eval/test contexts, tools are passed as-is; the operator accepts the risk.
+- **Termination.** On timeout or abort the runner disposes the isolate, which also stops
+  synchronous infinite loops. The result is an ordinary failed `BranchResult` (`aborted: true`,
+  partial trace); the model sees it on its next turn and can correct the program.
+- **Memory limit** per isolate (default 128 MB); exceeding it fails the branch.
+- **Data crossing the boundary.** The isolate and the host share no memory: tool arguments and
+  results, `state` and trace events are copied. They must be JSON data (§6.1). An error thrown by
+  a tool arrives in the program as an `Error` with the original `name`, `message` and `stack`.
+- **Not the last line of defence.** Isolate runtimes have had escape bugs. Untrusted environments
+  still run inside a container or OS sandbox (in experiments: the job container,
+  [framework-runner §6.4](framework-runner.md)).
 
-This is an explicit design choice: sandboxing (VM, worker thread) prevents synchronous infinite loops
-from being interrupted cleanly and adds complexity. The tradeoff is accepted.
+Considered and rejected: in-process execution (no isolation, synchronous loops cannot be
+stopped), a worker thread (can be stopped, but has full Node access), a container per program
+(strong, but ~0.3–1 s startup and a Docker dependency for harness users).
 
-_Open: revisit isolation separately from experiment reproducibility. In experiments, branch runs
-inside the job's container via the tool server (framework-runner §6.4); whether branch programs
-need their own isolation outside experiments (path containment, resource limits) is still undecided._
+Prior art: Code Mode runners (e.g. TanStack AI's `isolated-vm` driver) use the same approach;
+Anthropic's Programmatic Tool Calling likewise routes every tool call from its sandbox back to the
+client.
 
 ### 5.3 Abort
 
@@ -166,8 +185,8 @@ that point, so the model can see which calls completed and which side effects ma
 
 ### 5.4 Live events
 
-The caller may pass `onEvent(event)`. The runner invokes it synchronously for each trace event
-(§7.1) as it is recorded, so a harness can show progress during long branches. Errors thrown by
+The caller may pass `onEvent(event)`. The runner invokes it for each trace event (§7.1) when
+events reach the host — in batches, at every tool call and at least every few hundred events, so a harness can show progress during long branches. Errors thrown by
 `onEvent` are ignored and do not affect the branch. How progress is displayed is up to the harness.
 
 The model itself never sees events mid-branch; reacting to them would be a new turn.
@@ -191,7 +210,7 @@ type Tools = Record<string, Tool>;
 
 - The argument is always a single object, even for one-parameter tools: `tools.readFile({ path })`.
   Tools with no parameters take `{}`. Optional parameters are optional keys.
-- The return value may be any JSON-serialisable value (string, object, array, …). Structured
+- The return value may be any JSON value (string, object, array, …). Structured
   results are preferred over strings that the model must parse, e.g. `bash` returns `{ code, out }`.
 - Failures are signalled by throwing (see §4.3). A thrown error should carry a short, specific message.
 

@@ -12,7 +12,8 @@
 | `compile.ts` | Program string → instrumented JS function + line map | §5.1, §7.2 |
 | `instrument.ts` | AST transform inserting `__t.*` recorder calls | §7.2 |
 | `recorder.ts` | Event recorder (`__t`), call-id allocation, `onEvent` fan-out | §5.4, §7.1 |
-| `run.ts` | `runBranch()`: inject tools/state/console, abort, keepalive, result | §5.1, §5.3 |
+| `run.ts` | `runBranch()`: host side of the boundary — tool calls, state snapshots, event batches, abort, timeout, result | §5.1, §5.3 |
+| `isolate.ts` | `IsolateRuntime`: create isolate, load program, inject bridge, limits, dispose | §5.2 |
 | `stack.ts` | Map error stacks to original program lines | §7.2 |
 | `render/trace.ts`, `render/annotated.ts`, `render/full.ts` | Event stream → model-facing text | §7.3–7.5 |
 | `footer.ts` | State footer | §4.4, §7.3 |
@@ -36,26 +37,24 @@ renderTrace(result: BranchResult, opts: { mode: "trace" | "annotated" | "full"; 
 ## 2. Compile pipeline
 
 ```
-source ──parse (TS AST, original positions)──▶ validate ──▶ instrument ──▶ emit JS ──▶ new AsyncFunction
+source ──parse (TS AST, original positions)──▶ validate ──▶ instrument ──▶ emit JS ──▶ load in isolate
 ```
 
 1. **Wrap and parse.** The source is parsed as an expression statement `(<source>)`; the root must
-   be an `async` arrow function or async function expression (§4.1). Anything else is a
+   be an `async` arrow function (§4.1: no `function` keyword at the top level). Anything else is a
    `CompileError` with a line number, returned as a failed `BranchResult` without running.
 2. **Validate.** Reject `import`/`require`/dynamic `import()` (§4.1 "may not import modules").
-   This is a contract check, not a sandbox (§5.2).
+   This gives an early, clear error; the isolate enforces it anyway (§5.2).
 3. **Instrument** (§3).
 4. **Emit.** Strip types and print JS; append `//# sourceURL=branch-code-<n>.js`. Each recorder call
    carries the original line as a literal, so the emitted layout is irrelevant to reported lines.
-5. **Construct.** `new AsyncFunction("__t", "__tools", "__state", "console", body)` where the body
-   calls the user function with `(__tools, __state)`.
+5. **Load.** At run time (§4) the emitted JS is compiled inside a fresh isolate with filename
+   `branch-code-<n>.js`, as an async function of `(__t, __tools, __state, console)` that calls the
+   user function with `(__tools, __state)`. All four parameters are created inside the isolate.
 
 > **Decided I-01 (2026-10-23):** `core` depends on `typescript@5.x` for the compiler API, under an npm
 > alias (`"typescript-api": "npm:typescript@5.9"`) so it does not clash with the `typescript@7`
-> dev dependency used for `tsc`. Checked: the installed `typescript@7.0.2` package ships only the
-> native `tsc` binary, no JS API, so (b) is unavailable; (c) deviates from the spec's mechanism.
-> The current prototype `framework/core/branch/branch.ts` uses `stripTypeScriptTypes` and must
-> move to this pipeline.
+> dev dependency used for `tsc`; `typescript@7` ships only the native `tsc` binary, no JS API.
 
 ---
 
@@ -75,38 +74,60 @@ Rewrites (line `L` from the original AST node start):
 
 Not instrumented (§7.2): `&&`, `||`, `??`, `?.`.
 
-Tool calls are **not** rewritten: `__tools` is a `Proxy` over the `Tools` map built by `run.ts`
-(§4), which records `call` events. The calling line is taken from the stack at call time (first
+Tool calls are **not** rewritten: `__tools` is a `Proxy` inside the isolate over the tool names
+(§4), which records `call` events and forwards each call to the host. The calling line is taken from the stack at call time (first
 `branch-code` frame) — the same mechanism as error mapping.
 
 ---
 
 ## 4. Execution
 
-`runBranch`:
+`runBranch` runs the program in a fresh isolate (§4.1) and acts as the host side of the boundary.
+Nothing but JSON data crosses it (branching-framework §5.2).
 
-1. Build the call proxy: for each `tools.x(args)` → allocate call id, record `call` start
-   (line, name, compact args, start time), await the underlying tool with the signal in closure,
-   record outcome (ok/error, result, duration). A tool that is missing → throws
-   `unknown tool: x` with the list of available names.
-2. Inject `console` whose `log/info/warn/error` record `log` events.
-3. Keepalive: a ref'd interval timer while any tool promise is pending; cleared on completion.
-4. Race the program against the signal. On abort: mark in-flight calls `aborted`, return
-   `{ ok: false, aborted: true, … }` with the partial trace (§5.3). In-flight tools receive the
-   abort through their own signal; their late results are recorded as `late` and ignored.
-5. Unhandled throw → `error` event with mapped stack (`stack.ts`) and the throwing tool if the
-   error originated from a `call` (identified by an internal symbol on errors re-thrown by the
-   proxy).
-6. `state` is mutated in place and kept on failure (§4.4).
+1. **Bridge.** Inside the isolate, `__tools` is a `Proxy`: `tools.x(args)` allocates a call id,
+   records the `call` start (line, name, compact args, start time) and sends `{ id, name, args,
+   state, events }` to the host through one async host reference, so `Promise.all` fan-out still
+   runs tools concurrently. The host awaits the underlying tool with the signal in closure and
+   returns `{ ok, value | error }`; the proxy records the outcome (ok/error, result, duration) and
+   returns or throws. A missing tool throws `unknown tool: x` with the list of available names.
+2. **Recorder and console** (`__t`, `console`) live inside the isolate and buffer events. Buffers
+   are flushed to the host with every tool call, every 256 events (sync host reference) and at the
+   end; the host forwards them to `onEvent` (branching-framework §5.4). After a kill the trace
+   therefore ends at most 256 events before the point where the program stopped.
+3. **State.** `state` is copied in at start. Every tool call carries a copy of the current state;
+   the host keeps it as the latest snapshot. On normal completion or a thrown error the final
+   state is copied back; on kill the last snapshot is kept and the result has
+   `stateReverted: true` (branching-framework §4.4).
+4. **Abort and timeout.** On abort or timeout the host disposes the isolate. In-flight calls are
+   marked `aborted` and the result is `{ ok: false, aborted: true, … }` with the trace flushed so
+   far (§5.3). In-flight tools receive the abort through their own signal; their late results are
+   recorded as `late` and ignored.
+5. **Unhandled throw** → `error` event with mapped stack (`stack.ts`, from the isolate's stack
+   with the `branch-code-<n>.js` filename) and the throwing tool if the error came from a `call`
+   (marked by the proxy).
+6. **Memory limit** exceeded → isolate disposed, result `{ ok: false, error: "memory", … }`.
 
 > **Decided A-23 (2026-10-23, approved):** Default branch timeout 120 s (configurable per framework, recorded in
 > provenance as a "branch trace setting"). Time a host spends waiting for user approval is
 > excluded (harness-integration §4.6): the host pauses the timeout clock through a
 > `ctx.pauseTimeout()` handle passed with each inner call ([core-tools-and-hosts §4](core-tools-and-hosts.md#4-host-interface)).
 
-Synchronous infinite loops cannot be interrupted (§5.2, accepted). In the runner, the job's wall
-clock limit kills the container in that case and the job is recorded as a fail with reason
-`timeout` — this is a framework outcome, not an infra error.
+Synchronous infinite loops are stopped by the timeout like anything else: the isolate is
+disposed and the model receives the failed result on its next turn. The job's wall-clock limit
+(runner) remains only as a backstop.
+
+### 4.1 Isolate runtime
+
+`IsolateRuntime` hides the engine: `create({ memoryMb }) → { load(js, filename), bridge(hostFns),
+run(), dispose() }`. The default implementation uses `isolated-vm`; `quickjs-emscripten`
+(QuickJS-WASM: no native build, slower on heavy computation) is the fallback implementation.
+Each branch call gets a new isolate (a few ms), so nothing — globals, patched prototypes — carries
+over between calls.
+
+> **Decided I-11 (2026-10-24):** `core` depends on `isolated-vm@6.2.0`, pinned (Node ≥ 22; contains
+> the fix for GHSA-864f-rcv7-6rh4). 7.x needs Node ≥ 24. The project is in maintenance mode, which
+> is why the engine stays behind `IsolateRuntime`.
 
 ---
 
@@ -139,7 +160,10 @@ The `branch` tool is assembled outside the runtime, by the framework layer
 - Result text: `renderTrace(...)`. Failure results are MCP `isError: true` with the same text
   (harness-integration §5.2).
 - `branch` is never in its own `Tools` map (§6.3).
+- Calls that share one `state` are serialized by a per-state mutex in the framework layer, so
+  several `branch` calls in one turn (runner A-25, or a harness doing the same) run one after
+  another and never race on `state`. Amended 2026-10-24.
 
 > **Decided A-26 (2026-10-23, approved):** The `intent` field is an architecture addition derived from viewer
-> §8.2, which assumes the branch call has an `intent` to show as the card title. If not approved,
-> the viewer uses the first comment line of the program instead.
+> §8.2, which assumes the branch call has an `intent` to show as the card title. When a call has no
+> `intent`, the viewer uses the first comment line of the program.

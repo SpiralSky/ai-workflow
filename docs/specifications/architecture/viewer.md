@@ -42,8 +42,7 @@ The viewer opens from disk (`file://…/dist/index.html`) and needs no server (v
 > (`window.__aiw.register("job:<run>/<job>", {...})`) and are loaded by injecting `<script>` tags,
 > which works from `file://` (viewer §12 open question). Jobs load on demand. In watch mode the app
 > re-injects `index.js` and open job files every 2 s with a cache-busting query and re-renders when
-> the content hash changes. *Alternative:* `aiw view --serve` with a one-line local HTTP server and
-> plain JSON `fetch`.
+> the content hash changes.
 
 ---
 

@@ -261,8 +261,8 @@ Each job logs **both**:
 
 Each job's environment is a **Docker container** built from a fixed image, so every job starts
 from an identical environment (same files, toolchain versions, dependencies). The purpose is
-reproducibility of experiments, **not** security isolation — sandboxing the branch tool is a
-separate concern (see branching-framework §5.2).
+reproducibility of experiments, **not** security isolation; branch programs are isolated separately (branching-framework §5.2) and
+the container is the outer boundary.
 
 **Tools execute inside the container**, served by an MCP tool server running there, so the agent acts
 as if it were running in the container itself. Framework tools that run code (e.g. `branch`) also

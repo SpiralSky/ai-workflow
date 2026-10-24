@@ -164,7 +164,7 @@ Every catalog tool carries the branch registration fields
 | `whenNotToUse` | no | Common confusions ("not for searching file *names* — use `glob`"). Shown to the reranker and executor, not indexed. |
 | `examples` | no | Example intents this tool served. Indexed. Can be filled automatically from successful runs (§10). |
 | `category` | no | Coarse group (`fs`, `search`, `vcs`, `test`, `web`, …). Used for diversity and fallbacks. |
-| `effect` | yes | `read` \| `write` \| `external` (side effects outside the workspace). Used for parallelism (§5). |
+| `effect` | yes | `read` \| `exec` \| `write` \| `external`. `exec` runs workspace code without editing files (tests, snippets); `external` has side effects outside the workspace. Only `read` counts as read-only for parallelism (§5) and read-only mode (harness-integration §7.4). |
 | `requires` | no | Tools that must accompany this one (e.g. `edit` requires `readFile`). Pulled in after selection. |
 | `cost` | no | Rough relative cost/latency, used as a tie-breaker. |
 

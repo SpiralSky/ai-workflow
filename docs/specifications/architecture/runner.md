@@ -76,9 +76,11 @@ start container ─▶ start server (docker exec -i) ─▶ MCP initialize + too
 
 ### 4.1 Container
 
-`docker run -d --network <bridge|none> --mount type=bind,src=<jobdir>,dst=/out
+`docker run -d --network <none|aiw-job-<id>> --mount type=bind,src=<jobdir>,dst=/out
 --mount type=bind,src=<server-bundle>,dst=/opt/aiw/bundle,readonly <problem-image> sleep infinity`.
-Network is `none` for `baseline`/`branch-only` and `bridge` for orchestrate (A-03). A wall-clock
+Network is `none` for every framework except orchestrate, whose container joins a per-job internal
+network (`docker network create --internal`) where the only reachable endpoint is the LLM egress
+proxy (§5.1). Tools therefore have no network in any framework (tools §3.6). A wall-clock
 limit per job (default `turnLimit × 3 min`) kills the container (core-branch §4).
 
 ### 4.2 Model loop
@@ -105,8 +107,8 @@ OpenAI-compatible chat completions via `@aiw/llm` + `wrapLlm(role: "main")`:
 
 > **Decided A-25 (2026-10-23, approved):** Multiple tool calls in one assistant turn: catalog tools (`baseline`) are
 > executed sequentially in the order given; framework tools (`branch`, `do`, `resolve`) are
-> dispatched concurrently (orchestrate-engine §3.3). Concurrent `branch` calls share `state`
-> and can race; the branch prompt asks for one `branch` per turn.
+> dispatched concurrently (orchestrate-engine §3.3). Concurrent `branch` calls are
+> serialized by the server because they share `state` (core-branch §6; amended 2026-10-24).
 
 ### 4.4 Infra errors
 
@@ -120,7 +122,7 @@ outcome. A job killed by its wall-clock limit is a framework fail with reason `t
 ## 5. Server invocation
 
 ```
-docker exec -i [-e OPENAI_BASE_URL -e OPENAI_API_KEY] <ctr> /opt/aiw-node/bin/node /opt/aiw/bundle/aiw-server.mjs \
+docker exec -i [-e OPENAI_BASE_URL=http://aiw-egress:8080/v1] <ctr> /opt/aiw-node/bin/node /opt/aiw/bundle/aiw-server.mjs \
   --framework <variant> --tier S|L --host local --root /work \
   --events /out/events.jsonl --transcript /out/transcript.jsonl --blobs /out/blobs \
   [--executor-model <model> --secondary-cap 4] [--branch-context trace]
@@ -129,13 +131,24 @@ docker exec -i [-e OPENAI_BASE_URL -e OPENAI_API_KEY] <ctr> /opt/aiw-node/bin/no
 Blobs are written to the job's `blobs/`; the run writer moves them into the run-level `blobs/`
 at job end (dedup by hash, framework-runner §7).
 
+### 5.1 LLM egress proxy (orchestrate)
+
+For runs that include orchestrate, the runner starts one egress proxy container (`aiw-egress`) per
+run, attached to the default bridge and to each orchestrate job's internal network. It forwards
+only chat-completion requests to the configured `OPENAI_BASE_URL` and adds the `Authorization`
+header itself, so the API key never enters a job container and model-written code (`bash`, branch
+programs) can reach nothing else. The proxy logs usage per forwarded request; the runner adds any
+cost not matched by a server `turn` event to the budget total and flags the job, so spend from
+outside the executor loop cannot go unrecorded.
+
 ---
 
 ## 6. Grading
 
 1. `docker cp <ctr>:/work <tmp>/after`.
 2. `git diff --no-index --binary <problem>/workspace <tmp>/after` → `diff.patch` (paths rewritten to
-   be relative to `/work`).
+   be relative to `/work`; generated caches such as `__pycache__/`, `*.pyc` and `.pytest_cache/` are
+   excluded, as in orchestrate-engine §7).
 3. Fresh container from the same image (`--network none`), `docker cp diff.patch` and
    `checks/` in, `cd /work && git apply --binary /tmp/diff.patch`, copy `checks/*` over `/work`,
    run `check.sh` with a 120 s timeout. Exit 0 = pass. Output → `check.log`.
@@ -153,7 +166,7 @@ at job end (dedup by hash, framework-runner §7).
 - Infra error → attempt directory moved to `attempts/<n>/`, job restarted from scratch in a new
   container, backoff 10 s then 60 s, at most 2 retries (§6.5).
 - After 2 failed retries: the scheduler stops dispatching, waits for in-flight jobs, marks the run
-  `invalid: job <id> failed after retries`.
+  `{ "invalid": "job-failed:<job>" }` (data-formats §1.1).
 - **Budget**: the scheduler keeps a running total from every attempt's `turn.costUsd` (tailing
   `events.jsonl` after each tool call and turn). When total ≥ budget, in-flight jobs are cancelled
   (container killed), the run is marked `invalid: budget`.
@@ -187,7 +200,9 @@ at job end (dedup by hash, framework-runner §7).
 | Field | Source |
 |-------|--------|
 | Commit + dirty flag | `git rev-parse HEAD`, `git status --porcelain` |
-| Framework fingerprints | Start each framework's server once in a throwaway container per tier, hash `instructions` + `tools/list` |
+| Base prompt | sha256 of `@aiw/core/prompts/base.md` |
+| Framework fingerprints | Start each framework's server once in a throwaway container per tier, hash `instructions` + `tools/list`; plus every text the framework sends that `tools/list` does not show: executor prompt, reranker prompt, hot-path snippet set |
+| Framework switches | `rerank`, `hotPaths`, executor interface: part of the canonical framework id (§2) |
 | Models per role, temperature | config |
 | Limits | per-problem `turnLimit`, secondary cap, branch trace limits/mode, branch timeout |
 | Image digest per problem | `docker image inspect` |

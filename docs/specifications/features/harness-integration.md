@@ -25,7 +25,8 @@ The model sees the framework's tools (`branch`; `do` + `resolve`) instead of the
 ordinary tools. Those ordinary tools (built-ins and user-added tools) are **routed**: callable only
 from inside the framework, and every call a program makes still gets the harness's own checks
 (permission rules, hooks, approval prompts) — by the harness itself where it can execute for the
-framework, otherwise applied by the framework on its behalf.
+framework, otherwise applied by the framework on its behalf. This holds because branch programs
+run in an isolate whose only way out is a tool call ([branching-framework §5.2](branching-framework.md#52-isolation)).
 
 Three parts:
 
@@ -340,7 +341,7 @@ Default off; a path setting turns on the JSONL sink.
   framework-runner §8.
 - Harness features beyond §9.2: custom UIs, status lines, IDE integration.
 - Cross-session persistence of state and references (§5.3).
-- Sandboxing beyond workspace containment and policy (branching-framework §5.2 open item).
+- OS-level sandboxing beyond the branch isolate and workspace containment (branching-framework §5.2).
 - Harnesses without MCP support and without a native host.
 
 ---

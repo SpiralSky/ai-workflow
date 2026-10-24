@@ -143,7 +143,7 @@ plugins, managed).
 > inputs). This is race-free (context travels with the call) and needs no side channel.
 > To verify at build time: `updatedInput` is applied to MCP tool calls, and the tool schema must
 > allow the extra property (`additionalProperties: true`, not described to the model).
-> *Alternative:* the hook writes context to a file keyed by session id under
+> *Fallback if that check fails:* the hook writes context to a file keyed by session id under
 > `${CLAUDE_PLUGIN_DATA}`, read by the server — needs the server to learn its session id.
 
 ### 7.5 `ClaudeCodeChecker` (B4)
@@ -158,7 +158,7 @@ Limits (B5): the `branch` tool sets `_meta["anthropic/alwaysLoad"]: true`; decla
 at 4 000 chars with the priority list (core-tools-and-hosts §6.2); results stay below 50 k chars
 and error text below 11 k.
 
-### 7.6 Open
+### 7.6 Subagents
 
 > **Decided I-08 (2026-10-23):** Leave Claude Code subagents unchanged for now; the plugin ships no
 > subagent definitions. Revisit if subagent built-in use skews harness results.

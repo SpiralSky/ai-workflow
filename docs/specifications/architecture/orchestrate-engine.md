@@ -84,7 +84,7 @@ interface Selector {
 | Stage | Implementation | Default |
 |-------|----------------|---------|
 | Retrieve (§7.1) | In-house BM25 over name (split on case/underscore), description, `whenToUse`, `examples`; index built once per registry version | K = 20 |
-| Rerank (§7.2) | Interface `Reranker.rerank(instruction, candidates) → ordered subset`; implementations: `none` (truncate retrieval order), `llm` (one cheap call over `whenToUse`/`whenNotToUse`; reported as a secondary `turn` with role `selection`) | `llm` |
+| Rerank (§7.2) | Interface `Reranker.rerank(instruction, candidates) → ordered subset`; implementations: `none` (truncate retrieval order), `llm` (one call over `whenToUse`/`whenNotToUse` on the secondary-role model, which equals the main model in evaluation per framework-runner §4.4; reported as a `turn` with role `selection`) | `llm` |
 | Truncate | Keep top N | N = 6 |
 | Complete (§7.3) | Add `requires` after the requiring tool; dedupe | — |
 | Override (§7.5) | Planner `tools` → skip retrieve/rerank, still complete | — |
@@ -223,7 +223,7 @@ live-reference staleness (references §3).
 
 - Before each step, walk the workspace root and record `path → (size, mtime, sha1)`; hash only
   files whose size/mtime changed since the last snapshot. Ignore `.git/`, `node_modules/`,
-  `__pycache__/`, `.venv/` and paths matched by `.gitignore` when present.
+  `__pycache__/`, `.pytest_cache/`, `.venv/` and paths matched by `.gitignore` when present.
 - After the step, diff snapshots → added/modified/deleted paths → `Changed:`; also stored on the
   step so staleness can say which step changed a file.
 

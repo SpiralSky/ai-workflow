@@ -46,7 +46,7 @@ orchestrate §6 metadata. `catalog(tier, { root, sidecar })` returns the registe
 
 | Group | Implementation |
 |-------|----------------|
-| S | Node: `bash` via `child_process.spawn("bash", ["-lc", cmd])`, cwd `/work`, timeout (default 60 s, arg `timeoutMs`), process group killed on abort; `grep`/`findFiles` via bundled ripgrep binary in the base image, falling back to a JS walk. |
+| S | Node: `bash` via `child_process.spawn("bash", ["-lc", cmd])`, cwd `/work`, environment with secrets stripped (system-overview §7), timeout (default 60 s, arg `timeoutMs`), process group killed on abort; `grep`/`findFiles` via bundled ripgrep binary in the base image, falling back to a JS walk. |
 | `fs` | Node. `multiEdit` validates all edits before writing any (atomic). |
 | `nav`, `graph`, `refactor` | Python sidecar (§4). Results are capped and use `{ path, line, col? }` and `path#Name` (tools §4). |
 | `test` | Python sidecar: `runTests` drives `unittest` programmatically and returns structured results (never raw logs); `coverage`/`traceCalls` via `sys.settrace`/`sys.monitoring` (3.12); `stressRun` spawns repeated runs with a parallelism arg. |
