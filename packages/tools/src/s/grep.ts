@@ -9,7 +9,7 @@ const HARD_MAX = 500;
 /** `grep`: regex search over file contents (ripgrep when available, else a JS walk); results sorted by path and line. */
 export const grep: ToolDef = {
   name: "grep",
-  description: "Regex search over file contents. Returns matching lines as { path, line, text }. Skips .git, node_modules and binary files.",
+  description: "Regex search over file contents. Returns matching lines as { path, line, text }. Skips .git, node_modules, hidden and gitignored files, and binary files.",
   parameters: objectSchema(
     {
       pattern: { type: "string", description: "Regular expression to search for." },

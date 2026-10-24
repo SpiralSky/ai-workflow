@@ -124,7 +124,6 @@ const EXPECT_GREP = [
   { path: "src/a.py", line: 5, text: "    return foo()" },
   { path: "src/c.txt", line: 1, text: "hello foo" },
   { path: "src/sub/b.py", line: 1, text: "# TODO foo" },
-  { path: ".hidden", line: 1, text: "foo hidden" },
 ].sort((a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : a.line - b.line));
 
 test("grep: rg and JS fallback agree", async (t) => {
@@ -142,7 +141,7 @@ test("grep tool: filters, truncation", async () => {
   assert.equal(r.truncated, undefined);
   const one: any = await grep.fn({ pattern: "foo", maxResults: 2 }, ctx());
   assert.equal(one.matches.length, 2);
-  assert.match(one.truncated, /showing 2 of 5; /);
+  assert.match(one.truncated, /showing 2 of 4; /);
   const f: any = await grep.fn({ pattern: "foo", path: "src/c.txt" }, ctx());
   assert.deepEqual(f.matches, [{ path: "src/c.txt", line: 1, text: "hello foo" }]);
   await assert.rejects(grep.fn({ pattern: "foo", path: "../" }, ctx()), /path outside workspace/);
@@ -164,4 +163,29 @@ test("findFiles: rg and JS agree, sorted, truncation", async (t) => {
   const m: any = await findFiles.fn({ pattern: "*.m" }, ctx());
   assert.equal(m.files.length, 200);
   assert.match(m.truncated, /showing 200 of 250/);
+});
+
+test("grep/findFiles: ignore files, hidden entries; rg and JS agree", async (t) => {
+  const r = realpathSync(mkdtempSync(join(tmpdir(), "aiw-ign-")));
+  for (const d of ["pkg/gen", "pkg/keep", ".cfg", "__pycache__", "build"]) mkdirSync(join(r, d), { recursive: true });
+  const w = (f: string, c = "needle\n") => writeFileSync(join(r, f), c);
+  w(".gitignore", "# comment\n__pycache__/\n/build\n*.log\n!keep.log\n");
+  w("pkg/.gitignore", "gen/\n!/gen/\n*.tmp\n/only.txt\n");
+  w("pkg/gen/g.py"); w("pkg/keep/k.py"); w("pkg/a.tmp"); w("pkg/only.txt"); w("pkg/sub.txt");
+  w("a.log"); w("keep.log"); w("only.txt"); w("top.py");
+  w(".cfg/c.py"); w("__pycache__/p.py"); w("build/b.py"); w(".hid.py");
+  const rel = (m: { path: string }[]) => [...new Set(m.map((x) => x.path))];
+  const expectGrep = ["keep.log", "only.txt", "pkg/gen/g.py", "pkg/keep/k.py", "pkg/sub.txt", "top.py"];
+  const js = rel(grepJS(r, r, "needle", undefined, false));
+  assert.deepEqual(js, expectGrep);
+  assert.deepEqual(filesJS(r, r, "*"), expectGrep);
+  // explicitly listed ignored or hidden paths are searched
+  assert.deepEqual(rel(grepJS(r, join(r, "__pycache__/p.py"), "needle", undefined, false)), ["__pycache__/p.py"]);
+  assert.deepEqual(rel(grepJS(r, join(r, ".cfg"), "needle", undefined, false)), [".cfg/c.py"]);
+  if (!hasRg()) return t.skip("rg not installed");
+  assert.deepEqual(rel(await grepRg(r, "needle", ".", undefined, false)), expectGrep);
+  assert.deepEqual(await filesRg(r, "*", "."), expectGrep);
+  assert.deepEqual(await filesRg(r, "*.py", "pkg"), filesJS(r, join(r, "pkg"), "*.py"));
+  assert.deepEqual(rel(await grepRg(r, "needle", "__pycache__/p.py", undefined, false)), ["__pycache__/p.py"]);
+  assert.deepEqual(rel(await grepRg(r, "needle", ".cfg", undefined, false)), [".cfg/c.py"]);
 });

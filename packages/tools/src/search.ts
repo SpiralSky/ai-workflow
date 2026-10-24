@@ -49,8 +49,81 @@ export function* walk(startAbs: string): Generator<string> {
   }
 }
 
-/** Common rg flags: no ignore files, include hidden, skip .git and node_modules, so it matches the JS walk. */
-const RG_BASE = ["--no-ignore", "--hidden", "--no-messages", "-g", "!.git", "-g", "!node_modules"];
+/** One parsed ignore-file line. `dir` is the root-relative directory of the ignore file ("" for the root). */
+interface IgnoreRule { dir: string; glob: string; anchored: boolean; negate: boolean; dirOnly: boolean }
+
+/** Parses the common subset of gitignore syntax: comments, `!`, trailing `/`, leading `/`, `*`, `**`, `?`. */
+function parseIgnore(text: string, dir: string): IgnoreRule[] {
+  const rules: IgnoreRule[] = [];
+  for (let line of text.split("\n")) {
+    line = line.replace(/\r$/, "").replace(/(?<!\\)\s+$/, "");
+    if (!line || line.startsWith("#")) continue;
+    const negate = line.startsWith("!");
+    if (negate) line = line.slice(1);
+    const dirOnly = line.endsWith("/");
+    if (dirOnly) line = line.slice(0, -1);
+    const anchored = line.includes("/");
+    line = line.replace(/^\//, "");
+    if (line) rules.push({ dir, glob: line, anchored, negate, dirOnly });
+  }
+  return rules;
+}
+
+/** Reads the ignore files of one directory (`.gitignore`, then `.ignore`; later rules win; root also reads `.git/info/exclude`). */
+function loadIgnore(root: string, dirRel: string): IgnoreRule[] {
+  const abs = join(root, dirRel);
+  const names = dirRel === "" ? [join(".git", "info", "exclude"), ".gitignore", ".ignore"] : [".gitignore", ".ignore"];
+  const rules: IgnoreRule[] = [];
+  for (const n of names) {
+    try { rules.push(...parseIgnore(readFileSync(join(abs, n), "utf8"), dirRel)); } catch { /* no such file */ }
+  }
+  return rules;
+}
+
+/** Whether `rel` (root-relative) is ignored by `rules`; the last matching rule wins. */
+function isIgnored(rules: IgnoreRule[], rel: string, isDir: boolean): boolean {
+  let ignored = false;
+  for (const r of rules) {
+    if (r.dirOnly && !isDir) continue;
+    const sub = r.dir ? rel.slice(r.dir.length + 1) : rel;
+    if (matchesGlob(r.anchored ? sub : basename(sub), r.glob)) ignored = !r.negate;
+  }
+  return ignored;
+}
+
+/**
+ * Walks files under `startAbs` like rg's defaults (used by `grepJS` and `filesJS`): skips `.git`,
+ * `node_modules`, hidden entries and paths ignored by `.gitignore`/`.ignore` files (nested, from
+ * `root` down) and `.git/info/exclude`. A file given as `startAbs` is always yielded.
+ */
+export function* walkSearch(root: string, startAbs: string): Generator<string> {
+  if (statSync(startAbs).isFile()) { yield startAbs; return; }
+  const startRel = relPath(root, startAbs);
+  const dirs = startRel === "." || startRel === "" ? [] : startRel.split(/[\\/]/);
+  const rules = loadIgnore(root, "");
+  for (let i = 1; i <= dirs.length; i++) rules.push(...loadIgnore(root, dirs.slice(0, i).join("/")));
+  yield* walkRules(root, startAbs, startRel === "." ? "" : startRel, rules);
+}
+
+function* walkRules(root: string, abs: string, rel: string, inherited: IgnoreRule[]): Generator<string> {
+  for (const e of readdirSync(abs, { withFileTypes: true })) {
+    if (e.name.startsWith(".") || !(e.isDirectory() || e.isFile())) continue;
+    const childRel = rel ? `${rel}/${e.name}` : e.name;
+    const isDir = e.isDirectory();
+    if (isDir && SKIP_DIRS.has(e.name)) continue;
+    if (isIgnored(inherited, childRel, isDir)) continue;
+    const p = join(abs, e.name);
+    if (!isDir) yield p;
+    else yield* walkRules(root, p, childRel, [...inherited, ...loadIgnore(root, childRel)]);
+  }
+}
+
+/**
+ * Common rg flags: rg defaults (respect ignore files, skip hidden), `--no-require-git` so ignore
+ * files apply outside a git repo, and `.git` / `node_modules` skipped. Globs are applied in JS
+ * (`globMatch`), because an `rg -g` whitelist would override the ignore rules.
+ */
+const RG_BASE = ["--no-require-git", "--no-messages", "-g", "!.git", "-g", "!node_modules"];
 
 /** One grep hit. */
 export interface GrepMatch { path: string; line: number; text: string }
@@ -67,14 +140,15 @@ const clip = (s: string) => (s.length > MAX_LINE ? s.slice(0, MAX_LINE) + "…" 
 export async function grepRg(root: string, pattern: string, startRel: string, glob: string | undefined, ignoreCase: boolean): Promise<GrepMatch[]> {
   const args = ["--json", ...RG_BASE];
   if (ignoreCase) args.push("-i");
-  if (glob) args.push("-g", glob);
   args.push("-e", pattern, "--", startRel);
   const res: GrepMatch[] = [];
   for (const l of await runRg(root, args)) {
     const ev = JSON.parse(l);
     if (ev.type !== "match") continue;
     const text: string = ev.data.lines.text ?? "";
-    res.push({ path: ev.data.path.text.replace(/^\.\//, ""), line: ev.data.line_number, text: clip(text.replace(/\r?\n$/, "")) });
+    const path: string = ev.data.path.text.replace(/^\.\//, "");
+    if (glob && !globMatch(path, glob)) continue;
+    res.push({ path, line: ev.data.line_number, text: clip(text.replace(/\r?\n$/, "")) });
   }
   return sortMatches(res);
 }
@@ -83,7 +157,7 @@ export async function grepRg(root: string, pattern: string, startRel: string, gl
 export function grepJS(root: string, absStart: string, pattern: string, glob: string | undefined, ignoreCase: boolean): GrepMatch[] {
   const re = new RegExp(pattern, ignoreCase ? "i" : "");
   const res: GrepMatch[] = [];
-  for (const abs of walk(absStart)) {
+  for (const abs of walkSearch(root, absStart)) {
     const rel = relPath(root, abs);
     if (glob && !globMatch(rel, glob)) continue;
     const buf = readFileSync(abs);
@@ -105,14 +179,14 @@ function sortMatches(m: GrepMatch[]): GrepMatch[] {
 
 /** Glob over file paths using `rg --files`; sorted root-relative paths. */
 export async function filesRg(root: string, pattern: string, startRel: string): Promise<string[]> {
-  const out = await runRg(root, ["--files", ...RG_BASE, "-g", pattern, "--", startRel]);
-  return out.map((p) => p.replace(/^\.\//, "")).sort();
+  const out = await runRg(root, ["--files", ...RG_BASE, "--", startRel]);
+  return out.map((p) => p.replace(/^\.\//, "")).filter((p) => globMatch(p, pattern)).sort();
 }
 
 /** Same as `filesRg` using a JS walk and `path.matchesGlob`. */
 export function filesJS(root: string, absStart: string, pattern: string): string[] {
   const res: string[] = [];
-  for (const abs of walk(absStart)) {
+  for (const abs of walkSearch(root, absStart)) {
     const rel = relPath(root, abs);
     if (globMatch(rel, pattern)) res.push(rel);
   }

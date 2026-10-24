@@ -71,7 +71,11 @@ Every tool throws `unsupported language: <lang>` for files the backend doesn't h
 > - **`grep`** returns `{ matches: [{ path, line, text }] }`; the matching line is the line of
 >   context (clipped to 200 chars). `rg` is primary (always in the base image); the JS walk is a
 >   dev fallback and uses JS `RegExp`, so exotic regex syntax can differ between them. A glob
->   without `/` matches basenames at any depth.
+>   without `/` matches basenames at any depth. `grep` and `findFiles` follow rg's defaults
+>   (`--no-require-git`): honour `.gitignore`, `.ignore` and `.git/info/exclude`, skip hidden
+>   files and dirs, plus `.git` and `node_modules`; an explicitly named file or directory is still
+>   searched. The JS fallback implements the common gitignore subset (nested files, `#`, `!`,
+>   trailing and leading `/`, `*`, `**`, `?`). Globs are applied in JS to both backends.
 > - **Write summaries**: unified diff (3 context lines) included when ≤ 2 KB. `moveFile` and
 >   `deleteFile` act on single files only; a move counts all source lines `removed` and all target
 >   lines `added`; a delete counts all lines `removed`. `moveFile` refuses to overwrite unless
