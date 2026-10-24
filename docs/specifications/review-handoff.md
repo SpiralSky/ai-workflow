@@ -9,16 +9,6 @@ when it is empty.
 
 ## 3. Contradictions and gaps in feature specs
 
-**F10. Job outcome reasons.** framework-runner §6.1 lists "timeout" as an infra error (not counted,
-retried), while a job wall-clock kill is a framework fail (runner §4.4, needed for uninterruptible
-loops). Clarify that §6.1 means *API* timeouts, and add `timeout` and `patch-failed` as fail
-reasons.
-
-**F11. Model-side failures unclassified.** Malformed tool-call JSON, empty responses,
-context-length overflow (likely for baseline on large problems), content-filter refusals: framework
-outcome or infra error? Proposal: malformed args → returned to the model as a tool error; context
-overflow → fail with reason `context-limit`; empty/filtered responses → infra, retried.
-
 **F12. Reference grammar.** references §4 does not cover `@name@s2` (§7) or `@s1.c1!` (§9 Q1),
 and code-ref paths are inconsistent (`@src/pricing.py#…` vs `@pricing.py#…` in §1, §8). Define
 paths as workspace-root-relative and add the history form to §4.

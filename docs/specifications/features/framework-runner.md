@@ -229,7 +229,13 @@ Each problem also defines its own **turn limit**, since some problems inevitably
 | Checks pass | pass |
 | Checks fail | fail |
 | Turn limit reached | fail (recorded with reason `turn-limit`) |
-| API error, rate limit, timeout | **not counted**; retried (§6.5) |
+| Job wall-clock limit reached (e.g. an endless loop) | fail (reason `timeout`) |
+| Final patch does not apply to the grading workspace | fail (reason `patch-failed`) |
+| Context length exceeded | fail (reason `context-limit`) |
+| Infrastructure failure: API server down or unreachable, rate limit, API request timeout, empty or content-filtered response | **not counted**; retried (§6.5) |
+
+A malformed tool call (e.g. invalid argument JSON) does not end the job: it is returned to the
+model as a tool error, and the model may retry.
 
 Each problem is a benchmark-style task folder (§5.6):
 

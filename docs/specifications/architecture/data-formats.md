@@ -45,7 +45,7 @@ event), never by splitting the directory name, since variant values may contain 
 {
   "format": 1, "problem": "07-async-race", "framework": "branch-only", "rep": 0,
   "outcome": "pass" | "fail",
-  "reason": null | "checks" | "turn-limit" | "timeout" | "patch-failed",
+  "reason": null | "checks" | "turn-limit" | "timeout" | "patch-failed" | "context-limit",
   "attempts": [ { "n": 0, "infraError": "HTTP 429 …", "costUsd": 0.003 }, { "n": 1, "final": true } ],
   "costUsdAllAttempts": 0.014,
   "rollups": { /* telemetry §7 */ },

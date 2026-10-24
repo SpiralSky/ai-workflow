@@ -112,10 +112,13 @@ OpenAI-compatible chat completions via `@aiw/llm` + `wrapLlm(role: "main")`:
 
 ### 4.4 Infra errors
 
-Classified as infra (not counted, retried): HTTP 429/5xx/network/timeout from the LLM API
+Classified as infra (not counted, retried): HTTP 429/5xx/network/timeout from the LLM API, and
+empty or content-filtered responses
 (main or nested — nested ones are signalled by the server via `_meta["aiw/infraError"]`), MCP
 transport loss, container start failure, grading container failure. Everything else is a framework
-outcome. A job killed by its wall-clock limit is a framework fail with reason `timeout`.
+outcome. A job killed by its wall-clock limit is a framework fail with reason `timeout`; a
+context-length error from the API is a framework fail with reason `context-limit`. Malformed
+tool-call arguments are returned to the model as a tool error and do not end the job.
 
 ---
 
