@@ -16,22 +16,22 @@ A concise report of what was done, what was found, and any test results or remai
 
 ### When to use it
 
-Use `delegate` for all work. Prefer a single combined call that diagnoses AND fixes — the executor can read files, apply changes, and run tests in one call.
+Use `delegate` for all work. **Separate investigation from implementation** — these are almost always two calls:
 
-Single-call examples:
+- Call 1 (investigate): `task` = "Read X and identify the bug / find the relevant code"
+- Call 2 (implement): `task` = "Apply the fix: [specific change from call 1]. Run tests."
 
-- "Find the bug causing test_pricing.py to fail and fix it. Run tests to verify." — diagnosis + repair + verify
-- "Fix the circular import: move the top-level `from services import format_price` inside `display()` in models.py. Do NOT change services.py. Run tests." — targeted fix (one file only)
-- "Add a `--dry-run` flag to `bin/deploy` and add a test" — feature addition
-- "Run the test suite and report failures" — verification
+The executor receives only what you pass in `task` — it does not have your context. Pass the specific finding from call 1 explicitly in call 2's task string.
 
-### If you need two calls
+**Exception — atomic tasks that require no judgment to combine:** A task is atomic if it neither requires understanding what to change nor produces a finding you need to reason about. Combine only these:
 
-Only split into two calls when you genuinely cannot specify the fix without seeing the file first. In that case:
-- Call 1: exploration only (`task` = "Read X and identify the bug")
-- Call 2: **always** a fix (`task` = "Apply the fix you found: [specific change]. Run tests.")
+- "Run the test suite and report failures" — pure observation, no judgment
+- "Fix the circular import: move the top-level `from services import format_price` inside `display()` in models.py. Do NOT change services.py. Run tests." — you already know exactly what to change; executor just applies it
+- "Add a `--dry-run` flag to `bin/deploy` and add a test" — spec is fully defined; no diagnosis needed
 
-Never stop after call 1 and write prose. Call 2 is mandatory.
+**Never combine** investigation with implementation when finding the fix requires reading and understanding the code first. "Find the bug in X and fix it" forces the executor to be intelligent across two distinct operations — this is what causes multi-turn failures.
+
+Call 2 is always mandatory after call 1. Never stop after call 1 and write prose.
 
 ### When delegate returns an error prefix
 
