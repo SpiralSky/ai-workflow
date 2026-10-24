@@ -8,7 +8,7 @@
 
 ## 1. Summary
 
-A reference is a short token (e.g. `@s2`, `@failingTests`, `@pricing.py#apply_discount`) that
+A reference is a short token (e.g. `@s2`, `@failingTests`, `@src/pricing.py#apply_discount`) that
 stands for content held by the framework rather than by a model's context. Models write references
 instead of copying content; the framework resolves them for whoever needs the content.
 
@@ -54,8 +54,27 @@ References fix 1–3 directly and reduce 4 (§8).
 
 - A reference is `@` followed by one of the forms in §3, written inline in natural language:
   "Apply the fix decided in `@s2` to `@src/pricing.py#apply_discount`, then run the tests in `@s1.c1`."
-- Names are `[A-Za-z_][A-Za-z0-9_]*`. Paths follow the workspace's own paths; `#` separates a
-  symbol path (`Class.method`).
+- Grammar (`N`, `M`, `K` are positive integers):
+
+  | Form | Meaning |
+  |------|---------|
+  | `@sN` | step N |
+  | `@sN..sM` | steps N–M |
+  | `@sN.cK` | call K of step N |
+  | `@name` | named value, latest |
+  | `@name@sN` | named value as of step N (§7) |
+  | `@path` or `@path#Symbol.path` | code entity: a file, or a symbol in it |
+
+- Names are `[A-Za-z_][A-Za-z0-9_]*`; names of the form `s` + digits are reserved for steps.
+- Paths are relative to the workspace root (`@src/pricing.py`, never `@pricing.py` for a file in
+  `src/`). A token containing `/` or `.` is a path; a root file without either is written `@./Makefile`.
+  `#` separates a symbol path (`Class.method`).
+- Forms in §9 (e.g. `@s1.c1!`) are proposals, not part of the grammar until adopted.
+- **Where references are recognised.** Only in text that passes between planner and executors:
+  `do` instructions and executor reports (§6.4). Everywhere else — the final answer to the user,
+  tool arguments, file contents, shell commands — `@` is ordinary text and is never resolved.
+- **Literal `@`.** Inside instructions and reports, `@` is a reference only at the start of a word
+  (so `a@b.com` is plain text), and `@@` writes a literal `@` (`@@s2` is the text `@s2`).
 - References are recognised by the framework, not interpreted by the model. An unknown or malformed
   reference is rejected **before** the executor starts, with an error returned to the caller listing
   the valid references, so a typo costs one cheap turn rather than a confused executor.
@@ -179,7 +198,7 @@ are replaced with `[invalid ref: …]` so the planner never receives a dangling 
 References remove the need to *copy* content, but a cold executor still has to *read* what it is
 pointed at. Two things keep that cheap:
 
-1. **Live code references to the smallest unit.** `@pricing.py#apply_discount` resolves to one
+1. **Live code references to the smallest unit.** `@src/pricing.py#apply_discount` resolves to one
    function, not the 600-line file.
 2. **Structure-aware tools.** For files with structure (source code, JSON/YAML, Markdown), tools
    that return an outline and read one unit at a time let an executor take only what it needs. These are catalog tools, not part of this spec, but

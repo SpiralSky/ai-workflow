@@ -195,7 +195,30 @@ When a framework is attached to a real harness (§8), a harness subagent has the
 shape as orchestrate's `do` (a `tool` event with child `turn` and `tool` events), so rollups
 would treat both the same way.
 
-### 5.6 Harness choice
+### 5.6 Baseline and the base prompt
+
+**Baseline** is the control condition: plain function calling, as in most agent harnesses.
+
+- **Tools:** the same catalog as the other frameworks at the run's tier (tools §1). Every tool's
+  schema is sent on every turn; each tool call is dispatched directly and its result returned as
+  a tool message.
+- **Prompt:** the base prompt only; baseline adds no framework-specific section.
+- **Job end:** a response with no tool calls is the final answer and ends the job; otherwise the
+  job ends by turn limit, wall-clock limit or context limit (§6.1). Grading follows (§6.4).
+
+The **base prompt** is shared by every framework (§4.4) and held fixed per run (its hash is part of
+provenance, §7.1). Frameworks append their own section after it. It contains only:
+
+1. **Role.** A coding agent working in a repository at `/work`.
+2. **Task.** The problem's `task.md`, verbatim.
+3. **Autonomy.** No user is available to answer questions; make reasonable assumptions and finish.
+4. **Verification.** Check the change before finishing, e.g. by running the project's tests if any.
+5. **Ending.** Finish with a short summary of what changed, without calling a tool.
+
+It names no tools and gives no problem-specific or strategy hints, so nothing in it favours one
+framework.
+
+### 5.7 Harness choice
 
 **Decided: own minimal loop**, an OpenAI-compatible chat-completions loop owned by the runner.
 
@@ -237,7 +260,7 @@ Each problem also defines its own **turn limit**, since some problems inevitably
 A malformed tool call (e.g. invalid argument JSON) does not end the job: it is returned to the
 model as a tool error, and the model may retry.
 
-Each problem is a benchmark-style task folder (§5.6):
+Each problem is a benchmark-style task folder (§5.7):
 
 ```
 problems/<id>/

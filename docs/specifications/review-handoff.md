@@ -9,13 +9,6 @@ when it is empty.
 
 ## 3. Contradictions and gaps in feature specs
 
-**F12. Reference grammar.** references §4 does not cover `@name@s2` (§7) or `@s1.c1!` (§9 Q1),
-and code-ref paths are inconsistent (`@src/pricing.py#…` vs `@pricing.py#…` in §1, §8). Define
-paths as workspace-root-relative and add the history form to §4.
-
-**F14. No baseline spec.** The control condition appears only in tables. Add a short section (in
-framework-runner or tools): prompt, exposure, how a job ends, what the shared base prompt contains.
-
 **F15. Selection recall metric.** orchestrate §10.1 counts "no escalation" as a hit, so a silent
 fallback to `bash` looks like success. Add "executor called a generic tool not ranked first" or
 overlap with `expectedTools`.

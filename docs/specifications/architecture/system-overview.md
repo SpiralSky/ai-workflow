@@ -67,7 +67,7 @@
  After the job:  docker cp /work → host; diff on host; fresh GRADING CONTAINER applies diff + checks/
 ```
 
-- The model loop for the **main session** runs on the host, in the runner (framework-runner §5.6).
+- The model loop for the **main session** runs on the host, in the runner (framework-runner §5.7).
 - Every tool executes in the container (framework-runner §6.4): catalog tools for `baseline`,
   `branch` programs, and orchestrate's executors with their branch programs.
 - The container process is the **same framework server** used in harness integration, with the

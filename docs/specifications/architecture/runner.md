@@ -14,7 +14,7 @@
 | `plan.ts` | Expand config into jobs; cost projection | §6.5 |
 | `scheduler.ts` | Job queue, concurrency, budget stop, run status | §6.5 |
 | `job.ts` | One job attempt end to end | §6 |
-| `loop.ts` | Main-session model loop | §5.6 |
+| `loop.ts` | Main-session model loop | §5.6, §5.7 |
 | `container.ts` | Docker image build/inspect, start, exec, cp, kill | §6.4 |
 | `mcp.ts` | MCP client to the in-container server | §6.4 |
 | `grade.ts` | Diff and fresh-container grading | §6.4 |
