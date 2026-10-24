@@ -91,7 +91,7 @@ limit per job (default `turnLimit × 3 min`, recorded in provenance, §9) kills 
 
 ### 4.2 Model loop
 
-OpenAI-compatible chat completions via `@aiw/llm` + `wrapLlm(role: "main")`:
+OpenAI-compatible chat completions via `@aiw/llm` + `wrapLLM(role: "main")`:
 
 - System prompt = base system prompt (shared, `@aiw/core/prompts/base.md`) + the framework's MCP
   `instructions` section. Tools = server's `tools/list` converted to function schemas.

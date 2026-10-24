@@ -5,14 +5,14 @@ import { createHash } from "node:crypto";
 /** Content-addressed store for large texts (system prompts, tool declarations, big attachments). */
 export interface Blobs {
   put(text: string): string;
-  putJson(value: unknown): string;
+  putJSON(value: unknown): string;
 }
 
 /**
  * Serialises JSON with object keys sorted recursively, so equal values hash equally.
  * @param value - JSON-serialisable value
  */
-export function canonicalJson(value: unknown): string {
+export function canonicalJSON(value: unknown): string {
   return JSON.stringify(sortKeys(value));
 }
 
@@ -49,8 +49,8 @@ export class BlobStore implements Blobs {
     }
     return hash;
   }
-  putJson(value: unknown): string {
-    return this.put(canonicalJson(value));
+  putJSON(value: unknown): string {
+    return this.put(canonicalJSON(value));
   }
 }
 
@@ -59,7 +59,7 @@ export class NoopBlobStore implements Blobs {
   put(text: string): string {
     return sha256(text);
   }
-  putJson(value: unknown): string {
-    return sha256(canonicalJson(value));
+  putJSON(value: unknown): string {
+    return sha256(canonicalJSON(value));
   }
 }

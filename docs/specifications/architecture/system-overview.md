@@ -9,7 +9,7 @@
 | Component | Package | Feature spec | Role |
 |-----------|---------|--------------|------|
 | **Core** | `@aiw/core` | branching-framework, orchestrate, references, harness-integration §4 | Branch runtime, tool registry and declarations, `Host` interface, orchestrate engine, reference store. Harness-agnostic; never executes tools itself. |
-| **Telemetry** | `@aiw/telemetry` | framework-runner §4–5 | Reporter, event schema, sinks, transcript writer, `wrapTools` / `wrapLlm`, rollups. |
+| **Telemetry** | `@aiw/telemetry` | framework-runner §4–5 | Reporter, event schema, sinks, transcript writer, `wrapTools` / `wrapLLM`, rollups. |
 | **LLM client** | `@aiw/llm` | framework-runner §4.1, harness-integration §8 | OpenAI-compatible chat-completions client with usage normalisation. Used by the runner's loop and by orchestrate executors. |
 | **Tools** | `@aiw/tools` | tools | Catalog implementations (tiers S, L), `external` fixtures, Python analysis sidecar. |
 | **Framework server** | `@aiw/server` | harness-integration Part A | MCP server exposing a framework (`baseline` catalog, `branch`, or `do` + `resolve`) over a configurable host. |

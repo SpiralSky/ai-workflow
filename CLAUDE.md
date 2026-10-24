@@ -23,6 +23,11 @@ things easy to get wrong; the spec wins.
 **Budget:** per run, set with `--budget`: default $0.50 for dev and pilot runs, $1 for the full run
 (framework-runner §6.5–6.6). Every attempt's cost counts.
 
+## Naming
+- Acronyms stay fully capitalised in identifiers: `wrapLLM`, `LLMClient`, `putJSON`, `MCPServer`, `baseURL`
+  (not `wrapLlm`, `putJson`). Applies to code and to identifiers quoted in specs.
+- `Id` (identifier) is a plain abbreviation and stays `Id`: `turnId`, `harnessId`, `newId`.
+
 ## Code comments
 - Document functions with JSDoc/TSDoc (`/** ... */`) above the function: what it does, `@param`/`@returns`/`@throws` where they add information beyond the signature.
 - In TS, don't repeat types in tags (`@param name - meaning`, not `@param {string} name`).

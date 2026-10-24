@@ -35,7 +35,7 @@ export class TranscriptWriter {
       session: e.session,
       seq: st.seq + 1,
       system: this.blobs.put(e.system),
-      tools: this.blobs.putJson(e.tools),
+      tools: this.blobs.putJSON(e.tools),
       append: isPrefix ? e.messages.slice(st.prev.length) : e.messages,
       response: e.response,
       ...(isPrefix ? {} : { reset: true as const }),

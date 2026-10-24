@@ -5,8 +5,8 @@ import os from "node:os";
 import path from "node:path";
 import {
   BlobStore, FileSink, NoopBlobStore, NoopSink, TranscriptWriter, buildTree, createReporter, currentReporter,
-  fromMeta, parseEvents, runWithReporter, reconstruct, rollups, wrapLlm, wrapTools, writeJobEnd, writeJobStart,
-  TranscriptEntrySchema, type EventRecord, type Sink, type LlmClient,
+  fromMeta, parseEvents, runWithReporter, reconstruct, rollups, wrapLLM, wrapTools, writeJobEnd, writeJobStart,
+  TranscriptEntrySchema, type EventRecord, type Sink, type LLMClient,
 } from "../src/index.ts";
 
 const tmp = () => fs.mkdtempSync(path.join(os.tmpdir(), "aiw-tel-"));
@@ -137,12 +137,12 @@ test("fromMeta scopes to parent and harnessId", () => {
   });
 });
 
-test("wrapLlm writes turn and transcript entry with matching turnId", async () => {
+test("wrapLLM writes turn and transcript entry with matching turnId", async () => {
   const ev = new MemSink();
   const tr = new MemSink();
   const r = createReporter({ sink: ev, writer: "r" });
-  const client: LlmClient = { complete: async () => ({ response: { ok: 1 }, usage: { input: 3, output: 4 }, costUsd: 0.01 }) };
-  const w = wrapLlm(client, r, "main", { transcript: new TranscriptWriter({ sink: tr, blobs: new NoopBlobStore() }), session: "main" });
+  const client: LLMClient = { complete: async () => ({ response: { ok: 1 }, usage: { input: 3, output: 4 }, costUsd: 0.01 }) };
+  const w = wrapLLM(client, r, "main", { transcript: new TranscriptWriter({ sink: tr, blobs: new NoopBlobStore() }), session: "main" });
   await w.complete({ model: "m", system: "sys", tools: [{ b: 1, a: 2 }], messages: [{ role: "user" }] });
   assert.equal(ev.lines[0].kind, "turn");
   assert.equal(ev.lines[0].model, "m");
@@ -175,7 +175,7 @@ test("blob store is idempotent (O_EXCL) and canonical", () => {
   const h = b.put("hello");
   assert.equal(b.put("hello"), h);
   assert.equal(fs.readFileSync(path.join(dir, h + ".txt"), "utf8"), "hello");
-  assert.equal(b.putJson({ b: 1, a: { d: 1, c: 2 } }), b.putJson({ a: { c: 2, d: 1 }, b: 1 }));
+  assert.equal(b.putJSON({ b: 1, a: { d: 1, c: 2 } }), b.putJSON({ a: { c: 2, d: 1 }, b: 1 }));
   assert.equal(new NoopBlobStore().put("hello"), h);
 });
 

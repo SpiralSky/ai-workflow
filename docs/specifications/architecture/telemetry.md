@@ -51,7 +51,7 @@ Helpers:
 
 - `wrapTools(tools, reporter)`: for each call, `id = newId()`, `toolStart`, call the tool with
   `reporter.child(name, id)` available through an async-local context, then `tool({ id, … })`.
-- `wrapLlm(client, reporter, role)`: times the request, normalises usage (§6), writes `turn` and the
+- `wrapLLM(client, reporter, role)`: times the request, normalises usage (§6), writes `turn` and the
   transcript entry (§5); the entry's `turnId` is the `turn` event id (there is no id on the `turn` event pointing back).
 - `fromMeta(meta)`: builds a reporter scoped to the parent id carried in MCP `_meta`
   (`aiw/parent`, `aiw/harnessId`) — how the server nests its events under the runner's tool event.

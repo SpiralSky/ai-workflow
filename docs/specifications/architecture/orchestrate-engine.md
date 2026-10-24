@@ -160,7 +160,7 @@ executors:
 
 ### 5.2 Loop
 
-Uses `@aiw/llm` wrapped by `wrapLlm(reporter)`; each request is a secondary `turn` event and a
+Uses `@aiw/llm` wrapped by `wrapLLM(reporter)`; each request is a secondary `turn` event and a
 transcript entry in session `exec:<doEventId>`. The loop runs until the model returns text without
 a tool call (the report) or the budget (secondary turn cap, default 4) is reached. Before the last
 allowed turn the engine appends a user message: "This is your last turn: report what you have."

@@ -69,21 +69,21 @@ export function fromMeta(meta: Record<string, unknown> | undefined, root: Report
   );
 }
 
-export interface LlmCompletion {
+export interface LLMCompletion {
   response: unknown;
   usage: Usage;
   costUsd?: number;
   cacheHit?: boolean;
 }
 
-export interface LlmClient {
+export interface LLMClient {
   complete(req: {
     model: string;
     system: string;
     tools: unknown[];
     messages: unknown[];
     [k: string]: unknown;
-  }): Promise<LlmCompletion>;
+  }): Promise<LLMCompletion>;
 }
 
 /**
@@ -94,12 +94,12 @@ export interface LlmClient {
  * @param role - role recorded on every turn
  * @param opts - optional transcript writer and session name
  */
-export function wrapLlm(
-  client: LlmClient,
+export function wrapLLM(
+  client: LLMClient,
   reporter: Reporter,
   role: Role,
   opts: { transcript?: TranscriptWriter; session?: string } = {},
-): LlmClient {
+): LLMClient {
   return {
     async complete(req) {
       const t0 = performance.now();

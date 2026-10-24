@@ -41,7 +41,7 @@ Rebuild it per architecture/core-branch.md rather than patching it; the old `src
 npm workspaces root (A-02) exists: `npm test` / `npm run typecheck` at the repo root; `framework/` is not a workspace.
 Telemetry choices not in the spec: `wrapTools` nests a tool's calls directly under its tool id (no `scope`
 event); the explicit reporter wins over `currentReporter()`; `fromMeta(meta, root)` derives from the server's root
-reporter so `s:n` ids stay unique; `wrapLlm` takes an `LlmClient` interface returning already-normalised usage
+reporter so `s:n` ids stay unique; `wrapLLM` takes an `LLMClient` interface returning already-normalised usage
 (telemetry can't import `@aiw/llm`), so `@aiw/llm` must implement that interface.
 Workflow: the main session designs and orchestrates; subagents execute in small, self-contained steps. Use
 Sonnet subagents (`model: "sonnet"`) for implementation and Haiku (`model: "haiku"`, weaker) for simple mechanical

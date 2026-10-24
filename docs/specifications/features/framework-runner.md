@@ -155,7 +155,7 @@ interface Reporter {
   missing.
 - The harness hands the framework a reporter **already scoped to the current tool call**. Every
   event the framework records nests under that call without the framework knowing its id.
-- Convenience wrappers (`wrapTools(tools, reporter)`, `wrapLlm(client, reporter)`) report
+- Convenience wrappers (`wrapTools(tools, reporter)`, `wrapLLM(client, reporter)`) report
   automatically, so frameworks don't hand-write the plumbing. For branch, inner calls are reported by
   wrapping the `Tools` map passed to `runBranch` (the tracing-as-wrapper approach from the branch
   core).
