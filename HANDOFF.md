@@ -41,11 +41,12 @@ per framework-runner §6.5 (CLAUDE.md updated); large dev problem deferred until
    `npm run setup:venv`; tests use `AIW_VENV` → repo `.venv` → `/opt/aiw/venv`). Choices recorded in
    tool-catalog A-30–A-33. `catalog("L")` throws until all 53 exist (`partial: true` for tests).
    **Remaining, in order:**
-   a. `refactor` group (8, rope) — a subagent was building it, uncommitted; check `git status`, finish/verify
-      (`cd packages/tools && npm test`), record its choices as A-34 in tool-catalog.md, commit.
-   b. User-approved changes (2026-10-24): `bash` output over the cap keeps head + tail with
-      `[N bytes cut]` in the middle (currently tail-only, 6 KB); `grep`/`findFiles` respect `.gitignore`
-      and skip hidden files like rg defaults (JS fallback must match). Update A-30 accordingly.
+   a. ~~`refactor` group~~ — done (A-34, committed 6c2576a).
+   b. User-approved changes: `bash` head + tail output; `grep`/`findFiles` respect `.gitignore` + skip hidden.
+      A subagent was doing these with their own commits — check `git log` for them; if missing, redo.
+   **Open question for the user:** refactor tools leave uses on unannotated receivers unchanged and list
+   them in `unsure` instead of failing; tools.md §6.4 says refactors "fail rather than producing a partial
+   change". Ask: keep `unsure` (report) or throw when any exist (maybe `allowUnsure` flag)?
    c. `test` group (6: runTests, listTests, coverage, runSnippet, traceCalls, stressRun) — executes workspace
       code in a child process (tool-catalog §3–4); then make `catalog("L")` return all 53 and drop `partial`.
    **Then:** the server (`LocalHost` wraps the catalog) and runner that consume `buildFramework`, then step 3.
