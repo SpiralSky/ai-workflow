@@ -104,6 +104,21 @@ One sidecar per server session; restarted on crash (the in-flight call throws `s
 
 ---
 
+> **Decided A-32 (2026-10-24):** Sidecar and `nav`/`check` details:
+> - Interpreter `$AIW_VENV/bin/python` (default `/opt/aiw/venv`); dev venv `packages/tools/.venv`
+>   from pinned `python/requirements.txt` (`npm run setup:venv`). Workspace root is `argv[1]`;
+>   requests are served one at a time. Start failure rejects with `sidecar failed to start`; an
+>   abort rejects only that call with `aborted`.
+> - Targets are `symbol` (`path#Name`), or `path` + `name` (optional `line`), or `path` + `line` +
+>   `col`; lines and columns are 1-based. Definitions outside the workspace have `module`, no
+>   `path`; `findReferences` drops references outside the workspace and in `.venv`/`node_modules`.
+> - Only `outline` handles Markdown/JSON/YAML (YAML by top-level-key scan, no PyYAML); the other
+>   `nav` tools and `check`/`format` are Python-only.
+> - `check` severities: pyright's, `information` → `info`; ruff → `warning` (`error` for syntax
+>   errors). `format` is configured by `[tool.ruff.format]` or `[tool.black]` in `pyproject.toml`, or
+>   a `format` table in `ruff.toml`/`.ruff.toml`; both run `ruff format` (black configs carry over
+>   `line-length` only).
+
 ## 5. External tools and fixtures
 
 `fixtures/external/<tool>.json` holds canned responses selected by simple argument matching
