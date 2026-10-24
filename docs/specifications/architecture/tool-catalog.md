@@ -140,6 +140,29 @@ One sidecar per server session; restarted on crash (the in-flight call throws `s
 > - Per-list caps (also ~6 KB each): callGraph 40 nodes/60 edges; importGraph 60 edges/10 cycles;
 >   impact 30/20/20/15; dataFlow 25 writes/25 reads; overview sized to stay under 8 KB.
 
+> **Decided A-34 (2026-10-24):** `refactor` details:
+> - Each refactoring runs on a scratch copy of the workspace (rope `ropefolder=None`,
+>   `FileSystemCommands`, so nothing is git-staged); changed `.py` files must parse; only then is the
+>   difference written, rolled back if a write fails. Summaries count a move as old path removed +
+>   new path added (A-30). A dry run returns the diff up to 6 KB (`truncated` if cut).
+> - Args (all take `dryRun`): nav target forms (A-32) plus `renameSymbol.newName`;
+>   `moveSymbol { to, keepReexport }`; `moveModule { from, to }` (rename or move per call, not
+>   both); `extractFunction { path, range: [start, end], name }` (whole lines); `changeSignature`
+>   `ops` in order: `add { name, default, index? }`, `remove { name }`, `rename { name, to }`,
+>   `reorder { order }` (indices count `self`); `extractVariable { path, line, expression, col?,
+>   name, scope }`; `organizeImports { path }`.
+> - Rope gaps covered with jedi: annotation-typed receivers in rename and changeSignature.
+>   Annotations are restored after changeSignature; positional-/keyword-only params and removing a
+>   still-used param are refused. `moveSymbol` writes `import pkg.mod` + qualified use, refuses
+>   methods and moves that would create an import cycle; `keepReexport` adds a `# noqa: F401`
+>   re-export. `inlineSymbol` is limited to single-expression bodies with simple arguments
+>   (rope's inliner changes semantics otherwise); refused cases throw. `extractVariable` at module
+>   scope is refused if the expression uses local names.
+> - `organizeImports` hoists a function-local import only when it is a direct body statement of
+>   a stdlib or cycle-free workspace module, with no name clash, not alone in the function and
+>   not sharing a line; unused imports in `__init__.py` are kept as re-exports. Results add
+>   `hoisted` / `notHoisted` (with reason).
+
 ## 5. External tools and fixtures
 
 `fixtures/external/<tool>.json` holds canned responses selected by simple argument matching
