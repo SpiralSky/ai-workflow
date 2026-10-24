@@ -85,12 +85,18 @@ Related systems with similar ideas include Cloudflare Code Mode, CodeAct, smolag
 
 ## Roadmap
 
-1. **Clean rerun** — rerun all 9 problems after hint removal to get uncontaminated scores
-2. **orchestrate-active** — active coordinator tool set (`list_files`, `grep`, `find_symbol`, `get_structure`, `delegate`)
-3. **branch-python** — Python execution language instead of TypeScript ([issue 02](dev/issues/02-secondary-interface-language.md))
-4. **Expand to ~25 problems** — broader coverage, including multi-file tasks
-5. **Catalog-size scaling experiment** — measure whether BM25 context savings grow with tool catalog size ([issue 03](dev/issues/03-tool-selection-bm25.md))
-6. **Provider-agnostic backend + per-tier model routing** — different models for coordinator vs. executor
+Specs in [docs/specifications/](docs/specifications/features/README.md) are the source of truth; the code is being rebuilt to match them.
+
+1. **Finish the spec review**: remaining items in [review-handoff.md](docs/specifications/review-handoff.md) (F4–F8 and onward).
+2. **Build to the architecture specs**, in dependency order ([system-overview §2](docs/specifications/architecture/system-overview.md)):
+   telemetry → LLM client → core (branch runtime, tool registry and hosts, orchestrate engine) → tools (tier S, then L) →
+   framework server → report + runner + problems → viewer → Claude Code plugin.
+3. **Clean comparison**: `compare` (baseline, branch-only, orchestrate) on the new runner with `deepseek/deepseek-v4-flash`.
+   The results above come from the old framework and are superseded.
+4. **Catalog-size scaling experiment**: `orchestrate` vs. `branch-only[toolSearch]` at 50, 200 and 1000 tools
+   ([orchestrate §10.2](docs/specifications/features/orchestrate.md)).
+5. **Later**: [known-good hot paths](docs/ideas/known-good-hot-paths.md), fine-tuned role models (orchestrate §10.0),
+   tools that pair small models with deterministic algorithms.
 
 ---
 
