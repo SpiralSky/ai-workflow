@@ -1,0 +1,25 @@
+{
+  "cases": [
+    {
+      "match": {
+        "service": "worker"
+      },
+      "result": {
+        "service": "worker",
+        "lines": [
+          "2026-10-24T09:12:01Z INFO picked up job 4471",
+          "2026-10-24T09:12:03Z WARN retrying job 4471 (attempt 2)",
+          "2026-10-24T09:12:07Z ERROR job 4471 failed: upstream timeout"
+        ]
+      }
+    }
+  ],
+  "default": {
+    "service": "{{service}}",
+    "lines": [
+      "2026-10-24T09:12:01Z INFO listening on :8080",
+      "2026-10-24T09:12:15Z INFO GET /health 200 2ms",
+      "2026-10-24T09:12:45Z INFO GET /health 200 1ms"
+    ]
+  }
+}

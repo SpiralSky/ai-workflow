@@ -1,0 +1,51 @@
+{
+  "cases": [
+    {
+      "match": {
+        "query": "deploy"
+      },
+      "result": {
+        "pages": [
+          {
+            "title": "Deployment runbook",
+            "url": "https://wiki.internal.example/ENG/deployment-runbook",
+            "snippet": "Steps to deploy the service: tag a release, wait for CI, promote the image, watch the dashboards."
+          },
+          {
+            "title": "Rollback procedure",
+            "url": "https://wiki.internal.example/ENG/rollback",
+            "snippet": "Roll back by promoting the previous image tag."
+          }
+        ]
+      }
+    },
+    {
+      "match": {
+        "query": "on-call"
+      },
+      "result": {
+        "pages": [
+          {
+            "title": "On-call policy",
+            "url": "https://wiki.internal.example/ENG/on-call",
+            "snippet": "Primary and secondary rotate weekly. Page for customer-facing outages only."
+          }
+        ]
+      }
+    }
+  ],
+  "default": {
+    "pages": [
+      {
+        "title": "Engineering handbook",
+        "url": "https://wiki.internal.example/ENG/handbook",
+        "snippet": "Conventions, review process and tooling overview for the engineering team."
+      },
+      {
+        "title": "Architecture overview",
+        "url": "https://wiki.internal.example/ENG/architecture",
+        "snippet": "High-level diagram of services and data flow."
+      }
+    ]
+  }
+}

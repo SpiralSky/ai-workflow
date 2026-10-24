@@ -101,3 +101,27 @@ export function summarizeChange(root: string, abs: string, before: string | null
   if (diff && Buffer.byteLength(diff) <= MAX_DIFF_BYTES) summary.diff = diff;
   return summary;
 }
+
+/**
+ * Full unified diff of one file (no size limit), empty when identical.
+ * @param path - root-relative path shown in the headers
+ * @param before - previous content, or null if the file is new
+ * @param after - new content, or null if the file was deleted
+ */
+export function renderDiff(path: string, before: string | null, after: string | null): string {
+  return unified(path, diffLines(lines(before ?? ""), lines(after ?? "")));
+}
+
+/**
+ * Merges per-file summaries into one; the combined diff is kept only while it stays small.
+ * @param parts - summaries from `summarizeChange`
+ */
+export function mergeSummaries(parts: ChangeSummary[]): ChangeSummary {
+  const out: ChangeSummary = { files: parts.flatMap((p) => p.files) };
+  const diffs = parts.map((p) => p.diff);
+  if (diffs.length > 0 && diffs.every((d) => d !== undefined)) {
+    const all = diffs.join("");
+    if (Buffer.byteLength(all) <= MAX_DIFF_BYTES) out.diff = all;
+  }
+  return out;
+}

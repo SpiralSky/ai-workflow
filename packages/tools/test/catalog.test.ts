@@ -3,6 +3,7 @@ import { test } from "node:test";
 import { catalog, toHostDecl } from "../src/index.ts";
 
 const tools = catalog("S", { root: "/tmp" });
+const partialL = catalog("L", { root: "/tmp", partial: true });
 
 test("S order and unique names", () => {
   assert.deepEqual(tools.map((t) => t.name), ["bash", "readFile", "writeFile", "edit", "grep", "findFiles"]);
@@ -13,8 +14,19 @@ test("tier L is not built", () => {
   assert.throws(() => catalog("L", { root: "/tmp" }), /tier L not built yet/);
 });
 
+test("L partial: S objects unchanged, unique names, fs + vcs + external groups", () => {
+  assert.deepEqual(partialL.slice(0, 6), tools);
+  partialL.slice(0, 6).forEach((t, i) => assert.equal(t, tools[i]));
+  assert.equal(new Set(partialL.map((t) => t.name)).size, partialL.length);
+  assert.equal(partialL.length, 6 + 4 + 3 + 14);
+  assert.deepEqual(partialL.slice(6, 13).map((t) => t.name), ["multiEdit", "moveFile", "deleteFile", "listDir", "diff", "history", "restore"]);
+  const external = partialL.filter((t) => t.meta.category === "external");
+  assert.equal(external.length, 14);
+  assert.ok(external.every((t) => t.meta.effect === "external"));
+});
+
 test("length budgets (I-04) and meta filled", () => {
-  for (const t of tools) {
+  for (const t of partialL) {
     assert.ok(t.description.length <= 200, `${t.name} description`);
     assert.ok(t.meta.whenToUse.length > 0 && t.meta.whenToUse.length <= 200, `${t.name} whenToUse`);
     const props = (t.parameters as { properties: Record<string, { description?: string }> }).properties;
@@ -36,4 +48,7 @@ test("measured S schema size", () => {
   const chars = tools.map((t) => JSON.stringify({ name: t.name, description: t.description, parameters: t.parameters }).length).reduce((a, b) => a + b, 0);
   console.log(`tier S schema: ${chars} chars ~ ${Math.round(chars / 4)} tokens`);
   assert.ok(chars > 0);
+  const size = (ts: typeof partialL) => ts.map((t) => JSON.stringify({ name: t.name, description: t.description, parameters: t.parameters }).length).reduce((a, b) => a + b, 0);
+  const l = size(partialL);
+  console.log(`tier L partial (${partialL.length} tools, fs+vcs+external): ${l} chars ~ ${Math.round(l / 4)} tokens`);
 });

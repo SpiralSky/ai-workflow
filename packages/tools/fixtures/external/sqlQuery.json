@@ -1,0 +1,67 @@
+{
+  "cases": [
+    {
+      "match": {
+        "sql": "from users"
+      },
+      "result": {
+        "columns": [
+          "id",
+          "email",
+          "created_at"
+        ],
+        "rows": [
+          [
+            1,
+            "ada@example.com",
+            "2026-01-14"
+          ],
+          [
+            2,
+            "grace@example.com",
+            "2026-02-03"
+          ],
+          [
+            3,
+            "alan@example.com",
+            "2026-02-19"
+          ]
+        ],
+        "rowCount": 3
+      }
+    },
+    {
+      "match": {
+        "sql": "count("
+      },
+      "result": {
+        "columns": [
+          "count"
+        ],
+        "rows": [
+          [
+            128
+          ]
+        ],
+        "rowCount": 1
+      }
+    }
+  ],
+  "default": {
+    "columns": [
+      "id",
+      "name"
+    ],
+    "rows": [
+      [
+        1,
+        "alpha"
+      ],
+      [
+        2,
+        "beta"
+      ]
+    ],
+    "rowCount": 2
+  }
+}

@@ -38,8 +38,8 @@ function runRg(root: string, args: string[]): Promise<string[]> {
   });
 }
 
-/** Walks files under `startAbs` in the JS fallback, skipping `.git` and `node_modules`; yields absolute paths. */
-function* walk(startAbs: string): Generator<string> {
+/** Walks files under `startAbs` (also used by fs and vcs tools), skipping `.git` and `node_modules`; yields absolute paths. */
+export function* walk(startAbs: string): Generator<string> {
   const st = statSync(startAbs);
   if (st.isFile()) { yield startAbs; return; }
   for (const e of readdirSync(startAbs, { withFileTypes: true })) {
