@@ -157,6 +157,9 @@ One sidecar per server session; restarted on crash (the in-flight call throws `s
 >   `reorder { order }` (indices count `self`); `extractVariable { path, line, expression, col?,
 >   name, scope }`; `organizeImports { path }`.
 > - Rope gaps covered with jedi: annotation-typed receivers in rename and changeSignature.
+>   A use that neither rope nor jedi resolves to the target is left unchanged and listed in
+>   `unsure` (deduplicated, capped); the rest of the refactoring is applied (user decision
+>   2026-10-24, tools §6.4).
 >   Annotations are restored after changeSignature; positional-/keyword-only params and removing a
 >   still-used param are refused. `moveSymbol` writes `import pkg.mod` + qualified use, refuses
 >   methods and moves that would create an import cycle; `keepReexport` adds a `# noqa: F401`

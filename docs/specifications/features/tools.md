@@ -128,7 +128,9 @@ with symbols as `path#Name`.
 ### 6.4 `refactor` — semantic edits
 
 All update every reference, import and re-export, take `dryRun`, and return a change summary
-(§4). They fail rather than producing a partial change.
+(§4). They fail rather than producing a partial change, with one exception: a use whose
+receiver cannot be resolved to the refactored symbol (e.g. `obj.name` on an unannotated `obj`)
+is left unchanged and listed in `unsure: [{ path, line }]`, so the caller can check it by hand.
 
 | Tool | Effect | Purpose |
 |------|--------|---------|
