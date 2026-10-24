@@ -99,7 +99,9 @@ interface Selector {
 
 `findTools({ need })` runs `select({ instruction: need })` excluding tools already present, adds up
 to N tools to the executor's `Tools` map, and returns their declarations so the next branch program
-can call them. Logged as a selection miss in the handoff record.
+can call them. Logged as a selection miss (`escalation`) in the handoff record. Fallback misses
+(orchestrate §10.1) are computed when the record is written, from the step's calls, its shortlist
+and the problem's `expectedTools`.
 
 ### 4.5 Hot paths
 

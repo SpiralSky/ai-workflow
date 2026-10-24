@@ -1,6 +1,5 @@
 # Feature: References
 
-**Status:** Draft — under discussion  
 **Area:** Core agent interface  
 **Related:** [orchestrate.md](orchestrate.md), [branching-framework.md §4.4](branching-framework.md)
 

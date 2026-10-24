@@ -1,6 +1,5 @@
 # Feature: Problem Set
 
-**Status:** Draft  
 **Area:** Evaluation  
 **Related:** [framework-runner.md](framework-runner.md), [tools.md](tools.md)
 

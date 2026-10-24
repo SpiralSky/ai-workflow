@@ -7,19 +7,6 @@ when it is empty.
 
 ---
 
-## 3. Contradictions and gaps in feature specs
-
-**F15. Selection recall metric.** orchestrate §10.1 counts "no escalation" as a hit, so a silent
-fallback to `bash` looks like success. Add "executor called a generic tool not ranked first" or
-overlap with `expectedTools`.
-
-## 4. Hygiene in feature specs and project files
-
-**F17. Status labels.** features/README lists every spec as Draft; branching-framework says Final;
-references says "Draft — under discussion".
-
----
-
 ## 5. Architecture amendments made (2026-10-24)
 
 Not originating in feature specs, so fixed directly. Two revise previously approved decisions

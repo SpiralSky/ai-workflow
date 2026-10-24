@@ -1,7 +1,6 @@
 # Architecture: System Overview
 
 **Derived from:** all feature specs  
-**Status:** Draft
 
 ---
 

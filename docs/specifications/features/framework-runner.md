@@ -1,6 +1,5 @@
 # Feature: Framework Runner
 
-**Status:** Draft  
 **Area:** Evaluation infrastructure  
 **Related:** [branching-framework.md](branching-framework.md)
 

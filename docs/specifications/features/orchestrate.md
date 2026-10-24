@@ -1,6 +1,5 @@
 # Feature: Orchestrate
 
-**Status:** Draft  
 **Area:** Core agent interface  
 **Related:** [branching-framework.md](branching-framework.md), [framework-runner.md](framework-runner.md), [known-good-hot-paths](../../ideas/known-good-hot-paths.md)
 
@@ -310,7 +309,7 @@ from that text are attached per `do` call as a **handoff record**
 |-------|---------|
 | `instruction` | The instruction as the planner wrote it, references unresolved. |
 | `references` | Each reference in the instruction: how it was resolved (inline or handle, [references.md §5](references.md)), the text the executor received, and the step it came from for snapshots. |
-| `selection` | The shortlist with scores and order per stage, any explicit `tools` override, and escalations (§7). |
+| `selection` | The shortlist with scores and order per stage, any explicit `tools` override, escalations (§7), and selection misses (§10.1: kind `escalation` or `fallback`, with the tool involved). |
 | `hotPaths` | Ids of hot-path snippets included (§9). |
 | `budget` | Turn budget given and turns used; whether it was exhausted (§8.2). |
 | `model` | The executor's model. |
@@ -357,7 +356,13 @@ first implementation.
 
 Reported per run in addition to [framework-runner.md](framework-runner.md) metrics:
 
-- **Selection recall:** fraction of intents with no escalation.
+- **Selection recall:** fraction of intents with no selection miss. A miss is either an
+  **escalation** (the executor called `findTools`) or a **fallback** (the executor called `bash`
+  while a tool from the problem's `expectedTools` (problems §4) that is in the run's catalog was
+  not shortlisted). Fallback is a heuristic flag, so recall is approximate; flagged steps are
+  listed in the viewer for audit.
+- **Expected-tool coverage:** per job, the fraction of the problem's `expectedTools` in the
+  catalog that were called at all (also reported for baseline and branch).
 - **Selection precision:** tools called ÷ tools shortlisted.
 - **Rank agreement:** whether the executor's first-called tool was the top-ranked one.
 - **Shortlist size** (mean, p95).

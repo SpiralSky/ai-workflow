@@ -1,6 +1,5 @@
 # Feature: Branching Framework
 
-**Status:** Final  
 **Area:** Core agent interface
 
 ---

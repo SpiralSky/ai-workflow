@@ -1,6 +1,5 @@
 # Feature: Harness Integration
 
-**Status:** Draft  
 **Area:** Distribution / real-world use  
 **Related:** [branching-framework.md](branching-framework.md), [orchestrate.md](orchestrate.md),
 [references.md](references.md), [framework-runner.md](framework-runner.md), [tools.md](tools.md)

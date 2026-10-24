@@ -1,6 +1,5 @@
 # Feature: Tool Catalog
 
-**Status:** Draft  
 **Area:** Evaluation / tools  
 **Related:** [framework-runner.md](framework-runner.md), [problems.md](problems.md), [branching-framework.md](branching-framework.md), [orchestrate.md](orchestrate.md), [references.md](references.md)
 

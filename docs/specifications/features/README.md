@@ -19,4 +19,9 @@ Architecture specs (in `../architecture/`) follow from these and resolve the how
 | [viewer.md](viewer.md) | Browser UI for run groups, framework comparison and message-by-message conversations with branch/orchestrate renderers | Draft |
 | [harness-integration.md](harness-integration.md) | Core sends inner tool calls to a host (harness natively, runner, or MCP fallback); thin per-harness plugins | Draft |
 
+**Status** is kept only in this table (spec headers carry none):
+
+- **Draft:** under review; may change freely.
+- **Final:** checked; changes are spec changes and need the user's approval.
+
 Open review findings awaiting decisions: [`../review-handoff.md`](../review-handoff.md).

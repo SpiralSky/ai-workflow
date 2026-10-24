@@ -1,6 +1,5 @@
 # Feature: Experiment Viewer
 
-**Status:** Draft  
 **Area:** Evaluation infrastructure  
 **Related:** [framework-runner.md](framework-runner.md), [branching-framework.md](branching-framework.md), [orchestrate.md](orchestrate.md), [references.md](references.md)
 
