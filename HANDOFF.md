@@ -28,8 +28,8 @@ per framework-runner §6.5 (CLAUDE.md updated); large dev problem deferred until
    `packages/telemetry`) → ~~LLM client~~ (done 2026-10-24, `packages/llm`) → ~~core branch runtime~~ (done
    2026-10-24, `packages/core/src/branch`) → **core tool registry, hosts and wrappers per
    architecture/core-tools-and-hosts.md (next)** → orchestrate engine.
-   Open with the user: isolated-vm packaging (native addon can't go in the single-file
-   `aiw-server.mjs`; needs `--no-node-snapshot`; plugin platform coverage) — see below.
+   Engine packaging resolved 2026-10-24 (core-branch §4.1, I-11 revised): QuickJS-WASM default,
+   isolated-vm optional, shipped beside the bundle; containers use `--engine isolated-vm`.
 3. Test the existing modes first: clean `compare` (baseline, branch-only, orchestrate) — Roadmap step 3.
 4. Only then: user's new orchestrate idea (adds one mode) — not yet presented; it goes through spec approval.
 
@@ -39,11 +39,12 @@ Commit spec/README changes as `docs:` commits when the user approves.
 
 ## Code state
 
-`packages/core/src/branch/` implements core-branch.md (compile → isolate run → render; 53 tests).
+`packages/core/src/branch/` implements core-branch.md (compile → isolate run → render; 59 tests).
 Implementation choices are recorded in core-branch.md (event shapes, line-preserving compile,
-root-only `return` events, render details). isolated-vm needs `node --no-node-snapshot`
-(core test script sets `NODE_OPTIONS`). Unresolved: server bundle/launch for the native addon
-(system-overview §5, runner §5, framework-server §7.1) — awaiting user decision.
+root-only `return` events, render details, engines). Engines in `src/branch/engines/`
+(`quickJSRuntime` default, `isolatedVMRuntime`, `selectRuntime`). `npm test` runs QuickJS;
+`npm run test:ivm` runs isolated-vm. Not yet built: the server's `--engine` flag, plugin packaging
+of isolated-vm and the first-session note (framework-server §7.1), `engine` in run provenance.
 
 ### Old `framework/core/branch/`
 
