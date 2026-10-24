@@ -3,7 +3,7 @@ import { ReporterImpl, type Reporter } from "./reporter.ts";
 import type { Role, Usage } from "./schema.ts";
 import type { TranscriptWriter } from "./transcript.ts";
 
-type ToolFn = (args: any) => Promise<unknown> | unknown;
+type ToolFn = (args: any, ...rest: any[]) => Promise<unknown> | unknown;
 
 function resultBytes(result: unknown): number {
   if (typeof result === "string") return Buffer.byteLength(result);
@@ -17,7 +17,8 @@ function resultBytes(result: unknown): number {
  * under the outer tool. Errors are recorded (`ok: false`) and rethrown unchanged.
  *
  * The scoped reporter uses `scopedTo(id)` and writes no `scope` event: the tool event itself is
- * the parent. The explicit `reporter` always wins over `currentReporter()` (telemetry §2: reporters
+ * the parent, and its `scope` is the call id. Extra arguments (e.g. a per-call ctx) are forwarded.
+ * The explicit `reporter` always wins over `currentReporter()` (telemetry §2: reporters
  * are passed explicitly); a tool that nests calls reads `currentReporter()` to wrap them.
  * @param tools - name to function map
  * @param reporter - reporter the calls are recorded under
@@ -25,7 +26,7 @@ function resultBytes(result: unknown): number {
 export function wrapTools<T extends Record<string, ToolFn>>(tools: T, reporter: Reporter): T {
   const out: Record<string, ToolFn> = {};
   for (const [name, fn] of Object.entries(tools)) {
-    out[name] = async (args: unknown) => {
+    out[name] = async (args: unknown, ...rest: unknown[]) => {
       const base = reporter;
       const id = base.newId();
       base.toolStart({ id, name, args });
@@ -33,7 +34,7 @@ export function wrapTools<T extends Record<string, ToolFn>>(tools: T, reporter: 
       const startTs = Date.now();
       const t0 = performance.now();
       try {
-        const result = await runWithReporter(scoped, () => fn(args));
+        const result = await runWithReporter(scoped, () => fn(args, ...rest));
         base.tool({
           id, name, args, ok: true, startTs,
           durationMs: Math.round(performance.now() - t0),

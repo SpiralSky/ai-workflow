@@ -114,6 +114,15 @@ test("wrapTools nests inner calls and records errors", async () => {
   assert.equal(s.lines.filter((l) => l.kind === "toolStart").length, 3);
 });
 
+test("wrapTools forwards extra arguments and scopes to the call id", async () => {
+  const s = new MemSink();
+  const r = createReporter({ sink: s, writer: "r" });
+  const w = wrapTools({ t: (_a: unknown, ctx: string) => [ctx, currentReporter()!.scope] }, r);
+  const [ctx, scope] = (await w.t({}, "c")) as string[];
+  assert.equal(ctx, "c");
+  assert.equal(scope, s.lines.find((l) => l.kind === "tool").id);
+});
+
 test("fromMeta scopes to parent and harnessId", () => {
   const s = new MemSink();
   const root = createReporter({ sink: s, writer: "s" });
