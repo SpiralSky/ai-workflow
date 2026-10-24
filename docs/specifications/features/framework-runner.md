@@ -209,10 +209,12 @@ The **base prompt** is shared by every framework (§4.4) and held fixed per run 
 provenance, §7.1). Frameworks append their own section after it. It contains only:
 
 1. **Role.** A coding agent working in a repository at `/work`.
-2. **Task.** The problem's `task.md`, verbatim.
-3. **Autonomy.** No user is available to answer questions; make reasonable assumptions and finish.
-4. **Verification.** Check the change before finishing, e.g. by running the project's tests if any.
-5. **Ending.** Finish with a short summary of what changed, without calling a tool.
+2. **Autonomy.** No user is available to answer questions; make reasonable assumptions and finish.
+3. **Verification.** Check the change before finishing, e.g. by running the project's tests if any.
+4. **Ending.** Finish with a short summary of what changed, without calling a tool.
+
+The problem's `task.md` is the **first user message**, verbatim, as a user would type it in a
+harness. The system prompt is therefore identical for every problem within a framework.
 
 It names no tools and gives no problem-specific or strategy hints, so nothing in it favours one
 framework.

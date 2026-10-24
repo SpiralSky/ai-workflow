@@ -196,7 +196,7 @@ separate **dev set** (`set: "dev"`), and the reported set is never gated.
 | `01-chunk-off-by-one` | The smoke test (§8.2). |
 | `03-discount-mismatch` | Cut from the reported set as a near-duplicate of 08 (§8.2); fine for tuning. |
 | `06-import-cycle` | Must first be fixed to §5.2 (no hidden constraint). |
-| one large dev problem on `fulfil` | To be written; must not overlap with L1–L5 in what it tests. |
+| one large dev problem on `fulfil` | **Deferred** until `fulfil` exists; must not overlap with L1–L5 in what it tests. Until then large-problem behaviour is checked only by pilot runs (framework-runner §6.6). |
 
 Dev problems must meet §5 like any other problem, so that a failure points at the framework, not at
 the problem.

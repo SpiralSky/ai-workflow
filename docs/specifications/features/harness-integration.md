@@ -260,9 +260,13 @@ containment; allow / deny / ask for inner tools and `bash` command patterns; des
 denied by default). An "ask" inner call is put to the user through MCP elicitation where the client
 supports it, and denied otherwise.
 
+When no rule matches: read-effect tools inside the workspace are allowed, `write` and `exec` tools
+ask, and anything outside the workspace or matching a destructive pattern is denied.
+
 ### 7.4 Read-only mode
 
-A flag that routes only read-effect tools, for harness modes such as plan mode.
+A flag that denies inner calls to tools whose effect is not `read`, for harness modes such as plan
+mode. Declarations stay unchanged, so the prompt cache is not invalidated when the mode toggles.
 
 ---
 
@@ -366,25 +370,30 @@ against the Claude Code docs in 2026-10; the plugin pins the Claude Code version
 | File | Contents |
 |------|----------|
 | `.claude-plugin/plugin.json` | Name, version, `userConfig` (framework choice; endpoint, API key (sensitive) and executor model for orchestrate, §8), and the framework server under `mcpServers` (started from `${CLAUDE_PLUGIN_ROOT}`; config values passed through `${user_config.*}` in `env`). |
-| `agents/<framework>.md` | The **main-thread agent**: its body is the framework's prompt section, its `tools` list is the direct tools (B2). |
-| `settings.json` | `{ "agent": "<plugin>:<framework>" }`, so the main session runs as that agent while the plugin is enabled. |
-| `hooks/hooks.json` | The session-context hook (B4). |
+| `hooks/hooks.json` + `hooks/register.ts` | A Claude Code **hooks module** that reads the framework choice from `userConfig` and: adds the framework's prompt section to the system prompt (`prompt.compose`); routes tools (B2); attaches session context to framework calls (B4). |
+
+No main-thread agent or plugin `settings.json` is used: plugin settings are static and cannot follow
+`userConfig`, and an agent's `tools` list is fixed when the plugin is built.
 
 The plugin name must not start with `claude-` or `anthropic-` (reserved). The framework's MCP tool
 then appears to Claude Code as `mcp__plugin_<plugin>_<server>__branch`.
 
 ## B2. Routing (hiding tools from the model)
 
-Plugins cannot ship permission rules (plugin settings accept only `agent` and `subagentStatusLine`),
-so routing uses the main-thread agent's `tools` list instead of deny rules:
+Plugins cannot ship permission rules, and the routed set (user MCP servers) is only known at
+runtime, so routing is done by the hooks module, decided per call:
 
-- **Listed (direct):** the framework tools; Claude Code control tools (subagents, task lists, asking
-  the user, plan mode, skills); tools the framework can't reach (§4.2), such as claude.ai
-  connectors.
-- **Not listed (routed):** file, search and shell built-ins, and user-added MCP servers the
-  framework can reach. The model can only use them from a program.
+- **Direct:** the framework tools; Claude Code control tools (subagents, task lists, asking the
+  user, plan mode, skills); tools the framework can't reach (§4.2), such as claude.ai connectors.
+- **Routed:** file, search and shell built-ins, and every user MCP server the framework server
+  discovered and reaches (it publishes this list at startup). A direct call to a routed tool is
+  denied in `tool.call` with a message saying to call it from a program. `tool.describe` moves
+  routed tools behind ToolSearch so their schemas are not sent every turn; a module cannot remove a
+  tool from the list, so the deny is the enforcement.
 
-Nothing is denied, so the user's own rules are untouched and apply to inner calls (B4).
+The framework's own inner calls go through its `claude mcp serve` client, not through the model's
+tool calls, so routing never blocks them. The user's own permission rules are untouched and apply
+to inner calls (B4).
 
 ## B3. Tool source
 
@@ -419,7 +428,7 @@ Run before every inner call, in this order; the first deny wins.
    the rule that asked). Accept runs the call; decline throws into the program. Waiting time is not
    counted (§4.6).
 
-**Session context.** A plugin `PreToolUse` hook on the framework tool passes the session's
+**Session context.** The hooks module's `tool.call` hook on the framework tool passes the session's
 `permission_mode`, `session_id` and `transcript_path` to the server before each framework call.
 
 **The framework call itself.** Plugins can't add allow rules, so first-run instructions suggest

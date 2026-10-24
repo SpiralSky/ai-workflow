@@ -370,8 +370,10 @@ Reported per run in addition to [framework-runner.md](framework-runner.md) metri
 - **Intents per task.**
 - **Planner `resolve` calls per task**, and tokens returned by them.
 - **Re-read tokens:** content returned again for an unchanged file or symbol within one task (§11.3).
-- **Tool-definition tokens** per task, split into cached and uncached input.
-- **Escalation turns** (`findTools` calls) per task, and the output tokens they cost.
+- **Tool-definition tokens** per task (tokenized declarations; the API reports cache use per
+  request, not per prompt part, so no cached/uncached split).
+- **Escalation turns** (`findTools` calls) per task. Their output tokens are not reported: a turn
+  that calls `findTools` usually does other work too.
 
 ### 10.2 Catalog-size scaling experiment
 

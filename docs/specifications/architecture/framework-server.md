@@ -84,9 +84,10 @@ interface Checker {
 }
 ```
 
-- **PolicyChecker** (fallback, harness §7.3): policy file (JSON) with `root` containment, per-tool
+- **PolicyChecker** (fallback, harness-integration §7.3): policy file (JSON) with `root` containment, per-tool
   allow/deny/ask, `bash` command patterns, and a built-in deny list of destructive patterns
-  (`rm -rf /`, `git push --force`, writes outside root, `curl … | sh`, …).
+  (`rm -rf /`, `git push --force`, writes outside root, `curl … | sh`, …). No matching rule →
+  harness-integration §7.3 default (read inside root: allow; `write`/`exec`: ask; else deny).
 - **Read-only mode** (§7.4): `--read-only` or session context `plan` → any call with
   `effect ≠ read` is denied.
 
@@ -113,20 +114,25 @@ interface Checker {
 ```
 plugins/claude-code/
   .claude-plugin/plugin.json   name "aiw" (not claude-/anthropic-), userConfig, mcpServers.aiw
-  agents/branch.md, agents/orchestrate.md   main-thread agents (body = prompt section; tools = direct list)
-  settings.json                { "agent": "aiw:branch" }   (or orchestrate, per userConfig)
-  hooks/hooks.json             PreToolUse on mcp__plugin_aiw_aiw__(branch|do|resolve) → session-context hook
-  hooks/session-context.mjs
+  hooks/hooks.json             { "modules": ["./register.ts"] }
+  hooks/register.ts            hooks module: prompt.compose, tool.call, tool.describe
+  prompts/branch-only.md, prompts/orchestrate.md   framework prompt sections
   server/aiw-server.mjs        bundled server (same build as the job container)
 ```
 
-The agent `.md` bodies are generated at build time from `@aiw/core/prompts/<framework>.md` so they
-are byte-identical to what was measured (harness §2).
+The prompt files are copied at build time from `@aiw/core/prompts/<framework id>.md` so they are
+byte-identical to what was measured (harness-integration §2). `prompt.compose` appends the one
+chosen by `userConfig.framework` as a session-scoped system-prompt section.
 
 ### 7.2 Routing (B2)
 
-The agent `tools` list = framework tools + Claude Code control tools + unreachable tools.
-Generated from a table in the plugin build; everything else is routed.
+- The server writes the routed set at startup to `${CLAUDE_PLUGIN_DATA}/routed.json`: the fixed
+  built-in names (`Bash`, `Read`, `Edit`, `Write`, `Glob`, `Grep`, …, from the name table in §7.3)
+  plus `mcp__<server>__*` for each discovered server it reaches.
+- `tool.call`: a call whose name matches the routed set is denied with "call `<inner name>` from a
+  `branch` program"; anything else runs unchanged.
+- `tool.describe`: routed tools get `isDeferred: true`.
+- Unit tests: a fixture of tool names × routed set → decision.
 
 ### 7.3 Tool source (B3)
 
@@ -137,12 +143,12 @@ plugins, managed).
 
 ### 7.4 Session context
 
-> **Decided A-22 (2026-10-23, approved):** The plugin's `PreToolUse` hook on the framework tools returns
-> `updatedInput` adding `__session: { permission_mode, session_id, transcript_path, cwd }` to the
+> **Decided A-22 (2026-10-23, approved; updated 2026-10-24 for the hooks module):** The plugin's
+> `tool.call` hook on the framework tools rewrites the input, adding `__session: { permission_mode, session_id, transcript_path, cwd }` to the
 > tool input. The server strips `__session` before the call and uses it for the checks (B4 step 3–4
 > inputs). This is race-free (context travels with the call) and needs no side channel.
-> To verify at build time: `updatedInput` is applied to MCP tool calls, and the tool schema must
-> allow the extra property (`additionalProperties: true`, not described to the model).
+> To verify at build time: the tool schema must allow the extra property
+> (`additionalProperties: true`, not described to the model).
 > *Fallback if that check fails:* the hook writes context to a file keyed by session id under
 > `${CLAUDE_PLUGIN_DATA}`, read by the server — needs the server to learn its session id.
 

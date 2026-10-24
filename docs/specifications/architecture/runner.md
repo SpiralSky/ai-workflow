@@ -89,6 +89,7 @@ OpenAI-compatible chat completions via `@aiw/llm` + `wrapLlm(role: "main")`:
 
 - System prompt = base system prompt (shared, `@aiw/core/prompts/base.md`) + the framework's MCP
   `instructions` section. Tools = server's `tools/list` converted to function schemas.
+- First user message = the problem's `task.md`, verbatim (framework-runner §5.6).
 - Each turn: request → response. Tool calls → dispatch (§4.3). No tool calls → end (final answer).
 - Turn limit (`task.json.turnLimit`) counts main turns; reaching it ends the job as fail with reason
   `turn-limit` (§6.1). Secondary turns never count (§4.4).

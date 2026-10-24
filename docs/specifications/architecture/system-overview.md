@@ -16,7 +16,7 @@
 | **Runner** | `@aiw/runner` | framework-runner, problems §7 | CLI: runs evaluations, grades, combines runs, builds and self-checks problems. |
 | **Report** | `@aiw/report` | framework-runner §6.2, viewer §4 | Pure aggregation over run directories (pass rates, Wilson intervals, cost per success, paired comparison, failure gate). Shared by runner and viewer. |
 | **Viewer** | `@aiw/viewer` | viewer | Static React app plus an indexer that turns run directories into loadable data. |
-| **Claude Code plugin** | `plugins/claude-code` | harness-integration Part B | Plugin bundle: manifest, main-thread agent, settings, session-context hook. Ships the server bundle. |
+| **Claude Code plugin** | `plugins/claude-code` | harness-integration Part B | Plugin bundle: manifest, hooks module (prompt section, routing, session context), prompt files. Ships the server bundle. |
 | **Problems** | `problems/` (data) | problems | Task folders, shared codebases, base image definition. |
 
 ---

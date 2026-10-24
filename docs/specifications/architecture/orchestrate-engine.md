@@ -139,13 +139,20 @@ their effect is measured, not assumed; `compare` runs leave it off (orchestrate 
 
 ### 5.1 First request (the handoff)
 
+Stable part first, per-`do` part last (orchestrate §2.1), so the stable prefix is cached across
+executors:
+
+- Tools: a single model-facing tool `branch` with a **fixed** description that declares only the
+  meta-tools `findTools`, `resolve`, `save`, `refSymbol`. Identical for every executor.
 - System: `@aiw/core/prompts/executor.md` (static, hashed).
 - User message, in order: instruction with inline-resolved references; handle lines for large
-  references; hot-path snippets; turn budget ("You have N turns").
-- Tools: a single model-facing tool `branch` whose declarations are the shortlist (best fit first,
-  orchestrate §4.2) plus `findTools`, `resolve`, `save`, `refSymbol`.
+  references; hot-path snippets; turn budget ("You have N turns"); last, the shortlist declarations
+  (best fit first, orchestrate §4.2), in the same format as branch declarations, callable from the
+  program like any declared tool. Tools added by `findTools` are declared in its result.
 - Plain function calling (orchestrate §8.1 alternative) is the same loop with the shortlist exposed
-  as individual tools; selected by framework variant `orchestrate[executor=calls]`.
+  as individual tools; selected by framework variant `orchestrate[executor=calls]`. Tool definitions
+  come first in the request, so this variant's system prompt is not cached across executors — a
+  known cost of the variant.
 
 ### 5.2 Loop
 
@@ -240,10 +247,16 @@ live-reference staleness (references §3).
 
 Attached per `do` via `reporter.attach("orchestrate.handoff", record)` with exactly the fields of
 orchestrate §8.4 (`instruction`, `references`, `selection`, `hotPaths`, `budget`, `model`).
-Orchestrate §10 metrics (selection recall, precision, rank agreement, shortlist size, planner vs
-executor tokens, intents per task, planner `resolve` calls, re-read tokens) are computed by
+Orchestrate §10 metrics (selection recall, expected-tool coverage, precision, rank agreement,
+shortlist size, planner vs executor tokens, intents per task, planner `resolve` calls, re-read
+tokens, tool-definition tokens, escalation turns) are computed by
 `@aiw/report` from events + handoff records — they are orchestrate-specific report sections, not
 new comparable metrics (framework-runner §5.4).
 
 Re-read tokens: `@aiw/report` hashes the result of every read-effect inner call per task and sums
 the result size of repeats whose file/symbol was not changed in between (from step `Changed` data).
+
+Expected-tool coverage: distinct tool names in a job's `tool` events ∩ the problem's
+`expectedTools` in the run's catalog, ÷ the latter. Tool-definition tokens: the declarations sent
+per executor request, tokenized with the model's tokenizer (or chars/4 when none is available,
+marked as an estimate).
