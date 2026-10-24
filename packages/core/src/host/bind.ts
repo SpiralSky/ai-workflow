@@ -9,13 +9,13 @@ import type { Host } from "./types.ts";
  * is its telemetry tool event id and its parent is the reporter's scope.
  * @param registry - registered tools
  * @param host - executes the calls (usually checked and composed)
- * @param opts - reporter to record under; `names` (normalised, default all routed tools); `outputCap` bytes
+ * @param opts - reporter to record under; `names` (normalised, default all routed tools); `outputCap` bytes; `onRaw` receives each call's uncapped result keyed by its per-call ctx
  * @throws Error if a name in `names` is not registered
  */
 export function bindTools(
   registry: Registry,
   host: Host,
-  opts: { reporter: Reporter; names?: string[]; outputCap?: number },
+  opts: { reporter: Reporter; names?: string[]; outputCap?: number; onRaw?: (ctx: CallCtx, result: unknown) => void },
 ): BranchTools {
   const cap = opts.outputCap ?? DEFAULT_OUTPUT_CAP;
   const decls = opts.names
@@ -37,6 +37,7 @@ export function bindTools(
         },
         ctx,
       );
+      opts.onRaw?.(ctx, result);
       return decl.capsOutput ? result : capOutput(result, cap);
     };
   }
