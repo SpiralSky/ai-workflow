@@ -42,8 +42,7 @@ per framework-runner §6.5 (CLAUDE.md updated); large dev problem deferred until
    tool-catalog A-30–A-33. `catalog("L")` throws until all 53 exist (`partial: true` for tests).
    **Remaining, in order:**
    a. ~~`refactor` group~~ — done (A-34, committed 6c2576a).
-   b. User-approved changes: `bash` head + tail output; `grep`/`findFiles` respect `.gitignore` + skip hidden.
-      A subagent was doing these with their own commits — check `git log` for them; if missing, redo.
+   b. ~~`bash` head + tail; `grep`/`findFiles` respect `.gitignore`~~ — done (3a96a62, cee5d7c).
    **Open question for the user:** refactor tools leave uses on unannotated receivers unchanged and list
    them in `unsure` instead of failing; tools.md §6.4 says refactors "fail rather than producing a partial
    change". Ask: keep `unsure` (report) or throw when any exist (maybe `allowUnsure` flag)?
