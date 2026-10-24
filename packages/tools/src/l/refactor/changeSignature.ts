@@ -28,7 +28,7 @@ export function makeChangeSignature(sc?: Sidecar): ToolDef {
       },
       dryRun: DRY_RUN,
     }, ["ops"]),
-    returns: `{ ${CHANGE_RETURNS} }`,
+    returns: `{ ${CHANGE_RETURNS}; unsure?: { path: string; line: number }[] }`,
     meta: {
       whenToUse: "Add a parameter with a default, drop an unused one, rename or reorder parameters, keeping all callers correct.",
       whenNotToUse: "Not for changing only the body or return type (use edit), and not before checking callers' reach (use impact).",
