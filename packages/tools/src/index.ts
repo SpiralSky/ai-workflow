@@ -19,3 +19,6 @@ export { makeRestore } from "./l/vcs/restore.ts";
 export { history } from "./l/vcs/history.ts";
 export { externalTools } from "./l/external/index.ts";
 export { fixtureResult } from "./l/external/fixtures.ts";
+export { Sidecar, type SidecarOpts } from "./sidecar.ts";
+export { navTools } from "./l/nav/index.ts";
+export { checkTools } from "./l/check/index.ts";

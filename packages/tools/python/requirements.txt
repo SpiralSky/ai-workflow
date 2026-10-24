@@ -1,0 +1,6 @@
+jedi==0.20.1
+parso==0.8.7
+rope==1.15.0
+ruff==0.17.2
+pyright==1.1.414
+nodeenv==1.11.0

@@ -16,3 +16,6 @@ dev/out/
 .branch-tmp/
 framework/.branch-tmp/
 .claude/worktrees/
+
+# tools dev venv
+packages/tools/.venv/

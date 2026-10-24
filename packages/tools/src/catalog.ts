@@ -1,8 +1,10 @@
+import { checkTools } from "./l/check/index.ts";
 import { externalTools } from "./l/external/index.ts";
 import { deleteFile } from "./l/fs/deleteFile.ts";
 import { listDir } from "./l/fs/listDir.ts";
 import { moveFile } from "./l/fs/moveFile.ts";
 import { multiEdit } from "./l/fs/multiEdit.ts";
+import { navTools } from "./l/nav/index.ts";
 import { makeDiff } from "./l/vcs/diff.ts";
 import { history } from "./l/vcs/history.ts";
 import { makeRestore } from "./l/vcs/restore.ts";
@@ -12,6 +14,7 @@ import { findFiles } from "./s/findFiles.ts";
 import { grep } from "./s/grep.ts";
 import { readFile } from "./s/readFile.ts";
 import { writeFile } from "./s/writeFile.ts";
+import type { Sidecar } from "./sidecar.ts";
 import type { Snapshot } from "./snapshot.ts";
 import type { ToolDef } from "./types.ts";
 
@@ -21,7 +24,9 @@ export interface CatalogOpts {
   root: string;
   /** Startup snapshot of the workspace; without it `diff` and `restore` throw `no snapshot`. */
   snapshot?: Snapshot;
-  /** Internal, for tests: allow tier L with only the groups built so far (fs, vcs, external). */
+  /** Python analysis sidecar for nav and check tools; without it they throw `no sidecar`. */
+  sidecar?: Sidecar;
+  /** Internal, for tests: allow tier L with only the groups built so far (fs, nav, check, vcs, external). */
   partial?: boolean;
 }
 
@@ -35,11 +40,13 @@ export interface CatalogOpts {
 export function catalog(tier: "S" | "L", opts: CatalogOpts): ToolDef[] {
   const s = [bash, readFile, writeFile, edit, grep, findFiles];
   if (tier === "S") return s;
-  // nav, graph, refactor, test, check need the Python sidecar: added in a later step
+  // graph, refactor, test need the Python sidecar: added in a later step
   if (!opts.partial) throw new Error("tier L not built yet");
   return [
     ...s,
     multiEdit, moveFile, deleteFile, listDir,
+    ...navTools(opts.sidecar),
+    ...checkTools(opts.sidecar),
     makeDiff(opts.snapshot), history, makeRestore(opts.snapshot),
     ...externalTools,
   ];
