@@ -36,23 +36,16 @@ per framework-runner §6.5 (CLAUDE.md updated); large dev problem deferred until
    verbs with per-domain vocabulary and fields; 0 near-duplicate warnings up to N=1200 (wording repeats beyond).
    **Not built yet:** hot paths (`hotPaths: on` throws; arch §4.5), `orchestrate[executor=calls]`,
    declaration cap / `tools` inner call inside executors (core-tools-and-hosts §6 row `orchestrate`).
-   **`@aiw/tools` (in progress, 2026-10-24):** built + committed: S (6), L groups fs, vcs, external, nav,
-   graph, check + Python sidecar (`packages/tools/python/aiw_sidecar`, dev venv `packages/tools/.venv` via
-   `npm run setup:venv`; tests use `AIW_VENV` → repo `.venv` → `/opt/aiw/venv`). Choices recorded in
-   tool-catalog A-30–A-33. `catalog("L")` throws until all 53 exist (`partial: true` for tests).
-   **Remaining, in order:**
-   a. ~~`refactor` group~~ — done (A-34, committed 6c2576a).
-   b. ~~`bash` head + tail; `grep`/`findFiles` respect `.gitignore`~~ — done (3a96a62, cee5d7c).
-   **Open question for the user:** refactor tools leave uses on unannotated receivers unchanged and list
-   them in `unsure` instead of failing; tools.md §6.4 says refactors "fail rather than producing a partial
-   change". Ask: keep `unsure` (report) or throw when any exist (maybe `allowUnsure` flag)?
-   c. `test` group (6: runTests, listTests, coverage, runSnippet, traceCalls, stressRun) — executes workspace
-      code in a child process (tool-catalog §3–4); then make `catalog("L")` return all 53 and drop `partial`.
+   **`@aiw/tools` done (2026-10-24):** all 53 tools; `catalog("L")` complete, `partial` removed. Python
+   sidecar `packages/tools/python/aiw_sidecar` (dev venv via `npm run setup:venv`). Choices: tool-catalog
+   A-30–A-34; refactor `unsure` kept per user (tools §6.4). Test group: A-35 (approved; coverage is
+   line-only).
    **Then:** the server (`LocalHost` wraps the catalog) and runner that consume `buildFramework`, then step 3.
    Engine packaging resolved 2026-10-24 (core-branch §4.1, I-11 revised): QuickJS-WASM default,
    isolated-vm optional, shipped beside the bundle; containers use `--engine isolated-vm`.
 3. Test the existing modes first: clean `compare` (baseline, branch-only, orchestrate) — Roadmap step 3.
 4. Only then: user's new orchestrate idea (adds one mode) — not yet presented; it goes through spec approval.
+5. After that: optional branch coverage for `coverage` (`sys.monitoring` BRANCH events; tools §6.5, A-35).
 
 Commit spec/README changes as `docs:` commits when the user approves.
 

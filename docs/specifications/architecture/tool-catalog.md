@@ -171,6 +171,35 @@ One sidecar per server session; restarted on crash (the in-flight call throws `s
 >   not sharing a line; unused imports in `__init__.py` are kept as re-exports. Results add
 >   `hoisted` / `notHoisted` (with reason).
 
+> **Decided A-35 (2026-10-24):** `test` details:
+> - Exec tools run in a fresh `python -c` child per call (own process group, cwd = workspace,
+>   `PYTHONPATH` = workspace only, stdin `/dev/null`, output to capped temp files, result as JSON
+>   file). Abort sends a `$cancel` notification read by an rpc reader thread; the running child
+>   is killed, a queued request dropped. The sidecar still serves one request at a time.
+> - Tests are found by an ast walk (`test*.py`, `*_test.py`; classes whose bases are `*TestCase`,
+>   directly or via workspace classes), executing nothing; ids `path#Class.method`. `runTests`
+>   runs only classes defined in each loaded module. Generated tests and `load_tests` are not
+>   listed but run.
+> - `runTests { target?, failedOnly?, timeoutMs? = 120 s }` → `{ passed, skipped, failed: [{ id,
+>   kind: failure|error, message, location, excerpt }] }`; `location` is the deepest workspace
+>   frame; load errors use the file as id; each failing `subTest` is an entry; `failedOnly` uses
+>   the previous call's failures (throws without one). A timeout throws, discarding partials.
+> - `listTests { path?, symbol? }`; `symbol` filters via `impact` (call-reaching tests, plus test
+>   files that only import the module).
+> - `runSnippet { code, timeoutMs? = 30 s }` → `{ stdout, stderr, value?, exception?, timedOut?,
+>   exitCode? }`; `value` = repr of a trailing expression; a timeout returns partial output.
+> - `coverage { target, tests?, timeoutMs? }` → `{ path, symbol?, covered, total, percent,
+>   uncovered: [[start, end]], tests }`; **line coverage only** (user decision; branch coverage via `sys.monitoring` BRANCH events is deferred
+>   until after the second orchestrate idea, tools §6.5);
+>   executable lines from code objects, hits from `sys.monitoring` LINE events.
+> - `traceCalls { symbols (1–10), snippet | test, timeoutMs? }` → `{ calls: [{ seq, symbol, args,
+>   thread, task?, returned?, raised? }], total, run }`; first 100 calls kept; reprs ≤ 80 chars;
+>   a class traces `__init__`; all threads, with a reentrancy guard.
+> - `stressRun { test | snippet, n? = 20 (≤ 200), parallel? = 4 (≤ 16), timeoutMs? = 60 s,
+>   runTimeoutMs? = 30 s }` → `{ runs, failures, failureRate, distinct (≤ 5), timedOut? }`;
+>   a crash or per-run timeout counts as a failure (`Crash`, `Timeout`); dedupe by type +
+>   location + test id.
+
 ## 5. External tools and fixtures
 
 `fixtures/external/<tool>.json` holds canned responses selected by simple argument matching

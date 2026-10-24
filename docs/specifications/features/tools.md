@@ -149,7 +149,7 @@ is left unchanged and listed in `unsure: [{ path, line }]`, so the caller can ch
 |------|--------|---------|
 | `runTests` | exec | Run tests (all, a file, a `path#test` id, or `failedOnly`). Returns `{ passed, failed: [{ id, message, location, excerpt }] }` — never the raw log. |
 | `listTests` | read | Test ids, optionally filtered to tests that reach a symbol. |
-| `coverage` | exec | Lines/branches of a file or symbol executed by a test run; marks uncovered lines. |
+| `coverage` | exec | Lines of a file or symbol executed by a test run; marks uncovered lines. Branch coverage is deferred until after the second orchestrate idea. |
 | `runSnippet` | exec | Run a short Python snippet with the workspace importable; returns stdout, stderr, return value or exception with traceback. For reproducing a bug without writing a file. |
 | `traceCalls` | exec | Run a snippet or test and record calls to chosen symbols: arguments, return value or exception, thread/task id, order. For race conditions and "wrong value reaches X" bugs. |
 | `stressRun` | exec | Run a test or snippet *n* times (optionally in parallel) and report the failure rate and first distinct failures. For flaky/concurrency bugs. |
