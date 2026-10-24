@@ -101,9 +101,9 @@ data across branch calls without routing it through the model's context, the run
   `state.files = await Promise.all(...)`.
 - The layer above owns `state` and decides its lifetime (e.g. per task or per session). The runner
   copies it into the isolate (§5.2) and copies the program's version back after every tool call and
-  when the branch ends, so changes are kept even if the branch fails.
+  when the branch ends, so changes are kept even if the branch fails. Write-back replaces keys wholesale: keys the program deleted are deleted. A value that is not JSON-serialisable (function, cyclic) is dropped and named in the result message.
 - If the branch is killed (timeout or abort), `state` reverts to the snapshot taken at the last
-  tool call; changes made after it are lost, and the result says so.
+  tool call; changes made after it are lost, and the result says so (`stateReverted: true`). The same applies to a memory-limit kill (§5.2).
 - `state` is invisible to the model unless reported, so every trace ends with a **state footer**
   listing its keys and value sizes (see §7.3).
 - Values must be JSON data: they cross the isolate boundary (§5.2) and are logged, snapshotted and
@@ -137,12 +137,12 @@ The runner receives a branch program string, compiles it, and executes it agains
 
 ### 5.1 Execution
 
-1. Parse the string into a callable `async (tools, state) => { ... }` via `new Function` or equivalent.
-2. Inject the tool map and the state object.
+1. Compile the string inside the isolate (§5.2) as a callable `async (tools, state) => { ... }`.
+2. Inject the tool map and the state object (copied in, §5.2).
 3. Execute with an optional `AbortSignal` for timeout and an optional `onEvent` callback (§5.4).
 4. Return a `BranchResult`. Both variants carry the execution trace (§7):
    - **Success:** `{ ok: true, value: unknown, trace }`
-   - **Failure:** `{ ok: false, error: string, message: string, line?: number, aborted?: boolean, stateReverted?: boolean, trace }`
+   - **Failure:** `{ ok: false, error: ErrorCode, message: string, line?: number, aborted?: boolean, stateReverted?: boolean, trace }`, where `ErrorCode` is one of `compile` (syntax/validation), `thrown` (unhandled throw), `timeout`, `memory`, `aborted`.
 
 ### 5.2 Isolation
 
@@ -175,8 +175,7 @@ client.
 ### 5.3 Abort
 
 The caller passes an `AbortSignal`. Tools receive the signal via their closure and are expected to
-honour it (e.g., kill a spawned process). The runner sets a keepalive timer while a tool is awaited
-and clears it when the branch finishes, ensuring the process does not exit prematurely.
+honour it (e.g., kill a spawned process).
 
 On abort, timeout, or an unhandled error, the runner returns the **partial trace** recorded up to
 that point, so the model can see which calls completed and which side effects may have happened.

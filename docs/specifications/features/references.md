@@ -66,8 +66,8 @@ References fix 1–3 directly and reduce 4 (§8).
 
 - Names are `[A-Za-z_][A-Za-z0-9_]*`; names of the form `s` + digits are reserved for steps.
 - Paths are relative to the workspace root (`@src/pricing.py`, never `@pricing.py` for a file in
-  `src/`). A token containing `/` or `.` is a path; a root file without either is written `@./Makefile`.
-  `#` separates a symbol path (`Class.method`).
+  `src/`). Step and call forms (`@sN`, `@sN..sM`, `@sN.cK`) are matched first; otherwise a token containing `/` or `.` is a path; a root file without either is written `@./Makefile`.
+  `#` separates a symbol path (`Class.method`). A token ends at whitespace; trailing `.,;:)!?` is not part of it.
 - Forms in §9 (e.g. `@s1.c1!`) are proposals, not part of the grammar until adopted.
 - **Where references are recognised.** Only in text that passes between planner and executors:
   `do` instructions and executor reports (§6.4). Everywhere else — the final answer to the user,
@@ -158,7 +158,7 @@ The report footer lists names created or changed in that step, with their summar
 
 ```
 Saved: @failingTests — 3 failing tests in test_pricing.py, all off-by-tax
-       @discountFn — live, pricing.py#apply_discount(order, rate)
+       @discountFn — live, src/pricing.py#apply_discount(order, rate)
 ```
 
 This is how the planner learns that references exist. The planner only sees step references,
@@ -177,7 +177,7 @@ footer summary is.
 
 Executors may write references in their reports ("full output in `@s3.c2`"). Every reference in a
 report must resolve. Before the report is returned, the framework checks them; if any fail, the
-executor gets the error and one more turn to fix the report. References still invalid after that
+executor gets the error and one more turn, if the executor's turn budget remains, to fix the report. References still invalid after that
 are replaced with `[invalid ref: …]` so the planner never receives a dangling one.
 
 ---

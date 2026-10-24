@@ -29,7 +29,8 @@ The viewer opens from disk (`file://…/dist/index.html`) and needs no server (v
   reports, and per job: outcome, reason, rollups, attempts count.
 - Per job file: event tree, transcript sessions reconstructed from deltas
   ([telemetry §5](telemetry.md#5-transcripts)) with blobs resolved, `diff.patch`, `check.log`,
-  attachments (`branch.events`, `branch.trace`, `orchestrate.handoff`), attempts.
+  attachments (`branch.events`, `branch.trace`, `branch.source`, `orchestrate.handoff`,
+  `orchestrate.step`), attempts.
 - Large tool results are stored once and loaded on expand (chunked into separate files above
   256 KB) so a huge result never blocks the page (viewer §9).
 - `--watch`: watches run directories; on append, regenerates the affected job file and `index.js`.
@@ -60,6 +61,9 @@ The viewer opens from disk (`file://…/dist/index.html`) and needs no server (v
 
 React + Vite (viewer §10). Routing is hash-based: `#/g/<group>/f/<framework>/<view>/<job>/<item>`,
 where `<item>` addresses a message, tool call or nested session by event id (viewer §4.4).
+Compare view (several frameworks): `#/g/<group>/compare/<fw1>,<fw2>,…/<view>/<job>/<item>`.
+Ad-hoc group (a set of runs): `#/set/<run1>,<run2>,…/f/<framework>/<view>/<job>/<item>`.
+Every view has a stable URL.
 
 ```
 src/
@@ -82,7 +86,7 @@ src/
 
 ```ts
 interface Renderer<T = unknown> {
-  match: { tool?: string; attach?: string; session?: RegExp };
+  match: { tool?: string; attach?: string };
   render(item: T, ctx: RenderContext): ReactNode;   // ctx: job data, link builder, nested renderer
 }
 registerAdaptation(name: string, renderers: Renderer[]): void;
@@ -106,7 +110,8 @@ from `call` start/duration; state footer table. Card title from the call's `inte
 `references`); collapsed **Handoff** section built from the executor session's first transcript
 entry + `orchestrate.handoff` (never re-derived); selection table; collapsed executor conversation;
 report with framework-appended lines (`Changed:`, `Budget:`, `Saved:`) separated and `Noticed:`
-marked; parallel `do` calls grouped by shared parent turn.
+marked; parallel `do` calls grouped by shared parent turn; `orchestrate.step` (`changed`, `saved`) feeds
+the step line. A `resolve` call shows the reference and the (capped) value returned (viewer §8.3).
 
 ---
 

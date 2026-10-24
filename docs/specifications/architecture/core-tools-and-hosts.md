@@ -36,7 +36,7 @@ interface ToolDecl {
 }
 ```
 
-- Built from `host.tools()`. Duplicate normalised names are a registration error (§6.2).
+- Built from `host.tools()`. Duplicate normalised names are a registration error (branching-framework §6.2).
 - `effect` defaults to `write` when unknown (safe default for parallelism and read-only mode).
 - `whenToUse` defaults to the description when missing (orchestrate §6).
 - **Similarity warning** (orchestrate §6.1): at registration, cosine similarity of BM25 term
@@ -50,9 +50,9 @@ Implements branching-framework §6.3 once, for every host:
 
 | Step | Rule |
 |------|------|
-| Name | `mcp__<server>__<tool_name>` → `<server>_<toolName>`; other names camel-cased; non-identifier characters dropped; collisions get a numeric suffix and are reported. The mapping is kept in `ToolDecl.hostName` and shown in declarations as a comment. |
+| Name | `mcp__<server>__<tool_name>` → `<server>_<toolName>`; other names camel-cased; non-identifier characters dropped; collisions are a registration error (branching-framework §6.2), never suffixed. The mapping is kept in `ToolDecl.hostName` and shown in declarations as a comment. |
 | Errors | MCP `isError: true` → throw `Error(text)`; transport errors → throw `HostError` (distinguished for infra classification, [runner §7](runner.md#7-retries-budget-validity)). |
-| Results | Single text content: JSON-parse if it parses to an object/array, else return the string. Multiple content items → array. Structured content (`structuredContent`) wins when present. |
+| Results | Single text content: JSON-parse only if it parses to an object/array; scalars (numbers, `true`, `null`, quoted strings) stay text, deliberately. Multiple content items → array. Structured content (`structuredContent`) wins when present. |
 | Abort | `ctx.signal` forwarded as MCP request cancellation. |
 
 ---
@@ -72,9 +72,9 @@ interface Host {
 
 - `id` is the inner-call id (= its telemetry event id, so the host's own logs and the event tree
   correlate). `parent` is the event id of the enclosing framework call (`branch` / `do`).
-- `pauseTimeout()` returns a resume function; hosts call it around approval waits (A-23).
+- `pauseTimeout()` returns a resume function; hosts call it around approval waits (A-23). `ctx` is built per inner call by `runBranch` ([core-branch §4](core-branch.md#4-execution)); the model-facing tool takes one argument.
 - Host implementations live in `@aiw/server`, not in core ([framework-server §3](framework-server.md#3-hosts)).
-  Core ships only `CompositeHost` (merges several hosts, first-wins on name) and the
+  Core ships only `CompositeHost` (merges several hosts; a name collision is a registration error, branching-framework §6.2) and the
   `CheckedHost` wrapper (§5) because their semantics are part of the core contract.
 
 ---
@@ -87,7 +87,7 @@ Every inner call passes through the same stack, outermost first:
 |-------|-------|------|
 | Branch call proxy | core/branch | Trace `call` events, call id, line (core-branch §4) |
 | `reportTool` | telemetry (`wrapTools`) | `toolStart` + `tool` events, durations ([telemetry §2](telemetry.md#2-reporter)) |
-| `capOutput` | core | Enforce the tool output cap (tools §4, default 8 KB) for host tools that do not cap themselves; appends the truncation note |
+| `capOutput` | core | Enforce the tool output cap (tools §4, default 8 KB; applies to the `tools` inner call too) for host tools that do not cap themselves; appends the truncation note |
 | `CheckedHost` | core | Runs `check(call) → allow | deny | ask (+ modified args)` before the call (harness-integration §6.2). Deny throws `denied: <reason>` into the program. Ask → `approve()` callback supplied by the server (elicitation), with `pauseTimeout` around it |
 | `Host.call` | server | Executes |
 
@@ -104,9 +104,9 @@ One function per framework, used by the server in every host configuration:
 | Framework | Model-facing tools | Inner `Tools` map |
 |-----------|--------------------|-------------------|
 | `baseline` | every routed tool as its own MCP tool (JSON Schema, same description) | — |
-| `branch-only` | `branch` | all routed tools |
+| `branch-only` | `branch` | all routed tools, plus `tools` where description caps apply (§6.2) |
 | `branch-only[toolSearch]` | `branch` | `findTools` only at start; found tools are added and kept for the session (orchestrate §10.2) |
-| `orchestrate` | `do`, `resolve` | per executor: shortlist + `findTools`, `resolve`, `save`, `refSymbol` ([orchestrate-engine](orchestrate-engine.md)) |
+| `orchestrate` | `do`, `resolve` | per executor: shortlist + `findTools`, `resolve`, `save`, `refSymbol`, plus `tools` where description caps apply (§6.2) ([orchestrate-engine](orchestrate-engine.md)) |
 
 Any framework accepts the variant key `catalog=N`, which pads the registry with the fixed
 distractor set to N tools before assembly (orchestrate §10.2).

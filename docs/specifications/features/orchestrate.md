@@ -158,6 +158,7 @@ outside this spec.
 The executor receives:
 
 - `instruction`,
+- the framework meta-tools `findTools`, `resolve`, `save`, `refSymbol` (always present, not selected),
 - the shortlist (§7), best-fit first, rendered as branch declarations by default (§8.1),
 - relevant hot-path snippets if any are registered (§9),
 - a turn budget.
@@ -176,7 +177,7 @@ planner ──intent──▶ selection ──shortlist──▶ executor ⟲ (t
 
 1. Planner emits an intent.
 2. Selection builds a shortlist from the catalog (§7).
-3. Executor runs until it reports, exhausts its turn budget, or requests more tools (§7.4).
+3. Executor runs until it reports, or exhausts its turn budget.
 4. The report is returned to the planner as the `do` tool result.
 5. The executor session is discarded.
 
@@ -193,12 +194,12 @@ Every catalog tool carries the branch registration fields
 | Field | Required | Meaning |
 |-------|----------|---------|
 | `whenToUse` | yes | Situations this tool is the right choice, written as intents would be phrased ("find where a symbol is defined"). Indexed for retrieval. |
-| `whenNotToUse` | no | Common confusions ("not for searching file *names* — use `glob`"). Shown to the reranker and executor, not indexed. |
-| `examples` | no | Example intents this tool served. Indexed. Can be filled automatically from successful runs (§10). |
-| `category` | no | Coarse group (`fs`, `search`, `vcs`, `test`, `web`, …). Used for diversity and fallbacks. |
+| `whenNotToUse` | no | Common confusions ("not for searching file *names* — use `findFiles`"). Shown to the reranker and executor, not indexed. |
+| `examples` | no | Example intents this tool served. Indexed. Automatic filling from successful runs (§10) is future. |
+| `category` | no | Coarse group (`fs`, `search`, `vcs`, `test`, `web`, …). Reserved for shortlist diversity and fallbacks (future; not used in selection yet). |
 | `effect` | yes | `read` \| `exec` \| `write` \| `external`. `exec` runs workspace code without editing files (tests, snippets); `external` has side effects outside the workspace. Only `read` counts as read-only for parallelism (§5) and read-only mode (harness-integration §7.4). |
 | `requires` | no | Tools that must accompany this one (e.g. `edit` requires `readFile`). Pulled in after selection. |
-| `cost` | no | Rough relative cost/latency, used as a tie-breaker. |
+| `cost` | no | Rough relative cost/latency; breaks exact score ties in selection ([engine §4](../architecture/orchestrate-engine.md)). |
 
 Harness tools adapted per [branching-framework.md §6.3](branching-framework.md) have no
 `whenToUse`; it is derived from the description until a curated one is supplied.
@@ -206,12 +207,12 @@ Harness tools adapted per [branching-framework.md §6.3](branching-framework.md)
 ### 6.1 No near-duplicates
 
 The catalog must not contain tools that do the same job. Overlapping tools (several `search` tools
-from different MCP servers, `grep` and `searchText`) split retrieval scores and crowd each other
+from different MCP servers, `findFiles` and a second glob tool) split retrieval scores and crowd each other
 out of the shortlist. Instead, merge them into one tool with arguments that select the variant
 (`search({ query, source? })`), with defaults that cover the common case so the executor rarely
 needs to set them.
 
-Registration warns when two tools' indexed text is highly similar. Adapted harness tools that
+Registration warns (no rejection) when two tools' indexed text is highly similar ([engine §4](../architecture/orchestrate-engine.md)). Adapted harness tools that
 overlap are the operator's to merge or hide.
 
 ---
@@ -243,7 +244,7 @@ A general tool is only included when nothing more specific fits.
 
 - Add `requires` dependencies, placed after the tool that required them.
 
-There is no always-included tool set: a tool reaches the executor only through selection,
+There is no always-included tool set apart from the framework meta-tools (`findTools`, `resolve`, `save`, `refSymbol`, §4.2): a tool reaches the executor only through selection,
 the planner's `tools` override, or escalation (§7.4).
 
 ### 7.4 Escalate (recovering from misses)
@@ -294,6 +295,7 @@ The framework appends these lines, which the model cannot get wrong or omit, tak
 - **Changed:** every path written, or `none`.
 - **Budget:** `exhausted` if the turn budget ran out (omitted otherwise).
 - **Saved:** named references created or changed in this step ([references.md §6.2](references.md)).
+- **Step:** the step id (`Step: sN`), so the planner can reference it.
 
 Reports have a size cap; raw tool output must be summarised, not pasted.
 
@@ -341,7 +343,7 @@ order, and whether the overall task succeeded.
 
 This data is used to:
 
-- add successful intents as `examples` on the tools they used,
+- add successful intents as `examples` on the tools they used (future),
 - train or calibrate the §7.2 classifier,
 - measure selection quality (§10.1).
 

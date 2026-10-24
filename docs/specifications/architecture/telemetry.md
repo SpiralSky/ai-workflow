@@ -26,10 +26,9 @@ across processes and crash-safe:
 ```ts
 interface Reporter {
   readonly scope: string | null;                  // event id this reporter nests under
-  turn(e: { model: string; role: Role; usage: Usage; costUsd?: number; latencyMs: number;
-            transcriptId?: string }): string;     // returns event id
+  turn(e: { model: string; role: Role; usage: Usage; costUsd?: number; latencyMs: number }): string; // returns event id
   tool(e: { id?: string; name: string; args: unknown; ok: boolean; durationMs: number;
-            error?: string; harnessId?: string; startTs?: number }): string;
+            error?: string; harnessId?: string; startTs: number; resultBytes: number }): string;
   toolStart(e: { id: string; name: string; args: unknown; harnessId?: string }): void;
   child(label: string, id?: string): Reporter;    // nested scope; writes a `scope` event
   attach(key: string, data: unknown): void;
@@ -53,7 +52,7 @@ Helpers:
 - `wrapTools(tools, reporter)`: for each call, `id = newId()`, `toolStart`, call the tool with
   `reporter.child(name, id)` available through an async-local context, then `tool({ id, … })`.
 - `wrapLlm(client, reporter, role)`: times the request, normalises usage (§6), writes `turn` and the
-  transcript entry (§5) with matching ids.
+  transcript entry (§5); the entry's `turnId` is the `turn` event id (there is no id on the `turn` event pointing back).
 - `fromMeta(meta)`: builds a reporter scoped to the parent id carried in MCP `_meta`
   (`aiw/parent`, `aiw/harnessId`) — how the server nests its events under the runner's tool event.
 
@@ -71,7 +70,7 @@ One JSON object per line. Common fields: `v` (schema version), `id`, `parent` (i
 |--------|--------|
 | `job` | first line written by the runner: `job`, `attempt`, `framework`, `problem`, `rep` |
 | `scope` | `label` |
-| `turn` | `model`, `role`, `usage { input, output, cachedRead?, cacheWrite? }`, `costUsd?`, `cacheHit?`, `latencyMs`, `transcriptId` |
+| `turn` | `model`, `role`, `usage { input, output, cachedRead?, cacheWrite? }`, `costUsd?`, `cacheHit?`, `latencyMs` |
 | `toolStart` | `name`, `args`, `harnessId?` |
 | `tool` | `name`, `args`, `ok`, `error?`, `durationMs`, `startTs`, `harnessId?`, `resultBytes` |
 | `attach` | `key`, `data` (inline if < 64 KB, else `blob: <hash>`) |
@@ -87,7 +86,7 @@ job attempt without coordination.
 
 - `FileSink(path)`: opens with `O_APPEND`, writes each event as one `write()` of one line, no
   buffering (crash safety, framework-runner §5.3).
-- `NoopSink`: default when no path is configured (§5.3 "No-op default").
+- `NoopSink`: default when no path is configured (framework-runner §5.3 "No-op default").
 - Server config: `--events <path>` / `AIW_EVENTS`; in harnesses off unless set
   (harness-integration §10).
 
@@ -150,4 +149,8 @@ the root and are flagged. Rollups (framework-runner §4.5) written to `job.json`
 | `leafToolCalls` | `tool` events with no `tool` descendants |
 | `tokens` | sums of usage fields per role |
 | `toolTimeMs` / `modelTimeMs` | sums of `durationMs` (top level) and `latencyMs` |
-| `callsPerTool`, `externalCalls` | for tools §8 metrics |
+| `callsPerTool` | `tool` events by `name` |
+| `externalCalls` | `tool` events whose name is in the `external` group (tools §6.8) |
+| `editCalls` | `{ refactor, manual }`: `tool` events of `refactor` group tools vs `edit`/`multiEdit` |
+
+Report-level tools §8 metrics are listed in [data-formats §4](data-formats.md#4-combined-report).

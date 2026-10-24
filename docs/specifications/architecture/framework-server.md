@@ -14,6 +14,8 @@ harness session (harness-integration §5.3); in experiments, one per job (runner
 aiw-server --framework <variant> --host local|fallback|mirrored|native
            [--tier S|L] [--root <dir>] [--policy <file>] [--adapter claude-code]
            [--events <path> --transcript <path> --blobs <dir>]
+           [--mcp-config <path>…] [--read-only] [--allow-server <name>…] [--deny-server <name>…]
+           [--max-chars N] [--priority <tool>,…]
            [--executor-model <m>] [--secondary-cap N] [--branch-context trace|annotated|full]
 ```
 
@@ -37,7 +39,7 @@ framework at startup with a clear message (harness-integration §8).
 | Infra error | `_meta["aiw/infraError"]: true` when a nested LLM call hit an infra error (runner §4.4) |
 | Approval | `elicitation/create` (§5); unsupported → deny |
 
-Output caps (§5.4) are applied by the framework (trace limits, report cap, tool caps) before the
+Output caps (harness-integration §5.4) are applied by the framework (trace limits, report cap, tool caps) before the
 result is returned.
 
 ---
@@ -50,7 +52,7 @@ result is returned.
 | `McpClientHost` | Connects as an MCP client to one server (stdio or HTTP) from a config entry; lists and calls its tools. Used for discovered user servers and `claude mcp serve`. |
 | `CompositeHost` (core) | Merges hosts, first wins on name conflict, conflicts reported. |
 | `CheckedHost` (core) | Applies a `Checker` before each call ([core-tools-and-hosts §5](core-tools-and-hosts.md#5-wrapper-stack)). |
-| `ChannelHost` | Native host over the call channel (harness-integration §4.5): JSON lines `{ id, parent, name, args }` / `{ id, ok, value \| error, durationMs }` / `{ cancel: id }` over a socket path or fd given by the plugin. Built when a native-capable harness is confirmed (harness §12 Q1). |
+| `ChannelHost` | Native host over the call channel (harness-integration §4.5): JSON lines `{ id, parent, name, args }` / `{ id, ok, value \| error, durationMs }` / `{ cancel: id }` / `{ pause: id }` / `{ resume: id }` (approval waits, §4.6) over a socket path or fd given by the plugin. Built when a native-capable harness is confirmed (harness §12 Q1). |
 
 ---
 
@@ -64,8 +66,8 @@ result is returned.
 | `native` | `ChannelHost` (the harness applies its own checks) |
 
 **Config discovery** reads the MCP config locations a plugin names (`--mcp-config <path>`
-repeatable) and starts each server as a second instance. Servers whose transport is HTTP with
-harness-held OAuth are skipped and stay direct (harness §4.2, §6.1).
+repeatable) and starts each server as a second instance. HTTP/remote servers are excluded by default
+(I-09) and stay direct, not routed (harness §4.2, §6.1).
 
 > **Decided I-09 (2026-10-23):** Discovered servers run twice (harness §12 Q2). Decision: exclude HTTP/remote
 > servers by default and include stdio servers; a per-server allow/deny list in the plugin config
@@ -88,7 +90,7 @@ interface Checker {
   allow/deny/ask, `bash` command patterns, and a built-in deny list of destructive patterns
   (`rm -rf /`, `git push --force`, writes outside root, `curl … | sh`, …). No matching rule →
   harness-integration §7.3 default (read inside root: allow; `write`/`exec`: ask; else deny).
-- **Read-only mode** (§7.4): `--read-only` or session context `plan` → any call with
+- **Read-only mode** (harness-integration §7.4): `--read-only` or session context `plan` → any call with
   `effect ≠ read` is denied.
 
 > **Decided I-10 (2026-10-23):** Harness/user tools without `effect` metadata default to `write`
@@ -145,7 +147,7 @@ plugins, managed).
 
 > **Decided A-22 (2026-10-23, approved; updated 2026-10-24 for the hooks module):** The plugin's
 > `tool.call` hook on the framework tools rewrites the input, adding `__session: { permission_mode, session_id, transcript_path, cwd }` to the
-> tool input. The server strips `__session` before the call and uses it for the checks (B4 step 3–4
+> tool input. The server strips `__session` before the call and uses it for the checks (B4 steps 3–4
 > inputs). This is race-free (context travels with the call) and needs no side channel.
 > To verify at build time: the tool schema must allow the extra property
 > (`additionalProperties: true`, not described to the model).
@@ -154,10 +156,11 @@ plugins, managed).
 
 ### 7.5 `ClaudeCodeChecker` (B4)
 
-Ordered steps exactly as B4: name mapping → permission rules (managed/user/project/local settings,
-deny > ask > allow, Claude Code pattern syntax) → permission mode → `PreToolUse` hooks (spawned with
-Claude Code's hook input JSON; `permissionDecision`, `updatedInput`, exit code 2) → ask via
-elicitation. `PostToolUse` hooks in `after`. A table-driven test suite (rules, modes, hooks, calls →
+Ordered steps exactly as B4: name mapping → `PreToolUse` hooks (spawned with Claude Code's hook
+input JSON; `permissionDecision`, `updatedInput`, exit code 2) → permission rules on the final
+(hook-updated) input (managed/user/project/local settings, deny > ask > allow, Claude Code pattern
+syntax) → permission mode → ask via elicitation. A hook `allow` skips the ask but not deny rules;
+first deny wins. `PostToolUse` hooks in `after`. A table-driven test suite (rules, modes, hooks, calls →
 decision) is pinned to the Claude Code version in `plugin.json` (B4 "Drift").
 
 Limits (B5): the `branch` tool sets `_meta["anthropic/alwaysLoad"]: true`; declarations are capped

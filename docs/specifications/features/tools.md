@@ -20,7 +20,7 @@ The **catalog** (which tools exist) is held constant across frameworks within a 
 | Framework | Exposure |
 |-----------|----------|
 | baseline | every tool schema, every turn |
-| branch | TS declarations of every tool in the `branch` description |
+| branch-only | TS declarations of every tool in the `branch` description |
 | orchestrate | planner sees none; executor sees a shortlist (orchestrate §7) |
 
 ---
@@ -67,7 +67,7 @@ failure) and register with branching-framework §6.2 plus orchestrate §6 metada
 - **Locations** are `{ path, line, col? }`; symbols are addressed as `path#Name` or
   `path#Class.method` — the same form as references.md code references.
 - **Write tools return a change summary**, not the new file: `{ files: [{ path, added, removed }],
-  diff? }`. `diff` is included when small.
+  diff? }`. `diff` is included when small. Exception: `bash` (effect `write`) returns `{ code, out }`.
 - **Refactoring tools take `dryRun`** and return the diff without writing.
 - **Language.** Contracts are language-agnostic. The first implementation targets Python, which
   every current problem uses. A tool that does not support a file's language throws

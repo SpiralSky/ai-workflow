@@ -28,7 +28,7 @@ problems/
     task.md  task.json  Dockerfile
     overlay/                             large problems only (problems §3)
     workspace/                           built (A-21)
-    checks/  check.sh
+    checks/check.sh
     reference/solution.patch  reference/notes.md
     .dockerignore                        generated: everything except workspace/
     .selfcheck.json                      generated: last self-check result + task hash
@@ -48,7 +48,7 @@ problems/
 > **Decided I-05 (2026-10-23):** The smoke test is an ordinary problem folder,
 > `problems/01-chunk-off-by-one/`, with `task.json` `size: "smoke"`. It follows every rule of §3
 > (layout, checks, reference, self-check). `all` = `small` + `large`, so it is never selected by
-> a set or reported in combined reports; `--problems smoke` or its id runs it.
+> a set or reported in combined reports; `--problems smoke` or its id runs it. It has `set: "dev"` (features/problems §4). Selectors: `small`/`large` = size AND `set: "reported"`; `dev` = `set: "dev"`; `smoke` = size smoke.
 
 ---
 
@@ -58,7 +58,7 @@ problems/
 
 1. Verify the codebase's own tests pass (`python -m unittest` in a `aiw-base` container).
 2. Copy `_codebases/<cb>/` → `<id>/workspace/`, then copy `overlay/` over it (files in overlay replace
-   or add; a `overlay/.delete` list removes files).
+   or add; an `overlay/.delete` list names files to remove; it is consumed, not copied into the workspace).
 3. Strip anything that could leak the answer (`.git/`, `__pycache__/`).
 
 > **Decided A-21 (2026-10-23, approved):** Commit the built `workspace/` of large problems. The problem folder is then

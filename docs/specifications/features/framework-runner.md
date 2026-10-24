@@ -393,6 +393,7 @@ format, not the other way round.
 | Field | Must match to combine |
 |-------|-----------------------|
 | Code version (commit) and whether there were uncommitted changes | yes |
+| Hash of the base prompt (§5.6) | yes |
 | Hash of each framework's system prompt and tool declarations | yes |
 | Model per role (main, secondary) and temperature | yes |
 | Limits: per-problem turn limits, secondary turn cap, branch trace settings | yes |

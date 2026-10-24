@@ -7,7 +7,7 @@
 
 ## 1. Modules
 
-| Module | Responsibility | Spec |
+| Module | Responsibility | framework-runner § |
 |--------|----------------|------|
 | `cli.ts` | Commands and flags | — |
 | `config.ts` | Resolve run configuration, framework variants, provenance | §6.6, §7.1 |
@@ -27,8 +27,8 @@
 ## 2. CLI
 
 ```
-aiw eval    --problems <ids|all|small|large|dev> --mode <baseline|branch-only|orchestrate|compare|variant,...>
-            --tools S|L  --reps 1  --model deepseek/deepseek-v4-flash  [--temperature 0]
+aiw eval    --problems <ids|all|small|large|dev|smoke> --mode <baseline|branch-only|orchestrate|compare|variant,...>
+            --tools S|L  --reps 1  --model deepseek/deepseek-v4-flash  [--secondary-model <model>]  [--temperature 0]
             --budget 0.50  [--full]  --concurrency 2  [--branch-context trace|annotated|full]
             [--secondary-cap 4]  [--until-reps N --combine-with <report>]
 aiw report  <run-dir>... --name <report-name>          # combine (§8)
@@ -36,6 +36,12 @@ aiw problems build [<id>...]                             # codebase + overlay �
 aiw problems check [<id>...]                             # self-check (problems.md §7)
 aiw view    [--watch]                                     # viewer indexer (viewer.md)
 ```
+
+`--secondary-model` defaults to `--model`; both map to `models.main` / `models.secondary` in
+`run.json` (data-formats §1.1). `--problems` selectors: `all` = `set: reported` (any reported size);
+`small` / `large` = that `size` AND `set: reported`; `dev` = `set: dev`; `smoke` = `size: smoke`
+(problems §4). Run `config.kind`: `full` with `--full`; else `dev` if every selected problem is
+`set: dev` or `size: smoke`; else `pilot`.
 
 Framework variants are written `base[key=value,...]` (e.g. `orchestrate[secondary=2]`), matching
 the viewer's naming (viewer §3). The canonical string (keys sorted) is the framework id in job
@@ -51,10 +57,10 @@ directory names and `run.json`.
 
 1. **Resolve config** and provenance (§9). Refuse to start if: model is `anthropic/*` on
    OpenRouter; any selected problem fails or lacks a passing self-check stamp (problems.md §7);
-   cost is not API-reported by the configured endpoint (§6.5).
+   cost is not API-reported by the configured endpoint (framework-runner §6.5).
 2. **Project cost**: mean cost per (problem, framework, tier) over the valid combined history
    (`experiments/reports/*` and valid runs with matching config) × planned jobs; refuse if above
-   budget. No history → no projection, start allowed (§6.5).
+   budget. No history → no projection, start allowed (framework-runner §6.5).
 3. **Build images** for selected problems if missing (`docker build`), record digests.
 4. **Schedule** jobs over `--concurrency` workers.
 
@@ -80,8 +86,8 @@ start container ─▶ start server (docker exec -i) ─▶ MCP initialize + too
 --mount type=bind,src=<server-bundle>,dst=/opt/aiw/bundle,readonly <problem-image> sleep infinity`.
 Network is `none` for every framework except orchestrate, whose container joins a per-job internal
 network (`docker network create --internal`) where the only reachable endpoint is the LLM egress
-proxy (§5.1). Tools therefore have no network in any framework (tools §3.6). A wall-clock
-limit per job (default `turnLimit × 3 min`) kills the container (core-branch §4).
+proxy (§5.1). Tools therefore have no network in any framework except that proxy (tools §3.6). A wall-clock
+limit per job (default `turnLimit × 3 min`, recorded in provenance, §9) kills the container (core-branch §4).
 
 ### 4.2 Model loop
 
@@ -92,7 +98,7 @@ OpenAI-compatible chat completions via `@aiw/llm` + `wrapLlm(role: "main")`:
 - First user message = the problem's `task.md`, verbatim (framework-runner §5.6).
 - Each turn: request → response. Tool calls → dispatch (§4.3). No tool calls → end (final answer).
 - Turn limit (`task.json.turnLimit`) counts main turns; reaching it ends the job as fail with reason
-  `turn-limit` (§6.1). Secondary turns never count (§4.4).
+  `turn-limit` (framework-runner §6.1). Secondary turns never count (framework-runner §4.4).
 - Temperature and model fixed per run.
 
 ### 4.3 Tool dispatch
@@ -100,7 +106,7 @@ OpenAI-compatible chat completions via `@aiw/llm` + `wrapLlm(role: "main")`:
 - For each tool call: preallocate event id, `toolStart`, call the server with
   `_meta: { "aiw/parent": id, "aiw/harnessId": tool_call_id }`, write `tool` event on return.
 - The server returns its measured execution time in `_meta["aiw/durationMs"]`; that value is used
-  for the event and for the model-facing text (§4.3 of the feature spec: tool timing is model-facing).
+  for the event and for the model-facing text (framework-runner §4.3: tool timing is model-facing).
 
 > **Decided A-09 (2026-10-23, approved):** Tool results returned to the model end with a line `[tool time: N ms]`
 > (all frameworks; for `branch` the per-call durations are already in the trace, and the line gives
@@ -142,7 +148,8 @@ run, attached to the default bridge and to each orchestrate job's internal netwo
 only chat-completion requests to the configured `OPENAI_BASE_URL` and adds the `Authorization`
 header itself, so the API key never enters a job container and model-written code (`bash`, branch
 programs) can reach nothing else. The proxy logs usage per forwarded request; the runner adds any
-cost not matched by a server `turn` event to the budget total and flags the job, so spend from
+cost not matched by a server `turn` event to the budget total and records it in `job.json` as
+`unmatchedProxyCostUsd` with `flags: ["unmatched-proxy-cost"]` (data-formats §1.2), so spend from
 outside the executor loop cannot go unrecorded.
 
 ---
@@ -151,8 +158,9 @@ outside the executor loop cannot go unrecorded.
 
 1. `docker cp <ctr>:/work <tmp>/after`.
 2. `git diff --no-index --binary <problem>/workspace <tmp>/after` → `diff.patch` (paths rewritten to
-   be relative to `/work`; generated caches such as `__pycache__/`, `*.pyc` and `.pytest_cache/` are
-   excluded, as in orchestrate-engine §7).
+   be relative to `/work`; excluded: `.git/`, `node_modules/`, `__pycache__/`, `*.pyc`, `.pytest_cache/`, `.venv/`.
+   Same directory set as orchestrate-engine §7 change tracking, plus `*.pyc`; differs in that
+   `.gitignore` is not honoured, so every other agent-written file counts).
 3. Fresh container from the same image (`--network none`), `docker cp diff.patch` and
    `checks/` in, `cd /work && git apply --binary /tmp/diff.patch`, copy `checks/*` over `/work`,
    run `check.sh` with a 120 s timeout. Exit 0 = pass. Output → `check.log`.
@@ -168,7 +176,7 @@ outside the executor loop cannot go unrecorded.
 ## 7. Retries, budget, validity
 
 - Infra error → attempt directory moved to `attempts/<n>/`, job restarted from scratch in a new
-  container, backoff 10 s then 60 s, at most 2 retries (§6.5).
+  container, backoff 10 s then 60 s, at most 2 retries (framework-runner §6.5).
 - After 2 failed retries: the scheduler stops dispatching, waits for in-flight jobs, marks the run
   `{ "invalid": "job-failed:<job>" }` (data-formats §1.1).
 - **Budget**: the scheduler keeps a running total from every attempt's `turn.costUsd` (tailing
@@ -184,10 +192,10 @@ outside the executor loop cannot go unrecorded.
 ## 8. Combining and staged evaluation
 
 - `aiw report` loads run directories, rejects invalid runs and runs with uncommitted changes,
-  checks that all §7.1 "must match" provenance fields agree, and that shared problems have the same
+  checks that all framework-runner §7.1 "must match" provenance fields agree, and that shared problems have the same
   task-folder hash. Output: `experiments/reports/<name>/report.json` (+ `report.md` summary).
 - Aggregation is done by `@aiw/report` (pass rate + 95% Wilson interval, cost per successful job,
-  paired per-problem comparison, failure gate at 90% on dev-set reports), see [data-formats §4](data-formats.md#4-combined-report).
+  paired per-problem comparison, minimum detectable difference and verdict (framework-runner §6.2 claim rule), failure gate at 90% on dev-set reports), see [data-formats §4](data-formats.md#4-combined-report).
 - Failure audits (`setup` | `framework` per failed job, framework-runner §6.6) are recorded in the
   combined report; the setup gate reads them.
 - `aiw eval --full`: the whole reported set with a default budget of $1. Refuses to start unless the
@@ -195,7 +203,7 @@ outside the executor loop cannot go unrecorded.
   no full run exists for the same provenance (§9).
 - `aiw eval --until-reps N --combine-with <name>`: loop of run → combine → gate; stops when the
   combined report reaches N reps per (problem, framework), the gate fails, or the next run's
-  projected cost exceeds the remaining budget (§6.6).
+  projected cost exceeds the remaining budget (framework-runner §6.6).
 
 > **Decided A-18 (2026-10-23, approved):** Combined reports live in `experiments/reports/<name>/` (committed), separate
 > from run directories (gitignored).
@@ -213,8 +221,8 @@ outside the executor loop cannot go unrecorded.
 | Framework fingerprints | Start each framework's server once in a throwaway container per tier, hash `instructions` + `tools/list`; plus every text the framework sends that `tools/list` does not show: executor prompt, reranker prompt, hot-path snippet set |
 | Framework switches | `rerank`, `hotPaths`, executor interface: part of the canonical framework id (§2) |
 | Models per role, temperature | config |
-| Limits | per-problem `turnLimit`, secondary cap, branch trace limits/mode, branch timeout |
+| Limits | per-problem `turnLimit`, wall-clock limit (default `turnLimit × 3 min`), secondary cap, branch trace limits/mode, branch timeout |
 | Image digest per problem | `docker image inspect` |
 | Runner version, run format version | package version, `FORMAT_VERSION` constant |
 | Tool tier | config (tools §3.4) |
-| Problem ids + task-folder hashes | sha256 over sorted file list + contents (excluding `reference/`) |
+| Problem ids + task-folder hashes | sha256 over sorted file list + contents, excluding `reference/` and the generated `.selfcheck.json` and `.dockerignore` |

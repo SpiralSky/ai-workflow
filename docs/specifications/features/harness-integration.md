@@ -133,7 +133,8 @@ guaranteed path everywhere.
 When the core runs in a separate process from the host (e.g. the framework server and a native
 host in the harness process), inner calls travel over a bidirectional channel opened by the plugin:
 request `{ id, parent, name, args }`, response `{ id, ok, value | error, durationMs }`, plus
-`cancel { id }`. In-process hosts use direct calls. The protocol is part of the core, not of any
+`cancel { id }`, and `pause { id }` / `resume { id }` so a host in another process can stop and
+restart the branch timeout while it waits for approval (§4.6). In-process hosts use direct calls. The protocol is part of the core, not of any
 plugin.
 
 ### 4.6 Timeouts and waiting
@@ -413,17 +414,17 @@ Run before every inner call, in this order; the first deny wins.
 
 1. **Name mapping.** Inner name → Claude Code tool name (`bash` → `Bash`, `readFile` → `Read`,
    discovered tools → `mcp__<server>__<tool>`), so the user's rules and hook matchers match.
-2. **Permission rules.** `permissions.deny / ask / allow` from managed, user, project and local
-   settings, with Claude Code's precedence (deny > ask > allow) and pattern syntax
-   (e.g. `Bash(npm run test:*)`, `Read(./secrets/**)`).
-3. **Permission mode.** From session context: `plan` → read-only (§7.4); `dontAsk` → ask becomes
-   deny; `bypassPermissions` → rules still apply but no prompts; `acceptEdits` → file edits allowed
-   without asking.
-4. **Hooks.** The user's `PreToolUse` hooks (all settings scopes and enabled plugins) whose matcher
+2. **Hooks.** The user's `PreToolUse` hooks (all settings scopes and enabled plugins) whose matcher
    matches, given Claude Code's input (`session_id`, `transcript_path`, `cwd`, `permission_mode`,
    `hook_event_name`, `tool_name`, `tool_input`, a generated `tool_use_id`). Their
-   `permissionDecision` (allow / deny / ask), `updatedInput` and exit code 2 (block) apply.
-   `PostToolUse` hooks run after the call.
+   `permissionDecision` (allow / deny / ask), `updatedInput` and exit code 2 (block) apply. A hook
+   `allow` skips the ask but not deny rules. `PostToolUse` hooks run after the call.
+3. **Permission rules**, checked on the final (hook-updated) input. `permissions.deny / ask / allow`
+   from managed, user, project and local settings, with Claude Code's precedence (deny > ask >
+   allow) and pattern syntax (e.g. `Bash(npm run test:*)`, `Read(./secrets/**)`).
+4. **Permission mode.** From session context: `plan` → read-only (§7.4); `dontAsk` → ask becomes
+   deny; `bypassPermissions` → rules still apply but no prompts; `acceptEdits` → file edits allowed
+   without asking.
 5. **Ask.** Shown through MCP elicitation, which Claude Code renders as a dialog (tool, arguments,
    the rule that asked). Accept runs the call; decline throws into the program. Waiting time is not
    counted (§4.6).

@@ -65,7 +65,7 @@ newline-delimited JSON-RPC over stdio: `{ id, method, params } → { id, result 
 One sidecar per server session; restarted on crash (the in-flight call throws `sidecar crashed`).
 
 - Runs from an isolated venv at `/opt/aiw/venv` (not on the workspace interpreter's path), with
-  the workspace on `sys.path` only for `runSnippet`/`traceCalls`/`runTests`, which execute workspace
+  the workspace on `sys.path` for all `exec` tools, which execute workspace
   code in a **child** process so analysis state is never polluted.
 - Methods map 1:1 to tool names; caching of parsed modules keyed by (path, mtime).
 
@@ -91,11 +91,11 @@ response is deterministic.
 
 ## 6. Base image and runtime mount
 
-> **Decided A-04 (2026-10-23, approved):** All problem images build `FROM aiw-base:py3.12`, defined in
+> **Decided A-04 (2026-10-23, approved):** All problem images build `FROM aiw-base:py3.12-<n>` (versioned), defined in
 > `problems/_base/Dockerfile`:
 > - `python:3.12-slim` (glibc) + `git` + `ripgrep`;
 > - Node 22 at `/opt/aiw-node` (for the server and pyright);
-> - tool venv at `/opt/aiw/venv` (jedi, rope, pyright/mypy, ruff) — outside the workspace
+> - tool venv at `/opt/aiw/venv` (jedi, rope, pyright, ruff) — outside the workspace
 >   interpreter's import path.
 >
 > The **server bundle** (`aiw-server.mjs` + sidecar package) is **not** baked into images: the

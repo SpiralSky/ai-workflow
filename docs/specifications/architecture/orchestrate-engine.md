@@ -9,7 +9,7 @@
 
 | Module | Responsibility | Spec |
 |--------|----------------|------|
-| `task.ts` | `Task`: one per server session — steps, reference store, change tracker, lock | references §7 |
+| `task.ts` | `Task`: one per session (runner: one job; harnesses: the session id from session context, so a new id, e.g. after /clear, starts an empty store) — steps, reference store, change tracker, lock | references §7 |
 | `planner-tools.ts` | `do` and planner `resolve` handlers and descriptions | orchestrate §4.1 |
 | `selection/` | `retrieve.ts` (BM25), `rerank.ts` (pluggable, `llm` by default, `none` to disable), `complete.ts`, `index.ts` | orchestrate §7 |
 | `executor.ts` | Executor session: prompt, loop, budget, last-turn notice | orchestrate §4.2, §8 |
@@ -41,8 +41,8 @@ validate refs ─▶ select ─▶ acquire lock ─▶ snapshot workspace ─▶
       └── isError to planner                    step stored (sN), lock released, handoff attached
 ```
 
-1. **Allocate step** `sN` (monotonic per task) and a reporter scope under the `do` tool event.
-2. **Validate references** in `instruction`; on failure return the error listing valid references.
+1. **Validate references** in `instruction`; on failure return the error listing valid references (no step id is used).
+2. **Allocate step** `sN` (monotonic per task) and a reporter scope under the `do` tool event.
 3. **Select** the shortlist (§4).
 4. **Lock** (§3.3).
 5. **Snapshot** the workspace (§7).
@@ -76,7 +76,7 @@ alone.
 
 ```ts
 interface Selector {
-  select(q: { instruction: string; override?: string[]; extraNeed?: string }, catalog: ToolDecl[]):
+  select(q: { instruction: string; override?: string[] }, catalog: ToolDecl[]):
     Promise<Selection>;   // ordered shortlist + per-stage scores (for the handoff record)
 }
 ```
@@ -88,6 +88,10 @@ interface Selector {
 | Truncate | Keep top N | N = 6 |
 | Complete (§7.3) | Add `requires` after the requiring tool; dedupe | — |
 | Override (§7.5) | Planner `tools` → skip retrieve/rerank, still complete | — |
+
+The LLM rerank is selection, not executor work: it does not count against the per-`do` secondary turn cap (executor turns only).
+
+**Tie-break and duplicates.** Equal retrieval scores are ordered by `cost` (lower first), then name. At registration, a tool whose indexed text has BM25 self-normalised cosine similarity > 0.8 with an existing tool logs a warning (never rejects). `category` is not used by selection yet.
 
 > **Decided A-12 (2026-10-23):** BM25 retrieve, shortlist = top 6 + `requires`, and an LLM reranker
 > that is implemented and **on by default**, controlled by `rerank: llm|none` (recorded in
@@ -129,7 +133,7 @@ agents and harness docs, found by web research) and from failure patterns in our
 (viewer failure breakdown). Each snippet must compile through the branch pipeline and is run
 against a fake host in a unit test that exercises its anticipated outcome.
 
-**Measurement.** Included snippet ids are recorded (`hotPaths`, orchestrate §8). A config switch
+**Measurement.** Included snippet ids are recorded (`hotPaths`, orchestrate §8.4). A config switch
 `hotPaths: on|off` (default `off`; variant `orchestrate[hotPaths]`) makes them an ablation, so
 their effect is measured, not assumed; `compare` runs leave it off (orchestrate §9).
 
@@ -175,7 +179,7 @@ In evaluation the runner passes the main model (harness-integration §8); both a
    new report. Otherwise replace each invalid reference with `[invalid ref: …]` (references §6.4).
 3. Apply the report size cap (default 2 000 chars of model-written text) with a truncation note.
 4. Append framework lines: `Changed:` (from §7), `Budget: exhausted` if applicable, `Saved:`
-   (names created/changed in this step with summaries).
+   (names created/changed in this step with summaries), `Step: sN`.
 
 > **Decided A-14 (2026-10-23, approved):** The repair turn counts against the secondary turn cap, so the cap stays a
 > hard fairness bound (framework-runner §4.4). If the cap is already used up, references are
@@ -202,13 +206,13 @@ Named values are the task's branch `state`: `state` is a `Proxy` over the store,
 
 At handoff, each reference is rendered: content ≤ 500 tokens (2 000 chars) inline; larger as a
 handle line with a summary from references §5.2 (call summaries generated from tool name, args and
-outcome; no model call). Transitive references are resolved one level deep (§5.3).
+outcome; no model call). Transitive references are resolved one level deep (references §5.3).
 
 ### 6.3 `resolve`
 
 Accepts either a reference token (`"@s1.c1"`) or a stored live-ref object (references §5.2), plus optional
 `grep` (regex, returns matching lines with line numbers) or `lines: [a, b]`. Live code refs read
-current content through the host's `readSymbol` implementation (or a file read for whole files) and
+current content through the host's `readSymbol` implementation if present (otherwise `readFile` of the whole file with a marker that symbol extraction was unavailable, as in S-only runs; whole-file refs use `readFile`) and
 compare the content hash; a mismatch returns `stale: true` and the step that changed it (§7).
 A deleted target throws `RefNotFound`.
 

@@ -56,7 +56,7 @@ problems/<id>/
 |-------|---------|
 | `id` | Folder name. |
 | `size` | `small` \| `large` \| `smoke` (setup check only; not in `all`, never reported, §8.2). |
-| `set` | `reported` (default) \| `dev` (tuning only; not in `all`, never reported, §8.5). |
+| `set` | `reported` (default) \| `dev` (tuning only; not in `all`, never reported, §8.5). `01-chunk-off-by-one` is `size: "smoke"`, `set: "dev"`. Selectors: `small`/`large` = size AND `set: "reported"`; `dev` = `set: "dev"`; `smoke` = size smoke. |
 | `codebase` | Shared codebase id (large problems only, §6). |
 | `turnLimit` | Base turn limit (framework-runner §4.4). |
 | `tags` | What it tests (`bugfix`, `feature`, `refactor`, `concurrency`, `multi-file`, `rename`, `move`, `signature`, `import-cycle`, `deep-cause`, …). Reports can group by tag. |

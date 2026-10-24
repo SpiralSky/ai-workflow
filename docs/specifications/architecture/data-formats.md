@@ -22,7 +22,7 @@ event), never by splitting the directory name, since variant values may contain 
   "format": 1,
   "id": "2026-10-23T14-02-11Z-a1b2",
   "status": "complete" | "in-progress" | { "invalid": "budget" | "job-failed:<job>" | "interrupted" },
-  "config": { "problems": [...], "frameworks": [...], "tier": "S", "reps": 1, "budgetUsd": 0.5,
+  "config": { "kind": "dev" | "pilot" | "full", "problems": [...], "frameworks": [...], "tier": "S", "reps": 1, "budgetUsd": 0.5,
               "concurrency": 2, "models": { "main": "...", "secondary": "..." }, "temperature": 0,
               "secondaryCap": 4, "branch": { "context": "trace", "timeoutMs": 120000,
               "limits": { "valueChars": 200, "loopCollapse": 3, "eventBudget": 60 } } },
@@ -32,12 +32,18 @@ event), never by splitting the directory name, since variant values may contain 
     "frameworks": { "<framework-id>": { "prompt": "<sha256>", "tools": "<sha256>",
                     "extra": { "executor": "<sha256>", "rerank": "<sha256>", "hotPaths": "<sha256>" } } },
     "images": { "<problem>": "sha256:…" },
-    "problems": { "<problem>": { "taskHash": "…", "turnLimit": 20 } }
+    "problems": { "<problem>": { "taskHash": "…", "turnLimit": 20, "wallClockMs": 3600000 } }
   },
   "totals": { "jobs": 30, "attempts": 31, "costUsd": 0.41, "pass": 27, "fail": 3 },
   "startedAt": "…", "endedAt": "…"
 }
 ```
+
+`config.kind` is decided by the runner (runner §2). Combining (runner §8) requires equal `tier`,
+`models`, `temperature`, `secondaryCap`, `branch`; `problems`, `frameworks`, `reps`, `budgetUsd`,
+`concurrency` and `kind` may differ (problems present in several runs need equal `taskHash`,
+`turnLimit`, `wallClockMs`). Provenance fields all must match except `problems` (see
+framework-runner §7.1).
 
 ### 1.2 `job.json`
 
@@ -48,6 +54,8 @@ event), never by splitting the directory name, since variant values may contain 
   "reason": null | "checks" | "turn-limit" | "timeout" | "patch-failed" | "context-limit",
   "attempts": [ { "n": 0, "infraError": "HTTP 429 …", "costUsd": 0.003 }, { "n": 1, "final": true } ],
   "costUsdAllAttempts": 0.014,
+  "unmatchedProxyCostUsd": 0.0004,      // optional: proxy spend with no server `turn` event; included in costUsdAllAttempts
+  "flags": ["unmatched-proxy-cost"],    // optional
   "rollups": { /* telemetry §7 */ },
   "durationMs": 81234
 }
@@ -104,12 +112,33 @@ the viewer shows them from `events.jsonl` alone, marked incomplete (viewer §9).
     }
   },
   "audits": { "<run-id>/<job-id>": { "label": "setup" | "framework", "note": "..." } },
-  "paired": [ { "problem": "07-async-race", "a": "branch-only", "b": "baseline",
-                "passA": 3, "passB": 2, "costA": 0.011, "costB": 0.019 } ],
+  "paired": [ { "a": "branch-only", "b": "baseline",
+                "mdd": 0.25, "verdict": "better" | "worse" | "inconclusive",
+                "problems": [ { "problem": "07-async-race", "passA": 3, "passB": 2,
+                                "costA": 0.011, "costB": 0.019 } ] } ],
   "orchestrate": { /* orchestrate §10.1 metrics when present */ },
-  "tools": { /* tools §8 metrics */ }
+  "tools": { "<framework-id>": { "<tier>": {
+      "schemaTokens": 5800, "callsPerTool": { "readFile": 41 }, "neverCalled": ["…"],
+      "externalCalls": 3, "refactorShare": 0.4 } },
+    "deltaSL": { "<framework-id>": { "costUsd": 0.002, "turns": -1.2, "passRate": 0.1 } } }
 }
 ```
+
+`mdd` and `verdict` are computed by `@aiw/report` per (a, b) pair (framework-runner §6.2 claim rule):
+`mdd` = smallest pass-rate difference detectable at 95% for the pair's job count; `verdict` is
+`better`/`worse` (for `a`) only if the pooled paired pass-rate difference exceeds `mdd`, else
+`inconclusive`.
+
+`tools` metrics (tools §8), computed by `@aiw/report`:
+
+| Metric | Source |
+|--------|--------|
+| `schemaTokens` | tokens of the `tools` blob of each session (`main`, or `exec:*` for orchestrate), from `transcript.jsonl`; baseline/branch = per turn, orchestrate = per executor |
+| `callsPerTool` | sum of job rollup `callsPerTool` |
+| `neverCalled` | catalog tool names at the tier minus names in any `tool` event of the run |
+| `externalCalls` | sum of job rollup `externalCalls` |
+| `refactorShare` | `editCalls.refactor / (refactor + manual)` summed over jobs |
+| `deltaSL` | mean difference S→L of `costPerSuccessUsd`, `turns.main`, `passRate` per framework (needs S and L runs in the report) |
 
 `report.md` is a human-readable rendering of the same data. Neither is stored inside a run
 directory (framework-runner §7).

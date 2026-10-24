@@ -133,7 +133,7 @@ packages/
   core/      src/branch/  src/registry/  src/host/  src/orchestrate/  src/refs/
   telemetry/
   llm/
-  tools/     src/ts/  python/  fixtures/
+  tools/     src/{catalog,s,l}/  python/aiw_sidecar/  fixtures/external/
   server/
   runner/
   report/
@@ -143,7 +143,7 @@ plugins/
 problems/
   _base/                     aiw-base Dockerfile (tool-catalog §6)
   _codebases/fulfil/
-  01-chunk-off-by-one/       smoke test, size "smoke" (problems §2)
+  01-chunk-off-by-one/       smoke test, size "smoke" (problems §4)
   02-inventory-feature/ … L5-refund-double-count/
 experiments/
   runs/                      gitignored run directories
