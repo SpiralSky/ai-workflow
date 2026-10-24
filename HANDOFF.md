@@ -25,7 +25,11 @@ per framework-runner §6.5 (CLAUDE.md updated); large dev problem deferred until
 **Next (in order):**
 1. ~~Sort out the uncommitted working tree~~ — done 2026-10-24 (tree clean).
 2. Rebuild the codebase to the architecture specs (README Roadmap step 2): ~~telemetry~~ (done 2026-10-24,
-   `packages/telemetry`) → ~~LLM client~~ (done 2026-10-24, `packages/llm`) → **core branch per architecture/core-branch.md (next)**.
+   `packages/telemetry`) → ~~LLM client~~ (done 2026-10-24, `packages/llm`) → ~~core branch runtime~~ (done
+   2026-10-24, `packages/core/src/branch`) → **core tool registry, hosts and wrappers per
+   architecture/core-tools-and-hosts.md (next)** → orchestrate engine.
+   Open with the user: isolated-vm packaging (native addon can't go in the single-file
+   `aiw-server.mjs`; needs `--no-node-snapshot`; plugin platform coverage) — see below.
 3. Test the existing modes first: clean `compare` (baseline, branch-only, orchestrate) — Roadmap step 3.
 4. Only then: user's new orchestrate idea (adds one mode) — not yet presented; it goes through spec approval.
 
@@ -33,7 +37,15 @@ Commit spec/README changes as `docs:` commits when the user approves.
 
 ---
 
-## Code state: `framework/core/branch/`
+## Code state
+
+`packages/core/src/branch/` implements core-branch.md (compile → isolate run → render; 53 tests).
+Implementation choices are recorded in core-branch.md (event shapes, line-preserving compile,
+root-only `return` events, render details). isolated-vm needs `node --no-node-snapshot`
+(core test script sets `NODE_OPTIONS`). Unresolved: server bundle/launch for the native addon
+(system-overview §5, runner §5, framework-server §7.1) — awaiting user decision.
+
+### Old `framework/core/branch/`
 
 `branch.ts` (+ `framework/test/core-branch.test.ts`, committed 3f6aeb9) is an early in-process runner from 2026-10-21. It
 predates the architecture specs and does not match them (no isolate, instrumentation, recorder, `state` or renderers).
