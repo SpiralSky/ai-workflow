@@ -1,0 +1,13 @@
+{
+  "name": "@aiw/core",
+  "private": true,
+  "type": "module",
+  "exports": { ".": "./src/index.ts" },
+  "dependencies": {
+    "@aiw/llm": "*",
+    "@aiw/telemetry": "*",
+    "isolated-vm": "6.2.0",
+    "typescript-api": "npm:typescript@5.9"
+  },
+  "scripts": { "test": "NODE_OPTIONS=--no-node-snapshot tsx --test test/*.test.ts" }
+}
