@@ -285,6 +285,11 @@ test("catalog=N pads with the fixed distractor set, for any framework", async ()
   const warnings: string[] = [];
   buildRegistry([...DECLS, ...distractorDecls(50).map((d) => ({ name: d.name, description: d.description, inputSchema: d.parameters, meta: d.meta }))], { warn: (m) => warnings.push(m) });
   assert.deepEqual(warnings, []);
+  // the distractors are not near-duplicates of each other (nor of the real tools) even at N=1000, and the set is a stable prefix
+  const big: string[] = [];
+  buildRegistry([...DECLS, ...distractorDecls(1000).map((d) => ({ name: d.name, description: d.description, inputSchema: d.parameters, meta: d.meta }))], { warn: (m) => big.push(m) });
+  assert.deepEqual(big, []);
+  assert.deepEqual(distractorDecls(200), distractorDecls(1000).slice(0, 200));
   // orchestrate selects among the padded catalog and still answers
   const fw = buildFramework("orchestrate", t.registry, { host: t.host, runtime, variant: { catalog: 200 }, orchestrate: { client: t.llm.client, model: "m", workspaceRoot: t.ws, rerank: "none" } });
   const r = await fw.tools[0]!.handle({ instruction: "read the contents of a file" }, t.call());
