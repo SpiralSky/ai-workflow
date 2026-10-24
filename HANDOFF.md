@@ -23,7 +23,7 @@ settings.json; read-only mode denies non-read calls; task.md is the first user m
 per framework-runner §6.5 (CLAUDE.md updated); large dev problem deferred until `fulfil` exists.
 
 **Next (in order):**
-1. Sort out the uncommitted working tree (deleted `dev/`, viewer/prompt/tsconfig edits, old `framework/core/`).
+1. ~~Sort out the uncommitted working tree~~ — done 2026-10-24 (tree clean).
 2. Rebuild the codebase to the architecture specs (README Roadmap step 2), starting with telemetry → LLM client →
    `framework/core/branch` per architecture/core-branch.md.
 3. Test the existing modes first: clean `compare` (baseline, branch-only, orchestrate) — Roadmap step 3.
@@ -35,7 +35,7 @@ Commit spec/README changes as `docs:` commits when the user approves.
 
 ## Code state: `framework/core/branch/`
 
-`branch.ts` (+ `framework/test/core-branch.test.ts`, uncommitted) is an early in-process runner from 2026-10-21. It
+`branch.ts` (+ `framework/test/core-branch.test.ts`, committed 3f6aeb9) is an early in-process runner from 2026-10-21. It
 predates the architecture specs and does not match them (no isolate, instrumentation, recorder, `state` or renderers).
 Rebuild it per architecture/core-branch.md rather than patching it; the old `src/runner.ts` path is replaced afterwards.
 When the `packages/` layout (A-02) lands, update CLAUDE.md's `cd framework && npm test`.
