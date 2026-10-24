@@ -273,8 +273,8 @@ no cost in that case, since a branch program with one call is just a call.
 
 ### 8.2 Budget
 
-Each `do` call has a turn budget: the secondary turn cap (framework-runner §4.4), default 4 — one
-attempt plus up to 3 retries. It is configurable; 2–3 is worth testing. On its last turn the executor is told
+Each `do` call has a turn budget: the secondary turn cap (framework-runner §4.4), default 4 (at most 4
+executor turns; one is the normal case). It is configurable; 2–3 is worth testing. On its last turn the executor is told
 to report what it has, rather than being cut off without a report.
 
 ### 8.3 Report
@@ -386,7 +386,7 @@ and tool search's cost grows faster at a similar pass rate.
 
 ## 11. Open questions
 
-1. **Name.** Decided: `do` (field `instruction`), unless an A/B run shows `intent` performs
+1. ~~**Name.**~~ Decided: `do` (field `instruction`), unless an A/B run shows `intent` performs
    better on the same problems. Tool names and descriptions measurably change model tool-use
    behaviour (Faghih et al., *Tool Preferences in Agentic LLMs are Unreliable*, EMNLP 2025), so
    the name is a variable, not cosmetics. `delegate` was rejected: it suggests handing off the

@@ -87,8 +87,6 @@ failure) and register with branching-framework §6.2 plus orchestrate §6 metada
 | `grep` | read | Regex search over contents; `path`/`glob` filters; returns locations with a line of context. |
 | `findFiles` | read | Glob over file names. |
 
-These match the current baseline tools, so S results stay comparable with earlier runs.
-
 ---
 
 ## 6. Tier L — additions
@@ -229,15 +227,11 @@ In addition to framework-runner and orchestrate §10 metrics, per tier and frame
 
 ## 9. Open questions
 
-1. **Implementation backends.** Python: `rope` for refactors, `jedi`/`pyright` for navigation and
-   types, `coverage.py` + `sys.settrace`/`sys.setprofile` for `coverage`/`traceCalls`, `ast` for
-   graphs. TS later via `ts-morph` / tsserver. Or one LSP client for every language, with
-   refactors that the LSP lacks (`moveSymbol`) done separately.
-2. **Description length.** Longer descriptions help choice but cost baseline/branch every turn.
-   Fix a length budget per tool so that L's schema size is a known number.
-3. ~~**Fixture realism for `external`.**~~ Decided 2026-10-23: canned only (tool-catalog §5). Fixed canned responses or small per-problem fixtures
-   (e.g. an issue that restates the bug)? The latter makes some tools useful, which changes what
-   L measures.
+1. ~~**Implementation backends.**~~ Decided 2026-10-23: `ast`, `jedi`, `rope`, `ruff`, `pyright`; no `coverage.py`
+   (architecture/tool-catalog I-02).
+2. ~~**Description length.**~~ Decided 2026-10-23: description ≤ 200 chars, parameter doc ≤ 80, `whenToUse` ≤ 200;
+   a unit test enforces it and records S/L schema sizes (architecture/tool-catalog I-04).
+3. ~~**Fixture realism for `external`.**~~ Decided 2026-10-23: canned only (tool-catalog §5).
 4. **Medium tier.** Only if S/L results leave the crossover unclear.
 
 ---

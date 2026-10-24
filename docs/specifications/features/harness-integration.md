@@ -350,8 +350,8 @@ Default off; a path setting turns on the JSONL sink.
 
 1. **Native host availability.** No harness is confirmed to meet §4.4. opencode (in-process JS
    plugins) is the most likely native host and needs a check when a plugin for it is wanted.
-2. **Discovery duplicates** (§6): a discovered MCP server runs twice (harness + framework server).
-   Whether to exclude remote/stateful servers by default is decided at implementation.
+2. ~~**Discovery duplicates** (§6).~~ Decided 2026-10-23: HTTP/remote servers are excluded by default, stdio
+   servers included; a per-server allow/deny list overrides (architecture/framework-server I-09).
 
 ---
 
@@ -445,7 +445,7 @@ orchestrate cost display would use (§10, deferred).
 
 ## B7. Open questions
 
-1. **Subagents.** Subagents the model starts have their own tool lists and would see the built-ins
-   directly. Whether the plugin should also ship branch-only subagent definitions.
+1. ~~**Subagents.**~~ Decided 2026-10-23: subagents are left unchanged; the plugin ships no subagent
+   definitions. Revisit if subagent built-in use skews results (architecture/framework-server I-08).
 2. **`claude mcp serve` details.** Exact tool list and behaviour (e.g. background commands) to be
    confirmed when building B3.

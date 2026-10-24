@@ -33,4 +33,5 @@ Commit spec/README changes as `docs:` commits when the user approves.
 `branch.ts` (+ `framework/test/core-branch.test.ts`, uncommitted) is an early in-process runner from 2026-10-21. It
 predates the architecture specs and does not match them (no isolate, instrumentation, recorder, `state` or renderers).
 Rebuild it per architecture/core-branch.md rather than patching it; the old `src/runner.ts` path is replaced afterwards.
+When the `packages/` layout (A-02) lands, update CLAUDE.md's `cd framework && npm test`.
 Workflow: main session designs, Sonnet subagents execute, small steps.

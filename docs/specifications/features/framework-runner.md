@@ -95,7 +95,7 @@ Held constant across frameworks within a run:
 - Model and temperature.
 - **Base turn limit** (main-loop turns) per problem. Orchestrate's secondary-LLM ("subagent") turns
   are counted and reported separately and do not consume the base limit.
-- **Secondary turn cap**: at most 4 secondary turns per `do` call (one attempt + up to 3 retries; one is the normal case; configurable, orchestrate §8.2).
+- **Secondary turn cap**: at most 4 secondary turns per `do` call (at most 4 executor turns; one is the normal case; configurable, orchestrate §8.2).
   Their cost is always included in the job's total (§4.5).
 - Base system prompt, excluding framework-specific sections.
 
@@ -141,6 +141,7 @@ So the framework itself must report this work, in every harness, not just in the
 
 A single shared **reporter** library is used by all frameworks. It owns the event schema, parent ids,
 and timestamps. Frameworks call it the same way regardless of which harness they run in.
+The interface below is illustrative; the approved one is in [architecture/telemetry.md §2](../architecture/telemetry.md).
 
 ```ts
 interface Reporter {
@@ -361,6 +362,8 @@ format, not the other way round.
 | Hash of each framework's system prompt and tool declarations | yes |
 | Model per role (main, secondary) and temperature | yes |
 | Limits: per-problem turn limits, secondary turn cap, branch trace settings | yes |
+| Tool tier (tools §3.4) | yes |
+| Framework switches: `rerank`, `hotPaths`, executor interface (part of the framework id) | yes |
 | Docker image digest per problem | yes |
 | Runner version and run format version | yes |
 | Problem set: problem ids and a hash of each task folder | no — runs may cover different problems; a problem present in several runs must have the same hash |

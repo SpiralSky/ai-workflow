@@ -180,8 +180,9 @@ produces, identified by tool name and/or attachment key (framework-runner §5.4 
 
 For a branch tool call:
 
-- The program is shown as TypeScript with **syntax highlighting and line numbers**; `intent` is
-  shown as the card title.
+- The program is shown as TypeScript with **syntax highlighting and line numbers**; `intent` (an optional
+  `branch` field, architecture/core-branch A-26) is shown as the card title; without one, the
+  program's first comment line is used.
 - The **execution trace** (branching-framework §7) is shown beside or below the program. Hovering
   or selecting a trace line highlights the source line it refers to, and vice versa.
 - The **hot path** (taken `cond` events) is marked on the source: taken branches emphasised, untaken
@@ -261,7 +262,5 @@ orchestrate's nested calls and reuse the nested-conversation renderer.
 
 ## 12. Open questions
 
-- **Static loading.** Browsers block `fetch` from `file://`. Keep generating script files (as
-  `data.js` does today), one per job for lazy loading, or serve locally with a one-line command?
-- **Annotations.** Would per-job notes or tags ("planner vague", "wrong tool") be worth storing
-  alongside runs, outside the run directory?
+- ~~**Static loading.**~~ Decided 2026-10-23: data files are scripts loaded by injected `<script>` tags, one per job, loaded on demand (architecture/viewer A-19).
+- ~~**Annotations.**~~ Decided 2026-10-23: deferred; if wanted later, stored outside run directories (architecture/viewer I-07).

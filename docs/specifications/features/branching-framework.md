@@ -1,8 +1,7 @@
 # Feature: Branching Framework
 
 **Status:** Final  
-**Area:** Core agent interface  
-**Related:** `framework/core/branch/`
+**Area:** Core agent interface
 
 ---
 
@@ -35,7 +34,7 @@ correct TypeScript.
 ## 3. User-visible behaviour
 
 From the model's perspective, there is one tool: `branch`.
-Its input is a TypeScript function body (a string).
+Its input is TypeScript source for an `async` arrow function (a string; see §4).
 Its output is a structured execution trace of what happened, including the return value (see §7).
 
 The model **does not** receive raw JSON tool call results mid-branch.
