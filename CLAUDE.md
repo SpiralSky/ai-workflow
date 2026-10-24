@@ -18,8 +18,10 @@ things easy to get wrong; the spec wins.
 - No backward compatibility with old run formats; delete stale runs rather than adapting to them.
 
 ## Running experiments
-**Models:** never use Claude/Anthropic models via OpenRouter. Use `deepseek/deepseek-v4-flash` only.
-**Budget:** $0.50 total per key; max $0.10 per run if costs are tight.
+**Models:** never use Claude/Anthropic models via OpenRouter. Use `deepseek/deepseek-v4-flash` only
+(system-overview §7; the runner refuses `anthropic/*`).
+**Budget:** per run, set with `--budget`: default $0.50 for dev and pilot runs, $1 for the full run
+(framework-runner §6.5–6.6). Every attempt's cost counts.
 
 ## Code comments
 - Document functions with JSDoc/TSDoc (`/** ... */`) above the function: what it does, `@param`/`@returns`/`@throws` where they add information beyond the signature.
