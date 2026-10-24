@@ -9,5 +9,3 @@ Run a TypeScript program that calls tools.
 `intent` is an optional one-line label for the program.
 
 The result is an execution trace: each tool call with its line, arguments and result, conditions and loops taken, `console.log` output, and the return value or error.
-
-Tools:

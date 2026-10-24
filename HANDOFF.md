@@ -30,8 +30,8 @@ per framework-runner §6.5 (CLAUDE.md updated); large dev problem deferred until
    `src/registry`, `src/host`, `src/selection/bm25.ts`) → ~~`buildFramework` + prompts~~ (done 2026-10-24,
    `src/framework`, `prompts/{base,branch-only,branch-tool}.md`; baseline + branch-only only) →
    **orchestrate engine next**, which also completes `buildFramework`: `orchestrate`, `[toolSearch]`,
-   `catalog=N` (distractor set) currently throw "not built yet". Prompt texts were drafted without a
-   spec and await the user's review before any eval run (their hashes are in provenance).
+   `catalog=N` (distractor set) currently throw "not built yet". Prompt texts approved by the user
+   2026-10-24.
    Engine packaging resolved 2026-10-24 (core-branch §4.1, I-11 revised): QuickJS-WASM default,
    isolated-vm optional, shipped beside the bundle; containers use `--engine isolated-vm`.
 3. Test the existing modes first: clean `compare` (baseline, branch-only, orchestrate) — Roadmap step 3.

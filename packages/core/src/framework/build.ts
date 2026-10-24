@@ -69,7 +69,7 @@ function branchOnlyTool(registry: Registry, opts: BuildOptions, state: State): F
   // The `tools` inner call exists only when the cap actually omitted something; never itself capped.
   const hasToolsCall = opts.maxChars !== undefined && decls !== declarations(routed);
   if (hasToolsCall) decls += "\n" + declarations([TOOLS_DECL]);
-  const description = loadPrompt("branch-tool").trimEnd() + "\n```ts\n" + decls + "\n```";
+  const description = loadPrompt("branch-tool").trimEnd() + "\n\nTools:\n```ts\n" + decls + "\n```";
   const runtime = opts.runtime ?? quickJSRuntime;
   const serial = mutex();
   return {
