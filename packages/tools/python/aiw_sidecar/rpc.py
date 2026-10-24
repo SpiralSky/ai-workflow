@@ -8,7 +8,7 @@ import sys
 import time
 import traceback
 
-from . import check, graph, nav
+from . import check, graph, nav, refactor
 
 
 def ping(root, params):
@@ -21,6 +21,7 @@ def handlers():
     table = {"ping": ping}
     table.update(nav.METHODS)
     table.update(graph.METHODS)
+    table.update(refactor.METHODS)
     table.update(check.METHODS)
     return table
 

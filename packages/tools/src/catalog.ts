@@ -6,6 +6,7 @@ import { moveFile } from "./l/fs/moveFile.ts";
 import { multiEdit } from "./l/fs/multiEdit.ts";
 import { graphTools } from "./l/graph/index.ts";
 import { navTools } from "./l/nav/index.ts";
+import { refactorTools } from "./l/refactor/index.ts";
 import { makeDiff } from "./l/vcs/diff.ts";
 import { history } from "./l/vcs/history.ts";
 import { makeRestore } from "./l/vcs/restore.ts";
@@ -27,27 +28,28 @@ export interface CatalogOpts {
   snapshot?: Snapshot;
   /** Python analysis sidecar for nav and check tools; without it they throw `no sidecar`. */
   sidecar?: Sidecar;
-  /** Internal, for tests: allow tier L with only the groups built so far (fs, nav, graph, check, vcs, external). */
+  /** Internal, for tests: allow tier L with only the groups built so far (fs, nav, graph, refactor, check, vcs, external). */
   partial?: boolean;
 }
 
 /**
  * The registered tools for a tier, in tools.md §5–6 order: S, then the L groups
  * (fs, nav, graph, refactor, test, check, vcs, external). The S tools are the same objects in both tiers.
- * @param tier - `S` (core six) or `L` (S plus 47 more; the sidecar groups are not built yet)
+ * @param tier - `S` (core six) or `L` (S plus 47 more; the test group is not built yet)
  * @param opts - see `CatalogOpts`
  * @throws `tier L not built yet` unless `opts.partial` is set
  */
 export function catalog(tier: "S" | "L", opts: CatalogOpts): ToolDef[] {
   const s = [bash, readFile, writeFile, edit, grep, findFiles];
   if (tier === "S") return s;
-  // refactor, test need the Python sidecar: added in a later step
+  // test needs the Python sidecar: added in a later step
   if (!opts.partial) throw new Error("tier L not built yet");
   return [
     ...s,
     multiEdit, moveFile, deleteFile, listDir,
     ...navTools(opts.sidecar),
     ...graphTools(opts.sidecar),
+    ...refactorTools(opts.sidecar),
     ...checkTools(opts.sidecar),
     makeDiff(opts.snapshot), history, makeRestore(opts.snapshot),
     ...externalTools,
