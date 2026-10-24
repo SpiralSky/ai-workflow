@@ -28,7 +28,8 @@ per framework-runner §6.5 (CLAUDE.md updated); large dev problem deferred until
    `packages/telemetry`) → ~~LLM client~~ (done 2026-10-24, `packages/llm`) → ~~core branch runtime~~ (done
    2026-10-24, `packages/core/src/branch`) → ~~core tool registry, hosts and wrappers~~ (done 2026-10-24,
    `src/registry`, `src/host`, `src/selection/bm25.ts`; `buildFramework` + prompts not yet) →
-   **`buildFramework` (core-tools-and-hosts §6) and/or orchestrate engine (next)**.
+   **`buildFramework` + framework prompts (core-tools-and-hosts §6) next** (user-approved order), then
+   the orchestrate engine.
    Engine packaging resolved 2026-10-24 (core-branch §4.1, I-11 revised): QuickJS-WASM default,
    isolated-vm optional, shipped beside the bundle; containers use `--engine isolated-vm`.
 3. Test the existing modes first: clean `compare` (baseline, branch-only, orchestrate) — Roadmap step 3.
@@ -47,14 +48,9 @@ root-only `return` events, render details, engines). Engines in `src/branch/engi
 `npm run test:ivm` runs isolated-vm. Not yet built: the server's `--engine` flag, plugin packaging
 of isolated-vm and the first-session note (framework-server §7.1), `engine` in run provenance.
 
-Tool layer (core-tools-and-hosts) choices not in the spec, pending user approval to record in the spec:
-`HostToolDecl` = `{ name, description, inputSchema, returns?, routing?, capsOutput?, meta? }`; `capsOutput`
-lets self-capping hosts skip `capOutput`; over-cap structured results become truncated JSON text plus
-note; `normalizeName` lowercases only the first char (`Bash`→`bash`); `CheckedHost(inner, checker,
-{ session(), approve? })` denies read-only before the checker, no `approve` → ask denied; `bindTools`
-takes the call id from `currentReporter().scope` inside `wrapTools` (telemetry now forwards ctx).
-**Spec conflict to resolve:** framework-server §3 says CompositeHost "first wins on name conflict";
-core-tools-and-hosts §4 and branching-framework §6.2 say collisions are errors — implemented as error.
+Tool-layer, telemetry and LLM-client implementation choices are recorded in the specs (approved
+2026-10-24): core-tools-and-hosts A-28, telemetry A-27 (amended), runner A-29. CompositeHost name
+collisions are errors (framework-server §3 aligned).
 
 ### Old `framework/core/branch/`
 
@@ -62,14 +58,6 @@ core-tools-and-hosts §4 and branching-framework §6.2 say collisions are errors
 predates the architecture specs and does not match them (no isolate, instrumentation, recorder, `state` or renderers).
 Rebuild it per architecture/core-branch.md rather than patching it; the old `src/runner.ts` path is replaced afterwards.
 npm workspaces root (A-02) exists: `npm test` / `npm run typecheck` at the repo root; `framework/` is not a workspace.
-Telemetry choices not in the spec: `wrapTools` nests a tool's calls directly under its tool id (no `scope`
-event); the explicit reporter wins over `currentReporter()`; `fromMeta(meta, root)` derives from the server's root
-reporter so `s:n` ids stay unique; `wrapLLM` takes an `LLMClient` interface returning already-normalised usage
-(telemetry can't import `@aiw/llm`), so `@aiw/llm` must implement that interface.
-LLM choices not in the spec: `createChatClient({ baseURL, apiKey, timeoutMs=300 s })` does no retries (the runner
-restarts the job, runner §7); errors are `LLMError` with `kind` infra/context-limit/other (runner §4.4), context-limit
-detected by message regex; a caller's `signal` abort is rethrown unwrapped (not infra); `tools: []` is omitted
-from the body; OpenRouter is detected by base URL; `cacheWrite` read from `prompt_tokens_details.cache_write_tokens`.
 Workflow: the main session designs and orchestrates; subagents execute in small, self-contained steps. Use
 Sonnet subagents (`model: "sonnet"`) for implementation and Haiku (`model: "haiku"`, weaker) for simple mechanical
 tasks; the main agent reviews their output.

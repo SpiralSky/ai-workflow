@@ -101,6 +101,15 @@ OpenAI-compatible chat completions via `@aiw/llm` + `wrapLLM(role: "main")`:
   `turn-limit` (framework-runner §6.1). Secondary turns never count (framework-runner §4.4).
 - Temperature and model fixed per run.
 
+> **Decided A-29 (2026-10-24, approved):** `@aiw/llm` client details:
+> - `createChatClient({ baseURL, apiKey, timeoutMs = 300 s })` implements telemetry's `LLMClient`
+>   (telemetry §2). It does **no retries**: an infra error restarts the job (§7).
+> - Errors are `LLMError` with `kind`: `infra` | `context-limit` | `other` (§4.4); context-limit is
+>   detected by matching the API error message. An abort from the caller's `signal` is rethrown
+>   unwrapped, not classified as infra.
+> - An empty `tools: []` is omitted from the request body. OpenRouter is detected from the base URL;
+>   `cacheWrite` is read from `prompt_tokens_details.cache_write_tokens`.
+
 ### 4.3 Tool dispatch
 
 - For each tool call: preallocate event id, `toolStart`, call the server with

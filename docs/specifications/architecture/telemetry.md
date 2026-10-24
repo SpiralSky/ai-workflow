@@ -53,7 +53,9 @@ Helpers:
   reporter scoped to `id` available through an async-local context, then `tool({ id, … })`. The
   scoped reporter writes **no** `scope` event: the `tool` event itself is the parent, so each id
   names one record (a `toolStart` is superseded by its `tool`). `child()` stays for scopes that are
-  not tool calls (e.g. an executor session).
+  not tool calls (e.g. an executor session). Extra call arguments after `args` (e.g. the per-call
+  `ctx`, core-tools-and-hosts §4) are forwarded to the tool unchanged; inside the call,
+  `currentReporter().scope` is the call id.
 - `wrapLLM(client, reporter, role, { transcript?, session? })`: times the request, writes `turn` and the
   transcript entry (§5); the entry's `turnId` is the `turn` event id (there is no id on the `turn` event pointing back).
   `client` is the `LLMClient` interface defined in `@aiw/telemetry`, whose `complete()` returns
@@ -74,6 +76,7 @@ executor's tools, wrapped with the executor's reporter, would attach under the e
 
 > **Decided A-27 (2026-10-24, approved):** the four helper details above (no scope event per tool
 > call, normalised-usage `LLMClient` interface, explicit reporter wins, shared server counter).
+> Amended 2026-10-24 (approved): `wrapTools` forwards extra call arguments.
 
 ---
 

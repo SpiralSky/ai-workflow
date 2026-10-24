@@ -77,6 +77,18 @@ interface Host {
   Core ships only `CompositeHost` (merges several hosts; a name collision is a registration error, branching-framework §6.2) and the
   `CheckedHost` wrapper (§5) because their semantics are part of the core contract.
 
+> **Decided A-28 (2026-10-24, approved):** Implementation details of the host contract:
+> - Hosts declare tools as `HostToolDecl = { name, description, inputSchema, returns?, routing?,
+>   capsOutput?, meta? }`; the registry (§2) derives `ToolDecl` from it.
+> - **Name normalisation** (§3) lowercases only the first character of a non-MCP name
+>   (`Bash` → `bash`, `ReadFile` → `readFile`).
+> - **`capsOutput: true`** marks a host tool that enforces the output cap itself; `capOutput` (§5)
+>   skips it. Over-cap structured results become truncated JSON text plus the truncation note.
+> - **`CheckedHost(inner, checker, { session(), approve? })`**: in read-only mode non-read calls are
+>   denied before the checker runs; with no `approve` callback an `ask` verdict is denied.
+> - **`bindTools`** takes the inner-call `id` from `currentReporter().scope` inside `wrapTools`
+>   (telemetry §2), so the host call id equals the `tool` event id.
+
 ---
 
 ## 5. Wrapper stack

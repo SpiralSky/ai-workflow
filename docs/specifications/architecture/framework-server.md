@@ -50,7 +50,7 @@ result is returned.
 |------|----------------|
 | `LocalHost` | Wraps `@aiw/tools` catalog for a tier, contained to the root. Used by the runner host and as the built-in source for MCP fallback. |
 | `McpClientHost` | Connects as an MCP client to one server (stdio or HTTP) from a config entry; lists and calls its tools. Used for discovered user servers and `claude mcp serve`. |
-| `CompositeHost` (core) | Merges hosts, first wins on name conflict, conflicts reported. |
+| `CompositeHost` (core) | Merges hosts; a name collision is a registration error (core-tools-and-hosts §4, branching-framework §6.2). |
 | `CheckedHost` (core) | Applies a `Checker` before each call ([core-tools-and-hosts §5](core-tools-and-hosts.md#5-wrapper-stack)). |
 | `ChannelHost` | Native host over the call channel (harness-integration §4.5): JSON lines `{ id, parent, name, args }` / `{ id, ok, value \| error, durationMs }` / `{ cancel: id }` / `{ pause: id }` / `{ resume: id }` (approval waits, §4.6) over a socket path or fd given by the plugin. Built when a native-capable harness is confirmed (harness §12 Q1). |
 
