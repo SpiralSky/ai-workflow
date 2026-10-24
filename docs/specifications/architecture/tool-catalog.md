@@ -119,6 +119,27 @@ One sidecar per server session; restarted on crash (the in-flight call throws `s
 >   a `format` table in `ruff.toml`/`.ruff.toml`; both run `ruff format` (black configs carry over
 >   `line-length` only).
 
+> **Decided A-33 (2026-10-24):** `graph` details:
+> - `ast` index per file, cached by (path, mtime_ns); cross-file resolution rebuilt lazily. Call
+>   targets resolve through local names, `from` imports (re-exports, 6 hops), `self`/`cls`/`super()`
+>   on the workspace MRO, module aliases, constructors (→ `__init__`) and typed receivers (annotated
+>   params, `x = Class()`, `self.attr = Class()`). Otherwise an edge is `approx`: a unique method
+>   name links to it; else jedi `infer` if it gives exactly one function (≤ 150 lookups per
+>   rebuild); else an `approx` edge to every candidate (≤ 5) with `candidates: N`.
+> - Known blind spots: callbacks/registries, decorator-replaced functions, `partial`, call results
+>   other than constructors, `import *`, conditional redefinitions (last wins). Files with syntax
+>   errors are skipped and listed in `overview.unparsed`.
+> - Module-level code is `path#<module>`; nested functions `path#C.m.inner`; a class stands for its
+>   `__init__` in call graphs. Import cycles use non-lazy edges only (function-local and
+>   `TYPE_CHECKING` imports are `lazy`).
+> - `callGraph`: `direction` default `both`, `depth` default 2, max 5. `impact`: optional `depth`
+>   (default 4, max 8); test callers are listed under `tests` (`via: call | import`). `dataFlow`
+>   writes carry a concurrency `context` (thread target, executor task, asyncio task, `async def`,
+>   or reachable from one within 6 calls) and a `concurrentWrites` count. `overview` takes no
+>   arguments, excludes tests from modules/API/hotspots, and reads pyproject script tables.
+> - Per-list caps (also ~6 KB each): callGraph 40 nodes/60 edges; importGraph 60 edges/10 cycles;
+>   impact 30/20/20/15; dataFlow 25 writes/25 reads; overview sized to stay under 8 KB.
+
 ## 5. External tools and fixtures
 
 `fixtures/external/<tool>.json` holds canned responses selected by simple argument matching
