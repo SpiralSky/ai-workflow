@@ -287,7 +287,8 @@ valid over incomplete jobs.
 - An infra error (§6.1) retries the job from scratch, up to 2 retries with backoff.
 - If a job still fails after its retries, the run **stops**. The run is marked **invalid**: its
   results are kept for debugging but never used in reports or combined with other runs (§6.6).
-- **Budget** is set per run (default $0.50). Every attempt's cost counts, including failed and
+- **Budget** is set per run: default $0.50 for dev and pilot runs (§6.6), and $1 for the full
+  run. Every attempt's cost counts, including failed and
   retried ones. Before starting, the runner projects the run's cost from earlier combined runs
   (when there are any) and refuses to start if the projection exceeds the budget. If cost still
   reaches the budget mid-run, the run stops and is marked invalid.
@@ -295,18 +296,30 @@ valid over incomplete jobs.
 
 ### 6.6 Staged evaluation
 
-Evaluation grows in small runs rather than one large one, so a broken setup is caught cheaply.
+Evaluation grows in small runs rather than one large one, so a broken setup is caught cheaply, and
+the expensive full run happens once.
 
 - A run's size is configurable: which problems, which frameworks, and repetitions per problem
   (default 1).
 - Results from several valid runs are **combined** into one report, as if they were a single larger
   run. Only runs with the same configuration (see §7.1) can be combined.
-- **Failure gate.** After each run, the combined report checks every framework's pass rate against a
-  threshold (default 90%). Below it, the report flags the framework and the failing problems; the
-  failures are treated as setup bugs to investigate, not as results. Scaling up only continues
-  while every framework is at or above the threshold.
+- **Dev runs** use the dev set (problems §8.5) to tune the frameworks.
+- **Failure gate (temporary, dev set only).** After each dev run, the combined report checks every
+  framework's pass rate against a threshold (default 90%). Below it, the report flags the framework
+  and the failing problems. Every failure is audited and labelled `setup` (bug in the problem,
+  runner or tools) or `framework` (weakness to tune). Remove the gate together with the dev set.
+- **Setup gate (permanent).** Before any run on the reported set: the smoke test and every
+  problem's reference solution pass, and no audited failure is still labelled `setup`.
+- **Pilot runs** use part of the reported set (e.g. small problems at tier S) to check the setup
+  and to measure cost per job. Their results are never tuned against.
+- **Full run.** The whole reported set, with a $1 budget. The runner refuses to start it unless the
+  setup and failure gates pass, the cost projection from pilot runs fits the budget, and no full run
+  exists yet for the same provenance (§7.1).
 - The runner can repeat automatically: run, combine, check the gate, and start the next run, until
   a target number of repetitions is reached, the gate fails, or the budget would be exceeded.
+- **Tuning is a spec change.** A framework change made to pass the gate is reviewed and approved
+  like any spec change, except for minor bug fixes. Every change is checked twice for overfitting:
+  it must not encode knowledge of a specific problem (dev or reported), only general behaviour.
 
 ---
 

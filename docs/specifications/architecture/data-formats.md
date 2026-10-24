@@ -103,6 +103,7 @@ the viewer shows them from `events.jsonl` alone, marked incomplete (viewer §9).
       "failures": { "checks": 1 }, "gate": "ok" | { "flagged": ["<problem>", "..."] }
     }
   },
+  "audits": { "<run-id>/<job-id>": { "label": "setup" | "framework", "note": "..." } },
   "paired": [ { "problem": "07-async-race", "a": "branch-only", "b": "baseline",
                 "passA": 3, "passB": 2, "costA": 0.011, "costB": 0.019 } ],
   "orchestrate": { /* orchestrate §10.1 metrics when present */ },

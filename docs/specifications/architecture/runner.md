@@ -27,9 +27,9 @@
 ## 2. CLI
 
 ```
-aiw eval    --problems <ids|all|small|large> --mode <baseline|branch-only|orchestrate|compare|variant,...>
+aiw eval    --problems <ids|all|small|large|dev> --mode <baseline|branch-only|orchestrate|compare|variant,...>
             --tools S|L  --reps 1  --model deepseek/deepseek-v4-flash  [--temperature 0]
-            --budget 0.50  --concurrency 2  [--branch-context trace|annotated|full]
+            --budget 0.50  [--full]  --concurrency 2  [--branch-context trace|annotated|full]
             [--secondary-cap 4]  [--until-reps N --combine-with <report>]
 aiw report  <run-dir>... --name <report-name>          # combine (§8)
 aiw problems build [<id>...]                             # codebase + overlay → workspace (problems.md)
@@ -183,7 +183,12 @@ outside the executor loop cannot go unrecorded.
   checks that all §7.1 "must match" provenance fields agree, and that shared problems have the same
   task-folder hash. Output: `experiments/reports/<name>/report.json` (+ `report.md` summary).
 - Aggregation is done by `@aiw/report` (pass rate + 95% Wilson interval, cost per successful job,
-  paired per-problem comparison, failure gate at 90%), see [data-formats §4](data-formats.md#4-combined-report).
+  paired per-problem comparison, failure gate at 90% on dev-set reports), see [data-formats §4](data-formats.md#4-combined-report).
+- Failure audits (`setup` | `framework` per failed job, framework-runner §6.6) are recorded in the
+  combined report; the setup gate reads them.
+- `aiw eval --full`: the whole reported set with a default budget of $1. Refuses to start unless the
+  setup gate and the dev-set failure gate pass, the projection from pilot runs fits the budget, and
+  no full run exists for the same provenance (§9).
 - `aiw eval --until-reps N --combine-with <name>`: loop of run → combine → gate; stops when the
   combined report reaches N reps per (problem, framework), the gate fails, or the next run's
   projected cost exceeds the remaining budget (§6.6).

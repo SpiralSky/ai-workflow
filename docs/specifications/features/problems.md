@@ -28,7 +28,7 @@ always the cheapest strategy and structure-aware tools cannot show a benefit. Re
 codebases where reading everything is not an option. The cost claim
 ([framework-runner.md §2](framework-runner.md)) has to hold there too.
 
-Budget is tight ($0.50 per run by default), and each problem is multiplied by frameworks × tool
+Budget is tight (framework-runner §6.5), and each problem is multiplied by frameworks × tool
 tiers × repetitions. So every problem must earn its place: it should test something no other
 problem tests, and it should be able to separate frameworks rather than be passed or failed by all.
 
@@ -57,6 +57,7 @@ problems/<id>/
 |-------|---------|
 | `id` | Folder name. |
 | `size` | `small` \| `large` \| `smoke` (setup check only; not in `all`, never reported, §8.2). |
+| `set` | `reported` (default) \| `dev` (tuning only; not in `all`, never reported, §8.5). |
 | `codebase` | Shared codebase id (large problems only, §6). |
 | `turnLimit` | Base turn limit (framework-runner §4.4). |
 | `tags` | What it tests (`bugfix`, `feature`, `refactor`, `concurrency`, `multi-file`, `rename`, `move`, `signature`, `import-cycle`, `deep-cause`, …). Reports can group by tag. |
@@ -184,6 +185,25 @@ half of the limit).
 5 small + 5 large = 10 problems. A full comparison is 10 × 3 frameworks × 2 tiers = 60 jobs per
 repetition. Staged evaluation (framework-runner §6.6) should start with small problems at tier S,
 then large at both tiers.
+
+### 8.5 Dev set (temporary)
+
+Frameworks are tuned until they pass the failure gate (framework-runner §6.6). Tuning on the
+reported set would overfit the frameworks to the problems they are judged on, so the gate runs on a
+separate **dev set** (`set: "dev"`), and the reported set is never gated.
+
+| Id | Notes |
+|----|-------|
+| `01-chunk-off-by-one` | The smoke test (§8.2). |
+| `03-discount-mismatch` | Cut from the reported set as a near-duplicate of 08 (§8.2); fine for tuning. |
+| `06-import-cycle` | Must first be fixed to §5.2 (no hidden constraint). |
+| one large dev problem on `fulfil` | To be written; must not overlap with L1–L5 in what it tests. |
+
+Dev problems must meet §5 like any other problem, so that a failure points at the framework, not at
+the problem.
+
+Remove this section and the dev problems once the frameworks are mature (they pass the gate without
+further tuning).
 
 ---
 

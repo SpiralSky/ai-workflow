@@ -9,17 +9,6 @@ when it is empty.
 
 ## 2. Experimental validity (decision needed)
 
-**F4. Failure gate contradicts the problem goal.** framework-runner §6.6 requires every framework
-≥ 90% pass rate before scaling up; problems §2 wants problems that *separate* frameworks. Good
-problems will trip the gate. Proposal: gate only on smoke + small problems, or only on
-setup-looking failures (`patch-failed`, `timeout`, crashes).
-
-**F5. Budget.** framework-runner §6.5 and problems §2 say $0.50 *per run*; CLAUDE.md says $0.50
-*total per key* and max $0.10 per run when tight. Also no spec estimates per-job cost: a full rep is
-60 jobs (problems §8.4) with up to 30 turns on large problems, which likely exceeds $0.50.
-Proposal: align the default with CLAUDE.md and add a cost estimate per job size so staged
-evaluation is planned against the real budget.
-
 **F6. Hot paths and reranker only in orchestrate.** Known-good snippets (orchestrate §9) give
 orchestrate prompt content the others lack, confounding the comparison. Proposal: `hotPaths` off by
 default in comparisons, or a `branch-only[hotPaths]` variant. (The reranker's model was fixed to
