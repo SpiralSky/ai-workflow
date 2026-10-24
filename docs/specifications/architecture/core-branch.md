@@ -24,15 +24,32 @@ Public API:
 
 ```ts
 compileBranch(source: string): CompiledBranch | CompileError
-runBranch(program: CompiledBranch, tools: Tools, state: State,
-          opts: { signal?: AbortSignal; onEvent?: (e: TraceEvent) => void;
-                  timeoutMs?: number; memoryMb?: number }): Promise<BranchResult>
+runBranch(program: CompiledBranch, tools: BranchTools, state: State,
+          opts?: { signal?: AbortSignal; onEvent?: (e: TraceEvent) => void;
+                   timeoutMs?: number; memoryMb?: number },
+          runtime?: IsolateRuntime): Promise<BranchResult>
 renderTrace(result: BranchResult, opts: { mode: "trace" | "annotated" | "full"; source: string;
-            limits: TraceLimits }): string
+            limits?: TraceLimits; state?: State }): string
 ```
 
+`BranchTools` is `Record<string, (args, ctx: CallCtx) => unknown>`: the host side of BF §6.1's
+one-argument `Tool`, with the per-call ctx of A-23 added by the bridge. `renderTrace` appends the
+state footer when `state` is given and non-empty.
+
 `BranchResult` is exactly BF §5.1 (`ok`/`value` or `error`/`message`/`line?`/
-`aborted?`/`stateReverted?`, both with `trace: TraceEvent[]`). `runBranch` never throws.
+`aborted?`/`stateReverted?`, both with `trace: TraceEvent[]`), plus `droppedKeys?` naming state keys
+dropped as non-JSON (BF §4.4). `runBranch` never throws.
+
+`TraceEvent` (all with `t`, ms since branch start; lines are original program lines):
+
+| Event | Fields |
+|-------|--------|
+| `call` `start` / `end` | start: `id`, `line`, `name`, `args`; end: `id`, `ok`, `ms`, `result` or `error`, `aborted?`. One BF §7.1 `call` is the start/end pair, so concurrent and in-flight calls are representable; renderers merge the pair. |
+| `cond` | `line`, `kind` (`if`/`ternary`/`switch`/`catch`), `value`, `pos`/`end` (source offsets of the condition, case clause or catch clause, so renderers can quote it) |
+| `loop` `enter` / `iter` / `exit` | `line`; enter also `kind` (`for`/`for-of`/`for-in`/`while`/`do`) and `endLine` |
+| `log` | `line`, `level`, `message` |
+| `return` | `line`, `value` |
+| `error` | `message`, `lines` (innermost first), `tool?`, `callId?` |
 
 ---
 
@@ -48,8 +65,13 @@ source ──parse (TS AST, original positions)──▶ validate ──▶ inst
 2. **Validate.** Reject `import`/`require`/dynamic `import()` (BF §4.1 "may not import modules").
    This gives an early, clear error; the isolate enforces it anyway (BF §5.2).
 3. **Instrument** (§3).
-4. **Emit.** Strip types and print JS; append `//# sourceURL=branch-code-<n>.js`. Each recorder call
+4. **Emit.** Strip types and print JS (loaded as `branch-code-<n>.js`). Each recorder call
    carries the original line as a literal, so the emitted layout is irrelevant to reported lines.
+   Instrumentation (§3) is applied as text insertions into the original source that never add
+   newlines, so the instrumented TypeScript keeps the original line layout. Types are then stripped
+   with `ts.transpileModule` (source map on); the map gives the `lineMap` (emitted line → original
+   line) used to map stack frames (tool-call lines, errors, `console`). A trailing `;` after the arrow is
+   ignored. (Internal, 2026-10-24.)
 5. **Load.** At run time (§4) the emitted JS is compiled inside a fresh isolate with filename
    `branch-code-<n>.js`, as an async function of `(__t, __tools, __state, console)` that calls the
    user function with `(__tools, __state)`. All four parameters are created inside the isolate.
@@ -75,6 +97,12 @@ Rewrites (line `L` from the original AST node start):
 | arrow with expression body (root) | treated as `return` | `return` |
 
 Not instrumented (BF §7.2): `&&`, `||`, `??`, `?.`.
+
+Details (internal, 2026-10-24): `return` is instrumented only for the root function's returns, not
+returns of nested functions or callbacks (control flow inside those is instrumented). A `switch`
+clause records `__t.case(L, pos, end)` without re-evaluating the case expression. Loops are wrapped
+as `{__t.loopEnter(L, kind, endLine); try { <loop> } finally { __t.loopExit(L) }}`; a labelled
+loop is wrapped together with its label so labelled `break`/`continue` keep working.
 
 Tool calls are **not** rewritten: `__tools` is a `Proxy` inside the isolate over the tool names
 (§4), which records `call` events and forwards each call to the host. The calling line is taken from the stack at call time (first
@@ -106,10 +134,13 @@ Nothing but JSON data crosses it (BF §5.2).
 4. **Abort and timeout.** On abort or timeout the host disposes the isolate. In-flight calls are
    marked `aborted` and the result is `{ ok: false, aborted: true, … }` with the trace flushed so
    far (BF §5.3). In-flight tools receive the abort through their own signal; their late results are
-   recorded as a telemetry event only (not in the trace) and ignored.
+   recorded as a telemetry event only (not in the trace) and ignored. That event is the `tool`
+   event the `reportTool` wrapper (§ wrapper stack, core-tools-and-hosts §5) writes when the call
+   settles; `runBranch` itself does nothing with a late result.
 5. **Unhandled throw** → `error` event with mapped stack (`stack.ts`, from the isolate's stack
    with the `branch-code-<n>.js` filename) and the throwing tool if the error came from a `call`
-   (marked by the proxy).
+   (marked by the proxy). A tool error is rethrown in the isolate with the original `name` and
+   `message` and the stack of the call site (the host's stack has no program frames).
 6. **Memory limit** exceeded → isolate disposed, result `{ ok: false, error: "memory", stateReverted: true, … }`
    (state reverts to the last snapshot, as for any kill).
 
@@ -141,6 +172,9 @@ over between calls.
 > the fix for GHSA-864f-rcv7-6rh4). 7.x needs Node ≥ 24. The project is in maintenance mode, which
 > is why the engine stays behind `IsolateRuntime`.
 
+`isolated-vm` requires Node to run with `--no-node-snapshot` (Node ≥ 20); the `@aiw/core` test
+script sets it through `NODE_OPTIONS`.
+
 ---
 
 ## 5. Rendering
@@ -149,7 +183,11 @@ over between calls.
   pairs with per-iteration events summarised (ok/err counts, distinct errors with iteration
   numbers); concurrent calls ordered by start, completion on the same line, tagged with call id.
 - `annotated`: projects events onto source lines as end-of-line comments; re-sends the program.
-- `full`: as `trace` without value truncation or loop collapsing.
+- `full`: as `trace` without value truncation, loop collapsing or event budget (the upper bound,
+  BF §7.5).
+- Format details beyond BF §7.3 (internal, 2026-10-24): a ternary renders as `?: <cond> → v`; all
+  `for` variants render as `for`; an expanded loop prints no header; a return, error or in-flight
+  call inside a collapsed loop is printed after the loop summary.
 - Limits (`TraceLimits`): value truncation 200 chars, loop collapse threshold 3 iterations, event
   budget 60 events; the final `return`/`error` is always kept (BF §7.4). All three are provenance
   fields.
