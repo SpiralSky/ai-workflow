@@ -31,10 +31,9 @@ per framework-runner §6.5 (CLAUDE.md updated); large dev problem deferred until
    `src/framework`, `prompts/{base,branch-only,branch-tool}.md`; baseline + branch-only only) →
    ~~orchestrate engine~~ (done 2026-10-24, `src/orchestrate/`, `src/refs/`, `src/registry/distractors.ts`;
    `buildFramework` now builds `orchestrate`, `branch-only[toolSearch]`, `catalog=N`).
-   **Pending user approval** (committed as drafts): prompts `rerank.md`, `executor.md`, `orchestrate.md`,
-   `do-tool.md`, `resolve-tool.md`, and the executor's fixed `branch` description (`executorBranchDescription()`).
-   Also flag: distractor set is generated in code (50 business domains × 24 verbs); distinct from real tools
-   but near-duplicates of each other at N≥200 (spec §6.1 only requires vs real tools).
+   Prompts `rerank.md`, `executor.md`, `orchestrate.md`, `do-tool.md`, `resolve-tool.md` and the executor's
+   fixed `branch` description approved by the user 2026-10-24. Distractor set (`catalog=N`): 50 domains × 24
+   verbs with per-domain vocabulary and fields; 0 near-duplicate warnings up to N=1200 (wording repeats beyond).
    **Not built yet:** hot paths (`hotPaths: on` throws; arch §4.5), `orchestrate[executor=calls]`,
    declaration cap / `tools` inner call inside executors (core-tools-and-hosts §6 row `orchestrate`).
    **Next:** the runner / server that consume `buildFramework` (README Roadmap), then step 3.
