@@ -118,7 +118,8 @@ Shared conventions:
   are defined once in `@aiw/telemetry` (events, transcript) or `@aiw/report` (run files) with
   runtime validation (`zod`), and versioned (`v` field).
 - Server bundle: `esbuild` produces a single-file `aiw-server.mjs` used in containers and shipped
-  in the Claude Code plugin.
+  in the Claude Code plugin. The optional `isolated-vm` engine is external to it and ships beside it
+  (core-branch §4.1).
 
 ---
 

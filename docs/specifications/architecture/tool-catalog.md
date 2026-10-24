@@ -98,7 +98,7 @@ response is deterministic.
 > - tool venv at `/opt/aiw/venv` (jedi, rope, pyright, ruff) — outside the workspace
 >   interpreter's import path.
 >
-> The **server bundle** (`aiw-server.mjs` + sidecar package) is **not** baked into images: the
+> The **server bundle** (`aiw-server.mjs` + sidecar packages, including `isolated-vm`) is **not** baked into images: the
 > runner bind-mounts it read-only at `/opt/aiw/bundle` per job. Image digests then change only when
 > the environment changes, while code changes are tracked by the commit in provenance.
 > The base image is versioned (`aiw-base:py3.12-<n>`) and its digest is part of each problem

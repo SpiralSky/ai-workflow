@@ -132,8 +132,8 @@ tool-call arguments are returned to the model as a tool error and do not end the
 ## 5. Server invocation
 
 ```
-docker exec -i [-e OPENAI_BASE_URL=http://aiw-egress:8080/v1] <ctr> /opt/aiw-node/bin/node /opt/aiw/bundle/aiw-server.mjs \
-  --framework <variant> --tier S|L --host local --root /work \
+docker exec -i [-e OPENAI_BASE_URL=http://aiw-egress:8080/v1] <ctr> /opt/aiw-node/bin/node --no-node-snapshot /opt/aiw/bundle/aiw-server.mjs \
+  --engine isolated-vm --framework <variant> --tier S|L --host local --root /work \
   --events /out/events.jsonl --transcript /out/transcript.jsonl --blobs /out/blobs \
   [--executor-model <model> --secondary-cap 4] [--branch-context trace]
 ```

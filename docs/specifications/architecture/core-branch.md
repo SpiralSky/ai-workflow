@@ -163,17 +163,36 @@ disposed and the model receives the failed result on its next turn. The job's wa
 ### 4.1 Isolate runtime
 
 `IsolateRuntime` hides the engine: `create({ memoryMb }) → { load(js, filename), bridge(hostFns),
-run(), dispose() }`. The default implementation uses `isolated-vm`; `quickjs-emscripten`
-(QuickJS-WASM: no native build, slower on heavy computation) is the fallback implementation.
+run(), dispose() }` (`create` is async and takes an optional `interrupt` callback). Two
+implementations: `quickJSRuntime` (default) and `isolatedVMRuntime` (optional, faster on heavy
+computation).
 Each branch call gets a new isolate (a few ms), so nothing — globals, patched prototypes — carries
 over between calls.
 
-> **Decided I-11 (2026-10-24):** `core` depends on `isolated-vm@6.2.0`, pinned (Node ≥ 22; contains
-> the fix for GHSA-864f-rcv7-6rh4). 7.x needs Node ≥ 24. The project is in maintenance mode, which
-> is why the engine stays behind `IsolateRuntime`.
+> **Decided I-11 (2026-10-24, revised same day with user approval):** the default engine is
+> QuickJS-WASM: `quickjs-emscripten-core@0.32.0` with the `@jitl/quickjs-singlefile-mjs-release-sync`
+> variant (WASM inlined, so the server stays a single-file bundle). `isolated-vm@6.2.0` is an
+> `optionalDependency`, loaded lazily with `import()` (Node ≥ 22; contains the fix for
+> GHSA-864f-rcv7-6rh4; 7.x needs Node ≥ 24; the project is in maintenance mode). Its package ships
+> prebuilt binaries for linux-x64/arm64 (glibc, musl), darwin-arm64 and win32-x64, for Node 22 and 24.
 
-`isolated-vm` requires Node to run with `--no-node-snapshot` (Node ≥ 20); the `@aiw/core` test
-script sets it through `NODE_OPTIONS`.
+**Engine selection.** `selectRuntime("auto" | "quickjs" | "isolated-vm")` → `{ runtime, engine, note? }`.
+`auto` picks `isolated-vm` when it loads and Node runs with `--no-node-snapshot` (required by
+isolated-vm on Node ≥ 20; checked in `execArgv` and `NODE_OPTIONS`); otherwise QuickJS, with a
+`note` telling the user how to get the faster engine. An explicit `isolated-vm` that cannot be used
+throws. `runBranch` defaults to QuickJS.
+
+**QuickJS specifics.** QuickJS runs on the host thread, so a synchronous loop starves Node's timers:
+the timeout is enforced by QuickJS's interrupt handler polling `interrupt()` (killed, or the
+`Deadline` budget used up). The interrupt and out-of-memory errors are catchable inside QuickJS, so
+the engine remembers that the interrupt fired and fails `run` whatever the script returns (→
+`timeout`), and an `InternalError: out of memory` that ends the branch maps to `memory`. A program
+that catches an out-of-memory error and still finishes normally is not flagged (known gap). Heavy
+synchronous computation blocks the server for its duration; moving QuickJS into a worker thread is
+the remedy if that matters. Stack frames may lack a column; `mapStack` accepts both formats.
+
+**Tests** run on QuickJS (`npm test`); `npm run test:ivm` runs the same suite on isolated-vm
+(`AIW_ENGINE=isolated-vm`, `NODE_OPTIONS=--no-node-snapshot`).
 
 ---
 

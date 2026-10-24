@@ -120,7 +120,15 @@ plugins/claude-code/
   hooks/register.ts            hooks module: prompt.compose, tool.call, tool.describe
   prompts/branch-only.md, prompts/orchestrate.md   framework prompt sections
   server/aiw-server.mjs        bundled server (same build as the job container)
+  server/node_modules/isolated-vm   optional fast engine with its prebuilt binaries (~13 MB)
 ```
+
+`isolated-vm` is external to the esbuild bundle and shipped beside it with its prebuilds
+(linux-x64/arm64 glibc+musl, darwin-arm64, win32-x64; Node 22 and 24). `mcpServers.aiw` launches
+`node --no-node-snapshot server/aiw-server.mjs --engine auto` (core-branch §4.1). Where the fast
+engine cannot load (e.g. Intel macOS, another Node version), the server falls back to QuickJS and
+the hooks module shows its `note` once, at the first session start (plugins have no install hook),
+saying how to get the faster engine.
 
 The prompt files are copied at build time from `@aiw/core/prompts/<framework id>.md` so they are
 byte-identical to what was measured (harness-integration §2). `prompt.compose` appends the one

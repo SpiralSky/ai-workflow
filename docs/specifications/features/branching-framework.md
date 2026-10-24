@@ -146,15 +146,16 @@ The runner receives a branch program string, compiles it, and executes it agains
 
 ### 5.2 Isolation
 
-Each branch program runs in a **fresh V8 isolate** (`isolated-vm`), created for that call and
-disposed after it. The isolate holds only standard JavaScript built-ins plus what the runner injects
+Each branch program runs in a **fresh isolate**, created for that call and disposed after it. The
+default engine is QuickJS compiled to WASM: portable, with no native build. `isolated-vm` (a V8
+isolate) is an optional, faster engine for compute-heavy programs where it is available. The isolate holds only standard JavaScript built-ins plus what the runner injects
 (`tools`, `state`, `console`): no `process`, `require`, `import()`, Node modules, environment
 variables or references to host objects. A tool call is therefore the only way a program can affect
 anything outside itself, and every tool call goes through the layer above (for example the
 harness's checks, [harness-integration §1](harness-integration.md)).
 
 - **Termination.** On timeout or abort the runner disposes the isolate, which also stops
-  synchronous infinite loops. The result is an ordinary failed `BranchResult` (`aborted: true`,
+  synchronous infinite loops; a program cannot catch and survive a timeout. The result is an ordinary failed `BranchResult` (`aborted: true`,
   partial trace); the model sees it on its next turn and can correct the program.
 - **Memory limit** per isolate (default 128 MB); exceeding it fails the branch.
 - **Data crossing the boundary.** The isolate and the host share no memory: tool arguments and
@@ -167,6 +168,9 @@ harness's checks, [harness-integration §1](harness-integration.md)).
 Considered and rejected: in-process execution (no isolation, synchronous loops cannot be
 stopped), a worker thread (can be stopped, but has full Node access), a container per program
 (strong, but ~0.3–1 s startup and a Docker dependency for harness users).
+
+Engines are interchangeable: the trace, error lines and results are the same on both; only speed
+differs (QuickJS is faster to start, roughly 20× slower on heavy computation).
 
 Prior art: Code Mode runners (e.g. TanStack AI's `isolated-vm` driver) use the same approach;
 Anthropic's Programmatic Tool Calling likewise routes every tool call from its sandbox back to the

@@ -27,7 +27,7 @@ event), never by splitting the directory name, since variant values may contain 
               "secondaryCap": 4, "branch": { "context": "trace", "timeoutMs": 120000,
               "limits": { "valueChars": 200, "loopCollapse": 3, "eventBudget": 60 } } },
   "provenance": {
-    "commit": "…", "dirty": false, "runnerVersion": "…",
+    "commit": "…", "dirty": false, "runnerVersion": "…", "engine": "isolated-vm",
     "basePrompt": "<sha256>",
     "frameworks": { "<framework-id>": { "prompt": "<sha256>", "tools": "<sha256>",
                     "extra": { "executor": "<sha256>", "rerank": "<sha256>", "hotPaths": "<sha256>" } } },
