@@ -196,9 +196,45 @@ async function problemsCommand(argv: string[]): Promise<void> {
   }
 }
 
-async function viewCommand(_argv: string[]): Promise<void> {
-  // TODO: start viewer indexer
-  console.error("[view stub] viewer not yet implemented");
+async function viewCommand(argv: string[]): Promise<void> {
+  const watch = argv.includes("--watch");
+  const viewerPkg = new URL("../../viewer/", import.meta.url).pathname;
+  const indexerDist = join(viewerPkg, "indexer", "dist", "index.js");
+  const distHTML = join(viewerPkg, "dist", "index.html");
+
+  if (!existsSync(indexerDist)) {
+    console.error("[view] Indexer not built. Run: cd packages/viewer && npm run build:indexer");
+    process.exit(1);
+  }
+
+  // Run the indexer (or start it in watch mode)
+  const { spawn } = await import("node:child_process");
+  const indexerArgs = watch ? ["--watch"] : [];
+  if (watch) {
+    // Start indexer in background watch mode
+    const child = spawn(process.execPath, [indexerDist, ...indexerArgs], {
+      stdio: "inherit",
+      detached: false,
+    });
+    child.on("error", (err) => console.error("[view] indexer error:", err));
+    console.log("[view] Indexer running in watch mode (Ctrl+C to stop).");
+  } else {
+    // Run indexer once synchronously
+    const { execFileSync } = await import("node:child_process");
+    execFileSync(process.execPath, [indexerDist], { stdio: "inherit" });
+  }
+
+  if (!existsSync(distHTML)) {
+    console.error("[view] Viewer app not built. Run: cd packages/viewer && npm run build");
+    process.exit(1);
+  }
+
+  // Open the viewer in the default browser
+  const { platform } = process;
+  const opener = platform === "darwin" ? "open" : platform === "win32" ? "start" : "xdg-open";
+  const { spawn: spawnOpen } = await import("node:child_process");
+  spawnOpen(opener, [distHTML], { stdio: "ignore", detached: true }).unref();
+  console.log(`[view] Opened ${distHTML}`);
 }
 
 async function main(): Promise<void> {

@@ -1,0 +1,92 @@
+/* Design tokens for light and dark themes */
+:root {
+  --bg: #f7f8fa;
+  --bg2: #ffffff;
+  --bg3: #eef0f5;
+  --fg: #1a1d23;
+  --fg2: #5a6070;
+  --fg3: #8890a4;
+  --border: #e2e5ec;
+  --accent: #0ea5e9;
+  --pass: #16a34a;
+  --fail: #dc2626;
+  --warn: #d97706;
+  --tool: #7c3aed;
+  --result: #0891b2;
+  --radius: 6px;
+  --font-mono: "JetBrains Mono", ui-monospace, "Cascadia Code", monospace;
+  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0f1117;
+    --bg2: #1a1d26;
+    --bg3: #22263a;
+    --fg: #e8eaf0;
+    --fg2: #8890a4;
+    --fg3: #5a6070;
+    --border: #272b38;
+    --accent: #38bdf8;
+    --pass: #4ade80;
+    --fail: #f87171;
+    --warn: #fbbf24;
+    --tool: #a78bfa;
+    --result: #22d3ee;
+    color-scheme: dark;
+  }
+}
+
+:root[data-theme="dark"] {
+  --bg: #0f1117;
+  --bg2: #1a1d26;
+  --bg3: #22263a;
+  --fg: #e8eaf0;
+  --fg2: #8890a4;
+  --fg3: #5a6070;
+  --border: #272b38;
+  --accent: #38bdf8;
+  --pass: #4ade80;
+  --fail: #f87171;
+  --warn: #fbbf24;
+  --tool: #a78bfa;
+  --result: #22d3ee;
+  color-scheme: dark;
+}
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body {
+  height: 100%;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+#root {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Utility classes */
+.mono { font-family: var(--font-mono); }
+.pass { color: var(--pass); }
+.fail { color: var(--fail); }
+.warn { color: var(--warn); }
+.muted { color: var(--fg3); }
+
+button {
+  cursor: pointer;
+  font: inherit;
+  border: none;
+  background: none;
+  color: inherit;
+}
