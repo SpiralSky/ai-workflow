@@ -28,7 +28,7 @@ export interface JobOptions {
   baseURL: string;
   /** AbortSignal for budget cancellation. */
   signal?: AbortSignal;
-  /** Per-problem turn limits, from provenance. */
+  /** Per-problem turn limits override (task.json is the authoritative source; this is for overrides). */
   turnLimits: Record<string, number>;
   /** Path to the problem directories. */
   problemsDir: string;
@@ -112,10 +112,15 @@ export async function runJobAttempt(opts: JobOptions): Promise<JobResult> {
       const session = await openMCPSession(serverDescriptor);
 
       const taskText = readTaskText(problemsDir, job.problem);
-      const systemPrompt = buildSystemPrompt(""); // TODO: get from session.instructions
+      const systemPrompt = buildSystemPrompt(session.instructions ?? "");
 
       const client = createChatClient({ baseURL, apiKey, timeoutMs: 300_000 });
-      const turnLimit = turnLimits[job.problem] ?? 20;
+      // Read turnLimit from task.json; turnLimits map allows overrides, fallback to 20.
+      const taskJsonPath = join(problemsDir, job.problem, "task.json");
+      const taskJson = existsSync(taskJsonPath)
+        ? (JSON.parse(readFileSync(taskJsonPath, "utf8")) as { turnLimit?: number })
+        : {};
+      const turnLimit = turnLimits[job.problem] ?? taskJson.turnLimit ?? 20;
 
       const loopResult = await runLoop({
         client,

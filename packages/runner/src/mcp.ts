@@ -16,6 +16,8 @@ export interface MCPTool {
 /** MCP session handle with the underlying client for tool calls and teardown. */
 export interface MCPSession {
   tools: MCPTool[];
+  /** Framework instructions from the server's initialize response, used as the system prompt supplement. */
+  instructions?: string;
   /** @internal */
   _client: Client;
 }
@@ -48,7 +50,8 @@ export async function openMCPSession(serverDescriptor: {
     inputSchema: t.inputSchema as Record<string, unknown>,
   }));
 
-  return { tools, _client: client };
+  const instructions = client.getInstructions() ?? undefined;
+  return { tools, instructions, _client: client };
 }
 
 /** Result of a tool call. */
