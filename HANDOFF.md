@@ -44,8 +44,17 @@ per framework-runner §6.5 (CLAUDE.md updated); large dev problem deferred until
    **Then:** wire Docker stubs and run step 3 (clean `compare`).
    Engine packaging resolved 2026-10-24 (core-branch §4.1, I-11 revised): QuickJS-WASM default,
    isolated-vm optional, shipped beside the bundle; containers use `--engine isolated-vm`.
-3. Wire Docker stubs (`container.ts`, `mcp.ts`, `grade.ts` in `packages/runner/src/`) and `problems/` build+check, then run step 4.
-4. Test the existing modes first: clean `compare` (baseline, branch-only, orchestrate) — Roadmap step 3.
+3. ~~Wire Docker stubs~~ done 2026-10-25 (`da05649`): `container.ts` (real docker CLI), `mcp.ts`
+   (MCP client via `@modelcontextprotocol/sdk` StdioClientTransport), `grade.ts` (docker cp +
+   git diff --no-index + fresh-container check.sh), `problems/index.ts` (build + 5-step self-check),
+   `job.ts` wired. 97 tests pass.
+   **Before step 4:** the experiment problems in `experiments/problems/` are old-format (no
+   `task.json`, `workspace/`, `checks/`, `Dockerfile`). A smoke problem must be created at
+   `experiments/problems/01-chunk-off-by-one/` (the spec placeholder) plus the `aiw-base` Docker
+   image before `aiw problems check` and `aiw eval` can run.
+4. Create the smoke problem (`01-chunk-off-by-one`) in the new spec format and the `aiw-base` image,
+   then run `aiw problems check smoke` and `aiw eval --problems smoke --mode compare --reps 1
+   --budget 0.50`. — Roadmap step 3.
 5. Only then: user's new orchestrate idea (adds one mode) — not yet presented; it goes through spec approval.
 6. After that: optional branch coverage for `coverage` (`sys.monitoring` BRANCH events; tools §6.5, A-35).
 
