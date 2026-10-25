@@ -1,9 +1,0 @@
-#!/usr/bin/env bash
-# Generate mcp.json / settings.json from the *.template.json files with the absolute framework path (JSON-escaped).
-set -euo pipefail
-D="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-node -e '
-const fs = require("fs"), [D] = process.argv.slice(1);
-for (const f of ["mcp", "settings", "settings.orchestrate"])
-  fs.writeFileSync(`${D}/${f}.json`, fs.readFileSync(`${D}/${f}.template.json`, "utf8").split("__FW__").join(JSON.stringify(D).slice(1, -1)));
-' "$D"

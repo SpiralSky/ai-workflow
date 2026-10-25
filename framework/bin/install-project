@@ -1,3 +1,0 @@
-#!/usr/bin/env bash
-# Usage: install-project <dir> [--dry-run] [--uninstall] [--report intent|none]
-exec node "$(dirname "${BASH_SOURCE[0]}")/install-project.mjs" "$@"
