@@ -200,22 +200,34 @@ per framework-runner §6.5 (CLAUDE.md updated); large dev problem deferred until
    - Grading is skipped on `turn-limit` per framework-runner §6.1.
    - Turn limits per problem are correct; the runner now reads them from `task.json`.
 
-   **Options (need user decision before proceeding):**
-   A. **Accept** branch-only results as a valid measurement: the trace constraint (200-char
-      values) is part of what makes branch-only distinct from baseline. Re-run the full compare
-      and report the gap honestly — branch-only is harder in trace mode.
-   B. **Increase `valueChars`** (e.g. 400 or 800) before the full run — spec change needed.
-   C. **Use `--branch-context full`** for the full run — no value truncation in full mode
-      (spec §5, `full` mode); this is already a supported flag. Results would show branch-only
-      without the truncation constraint.
-   D. **Improve the branch-only prompt** to explicitly show the state-caching pattern for files;
-      this is a feature-spec change.
+   **Fix chosen (2026-10-25): increase `valueChars` 200→800 (commit `ab119f2`).**
+   800 chars covers ~50 lines of Python — all small-problem files fit.
+   Spec updated (core-branch.md); server bundle rebuilt.
 
-   **Pending user decision.** Do not run the full compare until the approach is chosen.
+   **Full compare re-run (2026-10-25, run `2026-10-25T13-52-23Z-3a9f`): run invalid.**
+   Two additional bugs fixed during this run:
+   - Runner `config.ts` had its own hardcoded `valueChars: 200` separate from core's
+     `DEFAULT_TRACE_LIMITS`; provenance showed 200 even after the core fix. Fixed in `11acdcb`
+     to import `DEFAULT_TRACE_LIMITS` from `@aiw/core`.
+   - Run invalidated mid-way by `job-failed: 07-async-race.orchestrate.0`: HTTP 402 from
+     OpenRouter — key hit its spending limit while requesting 131072 max_tokens. Not a code bug.
 
-   **To re-run full compare (once approach is decided):**
+   **Partial results (14 of 63 jobs, rep 0 only, first 5 problems):**
+   branch-only improved substantially — `02-inventory-feature`, `04-vague-rate-limit`,
+   `06-import-cycle`, `07-async-race` all PASS in rep 0 (vs. 0/7 before).
+   `05-report-refactor.branch-only.0` still FAIL (likely a harder problem for branch).
+   `08-api-mismatch.baseline.0` FAIL — unexpected; may be model variance.
+
+   **Blocked: OpenRouter key needs more credits.**
+   Top up the key at openrouter.ai/workspaces/default/keys or provide a new key,
+   then re-run the full compare. The server bundle and runner are correct as of `11acdcb`.
+
+   **Re-run command (when credits are available):**
    ```
-   OPENROUTER_API_KEY=sk-or-... PATH="$PATH:$(pwd)/node_modules/.bin" aiw eval --problems all --mode compare --reps 3 --budget 1.00 --model deepseek/deepseek-v4-flash --tools S [--branch-context full]
+   node packages/server/build.mjs   # only if source changed since 11acdcb
+   OPENROUTER_API_KEY=sk-or-... PATH="$PATH:$(pwd)/node_modules/.bin" \
+     aiw eval --problems all --mode compare --reps 3 --budget 1.00 \
+     --model deepseek/deepseek-v4-flash --tools S
    ```
 
 7. User's new orchestrate idea (adds one mode) — not yet presented; it goes through spec approval.
