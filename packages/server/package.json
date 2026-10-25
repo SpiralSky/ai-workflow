@@ -1,0 +1,14 @@
+{
+  "name": "@aiw/server",
+  "private": true,
+  "type": "module",
+  "exports": { ".": "./src/index.ts" },
+  "bin": { "aiw-server": "./src/cli.ts" },
+  "dependencies": {
+    "@aiw/core": "*",
+    "@aiw/tools": "*",
+    "@aiw/telemetry": "*",
+    "@modelcontextprotocol/sdk": "^1.15.1"
+  },
+  "scripts": { "test": "tsx --test test/*.test.ts" }
+}
