@@ -59,7 +59,7 @@ per framework-runner §6.5 (CLAUDE.md updated); large dev problem deferred until
      `git apply -p2`; also fixed `cp -r /tmp/checks /work/` (was `checks/.`) so check.sh lands
      at `/work/checks/check.sh`. Committed `0f21309` + `c3e56bd`.
    - `aiw problems check 01-chunk-off-by-one` → PASS (~7.8 s), 97 tests pass.
-   - **Next:** port problems 02–09 to new spec format, then full `compare` run on all 9.
+   - **Next:** port problems 02–09 to new spec format (see step 5 below), then full `compare` run on all 9.
    - **Server bundle required before eval.** `packages/server/` must be built first:
      `node packages/server/build.mjs` → produces `packages/server/dist/aiw-server.mjs` + prompts +
      isolated-vm + typescript-api alongside it. Rebuild whenever server or core source changes.
@@ -86,8 +86,64 @@ per framework-runner §6.5 (CLAUDE.md updated); large dev problem deferred until
      OPENROUTER_API_KEY=sk-or-... PATH="$PATH:$(pwd)/node_modules/.bin" aiw eval --problems 01-chunk-off-by-one --mode compare --reps 1 --budget 0.50 --model deepseek/deepseek-v4.1-flash --tools S
      # then: aiw view  (indexes runs + opens browser)
      ```
-5. Only then: user's new orchestrate idea (adds one mode) — not yet presented; it goes through spec approval.
-6. After that: optional branch coverage for `coverage` (`sys.monitoring` BRANCH events; tools §6.5, A-35).
+5. **Port problems 02–09** to new spec format. Use a `claude` (Sonnet 4.6) implementer agent per
+   problem; pass it the old `PROBLEM.md` + source files and have it produce the new layout.
+
+   **New layout per problem** (mirror `01-chunk-off-by-one/`):
+   ```
+   experiments/problems/<id>/
+     task.json       # metadata (problems §4)
+     task.md         # the task prompt — terse, no meta
+     workspace/      # source files the agent starts from (bug/gap already present)
+     checks/check.sh # runs python -m unittest discover (or pytest); exit 0 = pass
+     Dockerfile      # FROM aiw-base:latest; COPY workspace/ /work/; RUN cd /work && git init ...
+     reference/      # (optional) correct solution for grading reference
+   ```
+
+   **`task.json` fields** (problems.md §4):
+   - `id`: problem folder name
+   - `size`: `"small"` for all of 02–09 (single-file / small codebase)
+   - `set`: `"dev"` for 03-discount-mismatch (problems §8.5); `"reported"` (omit field, it's the default) for 02, 04–09
+   - `turnLimit`: pick conservatively — 8 for simple bugfixes, 12 for feature additions, 15 for multi-file/refactor
+   - `tags`: from the tag vocabulary: `bugfix`, `feature`, `refactor`, `concurrency`, `multi-file`, `import-cycle`
+
+   **Problems and their intended ports:**
+   | # | name | tags | turnLimit |
+   |---|------|------|-----------|
+   | 02 | inventory-feature | `feature` | 12 |
+   | 03 | discount-mismatch | `bugfix` | 8 |
+   | 04 | vague-rate-limit | `feature` | 12 |
+   | 05 | report-refactor | `refactor` | 12 |
+   | 06 | import-cycle | `bugfix`, `import-cycle` | 8 |
+   | 07 | async-race | `bugfix`, `concurrency` | 10 |
+   | 08 | api-mismatch | `bugfix` | 8 |
+   | 09 | cache-invalidation | `bugfix` | 10 |
+
+   **Dockerfile template** (same for all):
+   ```dockerfile
+   FROM aiw-base:latest
+   COPY workspace/ /work/
+   RUN cd /work && git init && git add -A && git commit -m "init"
+   ```
+
+   **After each problem:** run `aiw problems check <id>` — must PASS before moving to the next.
+   The check verifies the grading pipeline works (patch apply + check.sh).
+
+   **Verify `workspace/` has the bug/gap present** (not the fixed version): the agent solves the
+   problem at eval time; workspace is the starting state.
+
+   **Agent brief template** (pass to implementer):
+   > Port `experiments/problems/<id>/` from old format to new spec format. Old files are in
+   > `experiments/problems/<id>/` (PROBLEM.md, source files). Spec: problems.md §3–4. Reference
+   > layout: `experiments/problems/01-chunk-off-by-one/`. Produce: task.json, task.md,
+   > workspace/<files>, checks/check.sh, Dockerfile. The workspace must contain the bug/gap
+   > (the problem's starting state). check.sh must pass on the FIXED code and fail on the broken
+   > workspace (write a quick hidden test if the existing tests don't catch the bug). Confirm with
+   > `aiw problems check <id>`.
+
+6. Once all 9 are ported: `aiw eval --problems all --mode compare --reps 3 --budget 1.00 --model deepseek/deepseek-v4-flash --tools S` (README roadmap step 3).
+7. User's new orchestrate idea (adds one mode) — not yet presented; it goes through spec approval.
+8. After that: optional branch coverage for `coverage` (`sys.monitoring` BRANCH events; tools §6.5, A-35).
 
 Commit spec/README changes as `docs:` commits when the user approves.
 
