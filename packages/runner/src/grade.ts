@@ -5,7 +5,7 @@
 
 import { execFile as _execFile } from "node:child_process";
 import { promisify } from "node:util";
-import { mkdtemp, rm, stat, writeFile } from "node:fs/promises";
+import { cp, mkdtemp, rm, stat, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 
@@ -53,9 +53,14 @@ export async function gradeJob(
     // Remove .pyc files
     await execFile("find", [afterDir, "-name", "*.pyc", "-delete"]).catch(() => void 0);
 
-    // 2. Compute diff against pristine workspace
+    // 2. Compute diff against pristine workspace.
+    // Copy workspaceDir to tmp/before so git diff uses relative paths (before/file, after/file).
+    // A symlink would be diffed as a file by git --no-index, so we need a real copy.
+    // -p2 in git apply strips both the a/b prefix and the before/after component, yielding
+    // plain file paths that match /work/ inside the grading container.
     const diffPatchPath = join(jobDir, "diff.patch");
     const workspaceDir = join(problemDir, "workspace");
+    await cp(workspaceDir, join(tmp, "before"), { recursive: true });
 
     let diffOutput = "";
     try {
@@ -67,10 +72,10 @@ export async function gradeJob(
           "--binary",
           "--diff-filter=ACMRDT",
           "--",
-          workspaceDir,
-          afterDir,
+          "before",
+          "after",
         ],
-        { cwd: problemDir, maxBuffer: 10 * 1024 * 1024 },
+        { cwd: tmp, maxBuffer: 10 * 1024 * 1024 },
       );
       diffOutput = stdout;
     } catch (err: unknown) {
@@ -111,7 +116,7 @@ export async function gradeJob(
           gradeId,
           "sh",
           "-c",
-          "cd /work && git apply --binary /tmp/diff.patch",
+          "cd /work && git apply --binary -p2 /tmp/diff.patch",
         ]);
       } catch {
         await execFile("docker", ["rm", "-f", gradeId]).catch(() => void 0);
