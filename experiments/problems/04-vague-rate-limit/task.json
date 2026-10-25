@@ -1,0 +1,6 @@
+{
+  "id": "04-vague-rate-limit",
+  "size": "small",
+  "turnLimit": 12,
+  "tags": ["feature"]
+}

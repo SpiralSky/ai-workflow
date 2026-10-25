@@ -1,0 +1,47 @@
+diff --git a/inventory.py b/inventory.py
+index 57a3f8d..1ddcbc9 100644
+--- a/inventory.py
++++ b/inventory.py
+@@ -7,6 +7,16 @@ class Inventory:
+             raise ValueError("qty must be positive")
+         self._stock[name] = self._stock.get(name, 0) + qty
+ 
++    def remove(self, name, qty):
++        current = self._stock.get(name, 0)
++        if qty > current:
++            raise ValueError(f"cannot remove {qty} from {name}: only {current} in stock")
++        current -= qty
++        if current == 0:
++            del self._stock[name]
++        else:
++            self._stock[name] = current
++
+     def count(self, name):
+         return self._stock.get(name, 0)
+ 
+diff --git a/test_remove.py b/test_remove.py
+new file mode 100644
+index 0000000..52bbc91
+--- /dev/null
++++ b/test_remove.py
+@@ -0,0 +1,20 @@
++import unittest
++from inventory import Inventory
++
++class TestRemove(unittest.TestCase):
++    def setUp(self):
++        self.inv = Inventory()
++        self.inv.add("apple", 5)
++
++    def test_partial_remove(self):
++        self.inv.remove("apple", 2)
++        self.assertEqual(self.inv.count("apple"), 3)
++
++    def test_remove_to_zero_disappears(self):
++        self.inv.remove("apple", 5)
++        self.assertNotIn("apple", self.inv.items())
++
++    def test_over_remove_raises(self):
++        with self.assertRaises(Exception):
++            self.inv.remove("apple", 6)
++        self.assertEqual(self.inv.count("apple"), 5)

@@ -1,0 +1,7 @@
+{
+  "id": "03-discount-mismatch",
+  "size": "small",
+  "set": "dev",
+  "turnLimit": 8,
+  "tags": ["bugfix"]
+}

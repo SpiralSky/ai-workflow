@@ -86,8 +86,9 @@ per framework-runner §6.5 (CLAUDE.md updated); large dev problem deferred until
      OPENROUTER_API_KEY=sk-or-... PATH="$PATH:$(pwd)/node_modules/.bin" aiw eval --problems 01-chunk-off-by-one --mode compare --reps 1 --budget 0.50 --model deepseek/deepseek-v4.1-flash --tools S
      # then: aiw view  (indexes runs + opens browser)
      ```
-5. **Port problems 02–09** to new spec format. Use a `claude` (Sonnet 4.6) implementer agent per
-   problem; pass it the old `PROBLEM.md` + source files and have it produce the new layout.
+5. **Port problems 02–09** to new spec format. **Done 2026-10-25 (problems 02–08)**; 09 in progress.
+   Problems 02–08 all check PASS. Problem 09 agent was running at session end — resume and verify.
+   Use a `claude` (Sonnet 4.6) implementer agent per problem; pass it the old `PROBLEM.md` + source files and have it produce the new layout.
 
    **New layout per problem** (mirror `01-chunk-off-by-one/`):
    ```

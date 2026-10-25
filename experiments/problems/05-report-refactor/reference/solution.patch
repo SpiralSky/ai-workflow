@@ -1,0 +1,44 @@
+diff --git a/report.py b/report.py
+index 457f5f8..7453874 100644
+--- a/report.py
++++ b/report.py
+@@ -1,26 +1,23 @@
+-def format_sales(rows):
+-    out = ["== Sales =="]
++def _format_section(title, rows, negate=False):
++    out = [f"== {title} =="]
+     total = 0
+     for name, amt in rows:
+-        out.append(f"  {name:<10} {amt:>8.2f}")
+-        total += amt
+-    out.append(f"  {'TOTAL':<10} {total:>8.2f}")
++        display = -amt if negate else amt
++        out.append(f"  {name:<10} {display:>8.2f}")
++        if not negate:
++            total += amt
++    if not negate:
++        out.append(f"  {'TOTAL':<10} {total:>8.2f}")
+     return "\n".join(out)
+ 
++def format_sales(rows):
++    return _format_section("Sales", rows)
++
+ def format_costs(rows):
+-    out = ["== Costs =="]
+-    total = 0
+-    for name, amt in rows:
+-        out.append(f"  {name:<10} {amt:>8.2f}")
+-        total += amt
+-    out.append(f"  {'TOTAL':<10} {total:>8.2f}")
+-    return "\n".join(out)
++    return _format_section("Costs", rows)
+ 
+ def format_refunds(rows):
+-    out = ["== Refunds =="]
+-    for name, amt in rows:
+-        out.append(f"  {name:<10} {-amt:>8.2f}")
+-    return "\n".join(out)
++    return _format_section("Refunds", rows, negate=True)
+ 
+ def build_report(sales, costs, refunds):
+     return "\n\n".join([format_sales(sales), format_costs(costs), format_refunds(refunds)])
