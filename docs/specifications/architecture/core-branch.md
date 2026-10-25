@@ -207,7 +207,7 @@ the remedy if that matters. Stack frames may lack a column; `mapStack` accepts b
 - Format details beyond BF §7.3 (internal, 2026-10-24): a ternary renders as `?: <cond> → v`; all
   `for` variants render as `for`; an expanded loop prints no header; a return, error or in-flight
   call inside a collapsed loop is printed after the loop summary.
-- Limits (`TraceLimits`): value truncation 200 chars, loop collapse threshold 3 iterations, event
+- Limits (`TraceLimits`): value truncation 800 chars, loop collapse threshold 3 iterations, event
   budget 60 events; the final `return`/`error` is always kept (BF §7.4). All three are provenance
   fields.
 - Footer: `state: key(type/size), …`; references (objects with a `ref` marker,

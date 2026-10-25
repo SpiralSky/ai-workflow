@@ -36380,7 +36380,7 @@ var StdioServerTransport = class {
 };
 
 // packages/core/src/branch/types.ts
-var DEFAULT_TRACE_LIMITS = { valueChars: 200, loopCollapse: 3, eventBudget: 60 };
+var DEFAULT_TRACE_LIMITS = { valueChars: 800, loopCollapse: 3, eventBudget: 60 };
 
 // packages/core/src/branch/compile.ts
 import ts2 from "typescript-api";
