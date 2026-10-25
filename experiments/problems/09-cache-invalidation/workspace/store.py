@@ -1,6 +1,4 @@
 class DataStore:
-    """Simple in-memory key/value store."""
-
     def __init__(self):
         self._data = {}
 

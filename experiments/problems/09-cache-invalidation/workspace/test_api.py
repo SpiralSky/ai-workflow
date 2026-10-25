@@ -1,11 +1,9 @@
 import unittest
 from api import _svc, handle_create, handle_get, handle_update, handle_delete
 
-
 def reset():
     _svc._store._data.clear()
     _svc._cache.clear()
-
 
 class TestAPI(unittest.TestCase):
     def setUp(self):
@@ -43,7 +41,6 @@ class TestAPI(unittest.TestCase):
     def test_delete_not_found(self):
         _, status = handle_delete("ghost")
         self.assertEqual(status, 404)
-
 
 if __name__ == "__main__":
     unittest.main()

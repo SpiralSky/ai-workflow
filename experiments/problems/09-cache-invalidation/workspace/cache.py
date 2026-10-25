@@ -1,6 +1,4 @@
 class LRUCache:
-    """Least-recently-used cache with a fixed capacity."""
-
     def __init__(self, capacity=256):
         self._store = {}
         self._order = []
@@ -9,7 +7,6 @@ class LRUCache:
     def get(self, key):
         if key not in self._store:
             return None
-        # Move to end (most recently used).
         self._order.remove(key)
         self._order.append(key)
         return self._store[key]
@@ -24,7 +21,6 @@ class LRUCache:
         self._order.append(key)
 
     def invalidate(self, key):
-        """Remove key from cache so the next read goes to the store."""
         if key in self._store:
             self._order.remove(key)
             del self._store[key]

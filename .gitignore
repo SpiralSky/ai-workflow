@@ -10,6 +10,8 @@ framework/prompt/.system.*.md
 # run outputs
 experiments/runs/
 experiments/problems/**/.selfcheck.json
+experiments/problems/**/check.log
+experiments/problems/**/diff.patch
 dev/out/
 .branch-traces/
 

@@ -1,0 +1,6 @@
+{
+  "id": "09-cache-invalidation",
+  "size": "small",
+  "turnLimit": 10,
+  "tags": ["bugfix"]
+}

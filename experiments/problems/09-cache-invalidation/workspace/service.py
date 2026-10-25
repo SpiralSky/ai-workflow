@@ -3,13 +3,9 @@ from cache import LRUCache
 
 
 class ProductService:
-    """Business logic layer; caches reads to reduce store lookups."""
-
     def __init__(self):
         self._store = DataStore()
         self._cache = LRUCache()
-
-    # --- read ---
 
     def get(self, product_id: str):
         cached = self._cache.get(product_id)
@@ -22,8 +18,6 @@ class ProductService:
 
     def list_all(self):
         return [self.get(k) for k in self._store.keys()]
-
-    # --- write ---
 
     def create(self, product_id: str, data: dict):
         if self._store.get(product_id) is not None:
