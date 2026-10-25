@@ -8,6 +8,7 @@ import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { createRequire } from "node:module";
+import { DEFAULT_TRACE_LIMITS } from "@aiw/core";
 import type { RunConfig, Provenance, Tier, BranchContext } from "./types.ts";
 
 export { RunConfig, Provenance };
@@ -203,7 +204,7 @@ export function buildProvenance(cwd: string): Omit<Provenance, "frameworks" | "i
 export const DEFAULT_BRANCH_CONFIG = {
   context: "trace" as BranchContext,
   timeoutMs: 120_000,
-  limits: { valueChars: 200, loopCollapse: 3, eventBudget: 60 },
+  limits: DEFAULT_TRACE_LIMITS,
 };
 
 /**
