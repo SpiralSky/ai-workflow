@@ -64,14 +64,18 @@ per framework-runner §6.5 (CLAUDE.md updated); large dev problem deferred until
    - **Server bundle required before eval.** `packages/server/` must be built first:
      `node packages/server/build.mjs` → produces `packages/server/dist/aiw-server.mjs` + prompts +
      isolated-vm + typescript-api alongside it. Rebuild whenever server or core source changes.
-   - **Next (2 commands, user provides API key inline):**
+   - **Done (2026-10-25):** First valid `compare` run `2026-10-25T06-53-02Z-f8fd`:
+     baseline PASS, branch-only PASS, orchestrate FAIL (turn-limit; model ran, $0.006 total).
+     Fix committed `19ec0bb`: wire orchestrate LLM client (server.ts `ServerOptions` +
+     cli.ts `--executor-model/--executor-api-key/--executor-base-url` + job.ts server args).
+   - **Model used:** `deepseek/deepseek-v4.1-flash` ($0.00000002/token; practically free for dev).
+     CLAUDE.md rule (`deepseek/deepseek-v4-flash`) applies to full/pilot runs.
+   - **Orchestrate turn-limit:** expected for a dev model — not an infra bug.
+   - **To re-run:**
      ```
-     node packages/server/build.mjs
-     OPENROUTER_API_KEY=sk-or-... PATH="$PATH:$(pwd)/node_modules/.bin" aiw eval --problems 01-chunk-off-by-one --mode compare --reps 1 --budget 0.50 --model deepseek/deepseek-v3-0324:free --tools S
+     node packages/server/build.mjs   # only if server/core source changed
+     OPENROUTER_API_KEY=sk-or-... PATH="$PATH:$(pwd)/node_modules/.bin" aiw eval --problems 01-chunk-off-by-one --mode compare --reps 1 --budget 0.50 --model deepseek/deepseek-v4.1-flash --tools S
      ```
-     Build is done each time source changes; server dist does not get committed.
-   - **Permission workflow:** Use `/permissions` to approve Bash commands if the auto-mode
-     classifier blocks them.
 5. Only then: user's new orchestrate idea (adds one mode) — not yet presented; it goes through spec approval.
 6. After that: optional branch coverage for `coverage` (`sys.monitoring` BRANCH events; tools §6.5, A-35).
 
