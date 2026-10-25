@@ -1,9 +1,12 @@
 /**
  * Docker container operations for the runner.
  * Runner architecture §4.1; server invocation §5.
- *
- * TODO: All functions are stubs. Implement by calling `docker` CLI commands via child_process.
  */
+
+import { execFile as _execFile } from "node:child_process";
+import { promisify } from "node:util";
+
+const execFile = promisify(_execFile);
 
 /** Opaque handle returned by startContainer. */
 export interface Container {
@@ -20,9 +23,19 @@ export interface Container {
  * @returns the image digest (sha256:...)
  */
 export async function buildImage(problemDir: string, problem: string): Promise<string> {
-  // TODO: run `docker build -t aiw-problem-<problem> <problemDir>` and inspect digest
-  console.error(`[container stub] buildImage: would build image for ${problem} from ${problemDir}`);
-  return `sha256:stub-${problem}`;
+  const tag = `aiw-problem-${problem}`;
+  await execFile("docker", ["build", "-t", tag, problemDir], {
+    maxBuffer: 10 * 1024 * 1024,
+  });
+  const { stdout } = await execFile("docker", [
+    "image",
+    "inspect",
+    "--format",
+    "{{index .RepoDigests 0}}",
+    tag,
+  ]);
+  const digest = stdout.trim();
+  return digest || tag;
 }
 
 /**
@@ -39,20 +52,51 @@ export async function startContainer(
   serverBundle: string,
   network?: string,
 ): Promise<Container> {
-  // TODO: run `docker run -d --network <none|network> --mount ... aiw-problem-<problem> sleep infinity`
-  console.error(`[container stub] startContainer: would start container for ${problem}`);
-  return { id: `stub-ctr-${problem}-${Date.now()}`, problem, jobDir, networkId: network };
+  const tag = `aiw-problem-${problem}`;
+  const networkArg = network ?? "none";
+  const { stdout } = await execFile("docker", [
+    "run",
+    "-d",
+    "--network",
+    networkArg,
+    "--mount",
+    `type=bind,src=${jobDir},dst=/out`,
+    "--mount",
+    `type=bind,src=${serverBundle},dst=/opt/aiw/bundle,readonly`,
+    tag,
+    "sleep",
+    "infinity",
+  ]);
+  const id = stdout.trim();
+  return { id, problem, jobDir, networkId: network };
 }
 
 /**
- * Starts the MCP server inside the container via docker exec.
+ * Returns a spawn descriptor for starting the MCP server inside the container via docker exec.
+ * The descriptor is passed to openMCPSession in mcp.ts, which spawns the process as a stdio transport.
  * @param ctr - container handle
  * @param serverArgs - extra arguments to pass to the server process
- * @returns the exec process (or a mock)
+ * @param env - optional extra environment variables
+ * @returns spawn descriptor with command, args, and env
  */
-export async function startServer(ctr: Container, serverArgs: string[]): Promise<void> {
-  // TODO: run `docker exec -i <ctr.id> /opt/aiw-node/bin/node ... aiw-server.mjs <serverArgs>`
-  console.error(`[container stub] startServer: would start server in ${ctr.id} with args ${serverArgs.join(" ")}`);
+export async function startServer(
+  ctr: Container,
+  serverArgs: string[],
+  env?: Record<string, string>,
+): Promise<{ command: string; args: string[]; env: Record<string, string> }> {
+  return {
+    command: "docker",
+    args: [
+      "exec",
+      "-i",
+      ctr.id,
+      "/opt/aiw-node/bin/node",
+      "--no-node-snapshot",
+      "/opt/aiw/bundle/aiw-server.mjs",
+      ...serverArgs,
+    ],
+    env: { ...process.env, ...(env ?? {}) } as Record<string, string>,
+  };
 }
 
 /**
@@ -61,8 +105,7 @@ export async function startServer(ctr: Container, serverArgs: string[]): Promise
  * @param destDir - local destination directory
  */
 export async function exportWork(ctr: Container, destDir: string): Promise<void> {
-  // TODO: run `docker cp <ctr.id>:/work <destDir>`
-  console.error(`[container stub] exportWork: would copy /work from ${ctr.id} to ${destDir}`);
+  await execFile("docker", ["cp", `${ctr.id}:/work`, destDir]);
 }
 
 /**
@@ -70,8 +113,7 @@ export async function exportWork(ctr: Container, destDir: string): Promise<void>
  * @param ctr - container handle
  */
 export async function removeContainer(ctr: Container): Promise<void> {
-  // TODO: run `docker rm -f <ctr.id>`
-  console.error(`[container stub] removeContainer: would remove container ${ctr.id}`);
+  await execFile("docker", ["rm", "-f", ctr.id]);
 }
 
 /**
@@ -79,6 +121,5 @@ export async function removeContainer(ctr: Container): Promise<void> {
  * @param ctr - container handle
  */
 export async function killContainer(ctr: Container): Promise<void> {
-  // TODO: run `docker kill <ctr.id>`
-  console.error(`[container stub] killContainer: would kill container ${ctr.id}`);
+  await execFile("docker", ["kill", ctr.id]);
 }

@@ -1,11 +1,17 @@
 /**
  * Grading: diff the container's /work against the pristine workspace, then run check.sh.
  * Runner architecture §6.
- *
- * TODO: All functions are stubs. Implement using docker cp and a fresh container per §6.
  */
 
+import { execFile as _execFile } from "node:child_process";
+import { promisify } from "node:util";
+import { mkdtemp, rm, stat, writeFile } from "node:fs/promises";
+import { join } from "node:path";
+import { tmpdir } from "node:os";
+
 import type { Container } from "./container.ts";
+
+const execFile = promisify(_execFile);
 
 /** Grading result. */
 export interface GradeResult {
@@ -26,15 +32,136 @@ export interface GradeResult {
  * @returns grading result
  */
 export async function gradeJob(
-  _ctr: Container,
-  _problemDir: string,
-  _jobDir: string,
+  ctr: Container,
+  problemDir: string,
+  jobDir: string,
 ): Promise<GradeResult> {
-  // TODO: implement per runner §6:
-  //   1. docker cp <ctr>:/work <tmp>/after
-  //   2. git diff --no-index --binary <problemDir>/workspace <tmp>/after > diff.patch
-  //   3. Fresh container, docker cp diff.patch and checks/ in, git apply, run check.sh
-  //   4. Exit 0 → pass; non-zero → fail with reason "checks"; apply failure → "patch-failed"
-  console.error("[grade stub] gradeJob: grading not implemented");
-  return { pass: false, reason: "checks" };
+  const tmp = await mkdtemp(join(tmpdir(), "aiw-grade-"));
+  const afterDir = join(tmp, "after");
+  let gradeId: string | undefined;
+
+  try {
+    // 1. Copy /work from container to afterDir
+    await execFile("docker", ["cp", `${ctr.id}:/work`, afterDir]);
+
+    // Pre-delete excluded dirs/files from afterDir before diffing
+    await rm(join(afterDir, ".git"), { recursive: true, force: true });
+    await rm(join(afterDir, "node_modules"), { recursive: true, force: true });
+    await rm(join(afterDir, "__pycache__"), { recursive: true, force: true });
+    await rm(join(afterDir, ".pytest_cache"), { recursive: true, force: true });
+    await rm(join(afterDir, ".venv"), { recursive: true, force: true });
+    // Remove .pyc files
+    await execFile("find", [afterDir, "-name", "*.pyc", "-delete"]).catch(() => void 0);
+
+    // 2. Compute diff against pristine workspace
+    const diffPatchPath = join(jobDir, "diff.patch");
+    const workspaceDir = join(problemDir, "workspace");
+
+    let diffOutput = "";
+    try {
+      const { stdout } = await execFile(
+        "git",
+        [
+          "diff",
+          "--no-index",
+          "--binary",
+          "--diff-filter=ACMRDT",
+          "--",
+          workspaceDir,
+          afterDir,
+        ],
+        { cwd: problemDir, maxBuffer: 10 * 1024 * 1024 },
+      );
+      diffOutput = stdout;
+    } catch (err: unknown) {
+      // git diff --no-index exits 1 when differences exist (normal); re-throw on anything else
+      const e = err as NodeJS.ErrnoException & { stdout?: string };
+      if (String(e.code) === "1") {
+        diffOutput = e.stdout ?? "";
+      } else {
+        throw err;
+      }
+    }
+
+    await writeFile(diffPatchPath, diffOutput);
+
+    // 3. Start fresh grading container (network none, same image)
+    const tag = `aiw-problem-${ctr.problem}`;
+    const { stdout: runOut } = await execFile("docker", [
+      "run",
+      "-d",
+      "--network",
+      "none",
+      tag,
+      "sleep",
+      "infinity",
+    ]);
+    gradeId = runOut.trim();
+
+    // 4. Copy diff.patch and checks/ into the fresh container
+    await execFile("docker", ["cp", diffPatchPath, `${gradeId}:/tmp/diff.patch`]);
+    await execFile("docker", ["cp", `${join(problemDir, "checks")}/.`, `${gradeId}:/tmp/checks`]);
+
+    // 5. Apply the patch if non-empty
+    const diffStat = await stat(diffPatchPath);
+    if (diffStat.size > 0) {
+      try {
+        await execFile("docker", [
+          "exec",
+          gradeId,
+          "sh",
+          "-c",
+          "cd /work && git apply --binary /tmp/diff.patch",
+        ]);
+      } catch {
+        await execFile("docker", ["rm", "-f", gradeId]).catch(() => void 0);
+        gradeId = undefined;
+        return { pass: false, reason: "patch-failed" };
+      }
+    }
+
+    // 6. Copy checks over workspace
+    await execFile("docker", [
+      "exec",
+      gradeId,
+      "sh",
+      "-c",
+      "cp -r /tmp/checks/. /work/",
+    ]);
+
+    // 7. Run check.sh with 120 s timeout
+    const checkLogPath = join(jobDir, "check.log");
+    let checkOutput = "";
+    let checkExitCode = 0;
+    try {
+      const { stdout: cOut, stderr: cErr } = await execFile(
+        "docker",
+        ["exec", gradeId, "sh", "-c", "cd /work && timeout 120 sh checks/check.sh"],
+        { maxBuffer: 10 * 1024 * 1024 },
+      );
+      checkOutput = cOut + cErr;
+    } catch (err: unknown) {
+      const e = err as NodeJS.ErrnoException & { code?: number | string; stdout?: string; stderr?: string };
+      checkExitCode = typeof e.code === "number" ? e.code : 1;
+      checkOutput = (e.stdout ?? "") + (e.stderr ?? "");
+    }
+    await writeFile(checkLogPath, checkOutput);
+
+    // 8. Cleanup grading container and tmp dir
+    await execFile("docker", ["rm", "-f", gradeId]).catch(() => void 0);
+    gradeId = undefined;
+    await rm(tmp, { recursive: true, force: true });
+
+    // 9. Return result
+    if (checkExitCode === 0) {
+      return { pass: true, diffPatch: diffPatchPath, checkLog: checkLogPath };
+    }
+    return { pass: false, reason: "checks", diffPatch: diffPatchPath, checkLog: checkLogPath };
+  } finally {
+    // Always clean up on failure
+    if (gradeId) {
+      await execFile("docker", ["rm", "-f", gradeId]).catch(() => void 0);
+    }
+    await rm(tmp, { recursive: true, force: true }).catch(() => void 0);
+  }
 }

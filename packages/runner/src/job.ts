@@ -10,7 +10,7 @@ import { createChatClient } from "@aiw/llm";
 import { createReporter, writeJobStart, writeJobEnd, FileSink } from "@aiw/telemetry";
 import type { Job, JobResult } from "./types.ts";
 import type { RunConfig } from "./types.ts";
-import { buildImage, startContainer, removeContainer, killContainer } from "./container.ts";
+import { buildImage, startContainer, removeContainer, killContainer, startServer } from "./container.ts";
 import { openMCPSession, closeMCPSession } from "./mcp.ts";
 import { gradeJob } from "./grade.ts";
 import { runLoop } from "./loop.ts";
@@ -92,8 +92,17 @@ export async function runJobAttempt(opts: JobOptions): Promise<JobResult> {
     const ctr = await startContainer(job.problem, jobDir, join(repoRoot, "packages", "server", "dist"), undefined);
 
     try {
-      // TODO: start actual server process and pass to openMCPSession
-      const session = await openMCPSession(null);
+      const serverDescriptor = await startServer(ctr, [
+        "--engine", "isolated-vm",
+        "--framework", job.framework,
+        "--tier", config.tier ?? "S",
+        "--host", "local",
+        "--root", "/work",
+        "--events", "/out/events.jsonl",
+        "--transcript", "/out/transcript.jsonl",
+        "--blobs", "/out/blobs",
+      ]);
+      const session = await openMCPSession(serverDescriptor);
 
       const taskText = readTaskText(problemsDir, job.problem);
       const systemPrompt = buildSystemPrompt(""); // TODO: get from session.instructions
