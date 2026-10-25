@@ -10,5 +10,8 @@
     "@aiw/telemetry": "*",
     "@modelcontextprotocol/sdk": "^1.15.1"
   },
-  "scripts": { "test": "tsx --test test/*.test.ts" }
+  "scripts": {
+    "test": "tsx --test test/*.test.ts",
+    "build": "node build.mjs"
+  }
 }
