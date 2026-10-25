@@ -59,8 +59,7 @@ per framework-runner §6.5 (CLAUDE.md updated); large dev problem deferred until
      `git apply -p2`; also fixed `cp -r /tmp/checks /work/` (was `checks/.`) so check.sh lands
      at `/work/checks/check.sh`. Committed `0f21309` + `c3e56bd`.
    - `aiw problems check 01-chunk-off-by-one` → PASS (~7.8 s), 97 tests pass.
-   - **Next:** `aiw eval --problems 01-chunk-off-by-one --mode compare --reps 1 --budget 0.50`.
-     Use a free OpenRouter model for dev runs (see note below); real budget run uses deepseek/deepseek-v4-flash.
+   - **Next:** port problems 02–09 to new spec format, then full `compare` run on all 9.
    - **Server bundle required before eval.** `packages/server/` must be built first:
      `node packages/server/build.mjs` → produces `packages/server/dist/aiw-server.mjs` + prompts +
      isolated-vm + typescript-api alongside it. Rebuild whenever server or core source changes.
@@ -68,9 +67,13 @@ per framework-runner §6.5 (CLAUDE.md updated); large dev problem deferred until
      baseline PASS, branch-only PASS, orchestrate FAIL (turn-limit; model ran, $0.006 total).
      Fix committed `19ec0bb`: wire orchestrate LLM client (server.ts `ServerOptions` +
      cli.ts `--executor-model/--executor-api-key/--executor-base-url` + job.ts server args).
-   - **Model used:** `deepseek/deepseek-v4.1-flash` ($0.00000002/token; practically free for dev).
-     CLAUDE.md rule (`deepseek/deepseek-v4-flash`) applies to full/pilot runs.
-   - **Orchestrate turn-limit:** expected for a dev model — not an infra bug.
+   - **Orchestrate now verified PASS** (`2026-10-25T08-35-01Z-72bc`, commit `2211117`).
+     Root cause of original failure: container started with `--network none`; executor LLM calls
+     (from inside the container) had no outbound access. Fix: bridge network for orchestrate
+     (runner.md §5.1 egress proxy deferred — bridge is dev-only shortcut).
+     All three roles firing: main (planner), selection (LLM reranker), secondary (executor).
+     $0.00059, 146s, 50 turns (10 main + 8 selection + 32 secondary across 8 do calls).
+   - **Model used:** `deepseek/deepseek-v4-flash`.
    - **Done (2026-10-25, `e8ad223`):** `@aiw/viewer` (`packages/viewer/`): React+Vite app + Node
      indexer. Indexer reads `experiments/runs/*/` → `dist/data/index.js` + per-job `.js` scripts
      (A-19 script-injection pattern). App: sidebar (run groups), framework tabs, Summary/JobsMatrix/
