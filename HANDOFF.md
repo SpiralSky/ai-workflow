@@ -60,6 +60,7 @@ per framework-runner §6.5 (CLAUDE.md updated); large dev problem deferred until
      at `/work/checks/check.sh`. Committed `0f21309` + `c3e56bd`.
    - `aiw problems check 01-chunk-off-by-one` → PASS (~7.8 s), 97 tests pass.
    - **Next:** `aiw eval --problems 01-chunk-off-by-one --mode compare --reps 1 --budget 0.50`.
+     Confirm with user before running — costs real budget. Requires OpenRouter API key in env.
 5. Only then: user's new orchestrate idea (adds one mode) — not yet presented; it goes through spec approval.
 6. After that: optional branch coverage for `coverage` (`sys.monitoring` BRANCH events; tools §6.5, A-35).
 
