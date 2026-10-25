@@ -64,6 +64,21 @@ Commit spec/README changes as `docs:` commits when the user approves.
 
 ## Code state
 
+**The codebase has been fully rewritten** in `packages/` from scratch against the architecture specs.
+All 6 packages are complete as of 2026-10-25 (97 tests pass, `npm test` at repo root):
+
+| Package | What it covers |
+|---------|----------------|
+| `@aiw/telemetry` | Reporter, FileSink, TranscriptWriter, wrapLLM |
+| `@aiw/llm` | createChatClient, LLMError |
+| `@aiw/core` | branch runtime (compile/isolate/render), tool registry+hosts, framework builder, orchestrate engine, BM25 reranker, prompts |
+| `@aiw/tools` | All 53 tools (catalog L); Python sidecar `aiw_sidecar` |
+| `@aiw/server` | MCP stdio server (LocalHost, tools/list+tools/call, throttled progress) |
+| `@aiw/runner` | eval/report/problems/view CLI; scheduler, loop, Docker container+MCP client+grader, problems build+check |
+
+The old `framework/` directory (pre-spec, not a workspace) is dead code; nothing in `packages/`
+references it. It should be deleted once the first eval run confirms the new pipeline works.
+
 `packages/core/src/branch/` implements core-branch.md (compile → isolate run → render; 59 tests).
 Implementation choices are recorded in core-branch.md (event shapes, line-preserving compile,
 root-only `return` events, render details, engines). Engines in `src/branch/engines/`
