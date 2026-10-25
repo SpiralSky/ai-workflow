@@ -229,12 +229,63 @@ async function viewCommand(argv: string[]): Promise<void> {
     process.exit(1);
   }
 
-  // Open the viewer in the default browser
+  // Serve dist/ over HTTP so the browser can load ES module scripts with crossorigin attributes.
+  // Opening file:// directly blocks those scripts due to CORS enforcement on file origins.
+  const http = await import("node:http");
+  const fs = await import("node:fs");
+  const path = await import("node:path");
+  const distDir = join(viewerPkg, "dist");
+
+  const MIME: Record<string, string> = {
+    ".html": "text/html",
+    ".js": "application/javascript",
+    ".css": "text/css",
+    ".json": "application/json",
+    ".svg": "image/svg+xml",
+    ".png": "image/png",
+    ".ico": "image/x-icon",
+    ".woff2": "font/woff2",
+    ".woff": "font/woff",
+    ".ttf": "font/ttf",
+  };
+
+  const server = http.default.createServer((req, res) => {
+    const urlPath = req.url?.split("?")[0] ?? "/";
+    const filePath = join(distDir, urlPath === "/" ? "index.html" : urlPath);
+    const ext = path.default.extname(filePath);
+    const contentType = MIME[ext] ?? "application/octet-stream";
+    fs.default.readFile(filePath, (err, data) => {
+      if (err) {
+        if ((err as NodeJS.ErrnoException).code === "ENOENT") {
+          // SPA fallback: serve index.html for unknown paths
+          fs.default.readFile(join(distDir, "index.html"), (e2, d2) => {
+            if (e2) { res.writeHead(500); res.end(); return; }
+            res.writeHead(200, { "Content-Type": "text/html" });
+            res.end(d2);
+          });
+        } else {
+          res.writeHead(500); res.end();
+        }
+        return;
+      }
+      res.writeHead(200, { "Content-Type": contentType });
+      res.end(data);
+    });
+  });
+
+  await new Promise<void>((resolve, reject) => {
+    server.listen(0, "127.0.0.1", () => resolve());
+    server.once("error", reject);
+  });
+
+  const addr = server.address() as { port: number };
+  const url = `http://127.0.0.1:${addr.port}/`;
+
   const { platform } = process;
   const opener = platform === "darwin" ? "open" : platform === "win32" ? "start" : "xdg-open";
   const { spawn: spawnOpen } = await import("node:child_process");
-  spawnOpen(opener, [distHTML], { stdio: "ignore", detached: true }).unref();
-  console.log(`[view] Opened ${distHTML}`);
+  spawnOpen(opener, [url], { stdio: "ignore", detached: true }).unref();
+  console.log(`[view] Serving viewer at ${url} (Ctrl+C to stop)`);
 }
 
 async function main(): Promise<void> {
