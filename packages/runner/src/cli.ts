@@ -78,13 +78,22 @@ async function evalCommand(argv: string[]): Promise<void> {
   const root = repoRoot();
   const problemsDir = join(root, "experiments", "problems");
 
-  // Load available problems (simplified: list directories)
-  const { readdirSync } = await import("node:fs");
+  // Load available problems by reading task.json from each problem directory.
+  const { readdirSync, readFileSync } = await import("node:fs");
   let available: Array<{ id: string; size: string; set: string }> = [];
   if (existsSync(problemsDir)) {
     available = readdirSync(problemsDir)
       .filter((e) => !e.startsWith("."))
-      .map((id) => ({ id, size: "smoke", set: "dev" })); // defaults; real impl reads task.json
+      .map((id) => {
+        try {
+          const raw = JSON.parse(readFileSync(join(problemsDir, id, "task.json"), "utf8")) as {
+            size?: string; set?: string;
+          };
+          return { id, size: raw.size ?? "small", set: raw.set ?? "reported" };
+        } catch {
+          return { id, size: "small", set: "reported" };
+        }
+      });
   }
 
   const config = resolveConfig(
