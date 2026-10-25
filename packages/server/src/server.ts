@@ -3,6 +3,7 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { CallToolRequestSchema, ListToolsRequestSchema } from "@modelcontextprotocol/sdk/types.js";
 import { buildFramework, buildRegistry, type Host } from "@aiw/core";
 import { createReporter, NoopSink, FileSink } from "@aiw/telemetry";
+import { createChatClient } from "@aiw/llm";
 import type { FrameworkKind } from "@aiw/core";
 
 /** Parsed variant keys from the --framework flag. */
@@ -29,6 +30,14 @@ export interface ServerOptions {
   priority?: string[];
   /** Read-only mode: deny non-read calls before the check step (TODO: wire into CheckedHost). */
   readOnly?: boolean;
+  /** Orchestrate executor: model id (framework-server §5). */
+  orchestrateModel?: string;
+  /** Orchestrate executor: API key. */
+  orchestrateApiKey?: string;
+  /** Orchestrate executor: base URL (default: https://openrouter.ai/api/v1). */
+  orchestrateBaseURL?: string;
+  /** Orchestrate executor: workspace root (default: process.cwd()). */
+  orchestrateWorkspaceRoot?: string;
 }
 
 /**
@@ -41,13 +50,31 @@ export async function startServer(opts: ServerOptions): Promise<void> {
   const hostDecls = await opts.host.tools();
   const registry = buildRegistry(hostDecls);
 
-  // 2. Assemble the framework.
+  // 2. Build orchestrate options if needed.
+  let orchestrateOpts: import("@aiw/core").OrchestrateOptions | undefined;
+  if (opts.kind === "orchestrate") {
+    if (!opts.orchestrateModel) throw new Error("orchestrate requires --executor-model");
+    if (!opts.orchestrateApiKey) throw new Error("orchestrate requires an executor API key (--executor-api-key or OPENROUTER_API_KEY)");
+    const client = createChatClient({
+      baseURL: opts.orchestrateBaseURL ?? "https://openrouter.ai/api/v1",
+      apiKey: opts.orchestrateApiKey,
+      timeoutMs: 300_000,
+    });
+    orchestrateOpts = {
+      client,
+      model: opts.orchestrateModel,
+      workspaceRoot: opts.orchestrateWorkspaceRoot ?? process.cwd(),
+    };
+  }
+
+  // 3. Assemble the framework.
   const framework = buildFramework(opts.kind, registry, {
     host: opts.host,
     variant: opts.variant,
     branchContext: opts.branchContext,
     maxChars: opts.maxChars,
     priority: opts.priority,
+    orchestrate: orchestrateOpts,
   });
 
   // 3. Create MCP Server with instructions set.

@@ -92,7 +92,7 @@ export async function runJobAttempt(opts: JobOptions): Promise<JobResult> {
     const ctr = await startContainer(job.problem, jobDir, join(repoRoot, "packages", "server", "dist"), undefined);
 
     try {
-      const serverDescriptor = await startServer(ctr, [
+      const serverArgs = [
         "--engine", "isolated-vm",
         "--framework", job.framework,
         "--tier", config.tier ?? "S",
@@ -101,7 +101,13 @@ export async function runJobAttempt(opts: JobOptions): Promise<JobResult> {
         "--events", "/out/events.jsonl",
         "--transcript", "/out/transcript.jsonl",
         "--blobs", "/out/blobs",
-      ]);
+        ...(job.framework === "orchestrate" ? [
+          "--executor-model", config.models.secondary,
+          "--executor-api-key", apiKey,
+          "--executor-base-url", baseURL,
+        ] : []),
+      ];
+      const serverDescriptor = await startServer(ctr, serverArgs);
       const session = await openMCPSession(serverDescriptor);
 
       const taskText = readTaskText(problemsDir, job.problem);

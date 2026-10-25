@@ -30,6 +30,8 @@ const { values } = parseArgs({
     "max-chars": { type: "string" },
     priority: { type: "string" },
     "executor-model": { type: "string" },
+    "executor-api-key": { type: "string" },
+    "executor-base-url": { type: "string" },
     "secondary-cap": { type: "string" },
     "branch-context": { type: "string" },
   },
@@ -70,6 +72,13 @@ const branchContextRaw = typeof values["branch-context"] === "string" ? values["
 const branchContext = (branchContextRaw === "trace" || branchContextRaw === "annotated" || branchContextRaw === "full")
   ? branchContextRaw
   : undefined;
+const executorModel = typeof values["executor-model"] === "string" ? values["executor-model"] : undefined;
+const executorApiKey = typeof values["executor-api-key"] === "string"
+  ? values["executor-api-key"]
+  : (process.env["OPENROUTER_API_KEY"] ?? process.env["OPENAI_API_KEY"]);
+const executorBaseURL = typeof values["executor-base-url"] === "string"
+  ? values["executor-base-url"]
+  : process.env["OPENAI_BASE_URL"];
 
 // Build host based on --host flag.
 let host;
@@ -99,6 +108,10 @@ startServer({
   maxChars,
   priority,
   readOnly,
+  orchestrateModel: executorModel,
+  orchestrateApiKey: executorApiKey,
+  orchestrateBaseURL: executorBaseURL,
+  orchestrateWorkspaceRoot: root,
 }).catch((err) => {
   console.error("aiw-server: fatal error:", err);
   process.exit(1);
