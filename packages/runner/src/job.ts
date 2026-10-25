@@ -89,7 +89,8 @@ export async function runJobAttempt(opts: JobOptions): Promise<JobResult> {
   try {
     // Build image and start container (stubs in this implementation)
     await buildImage(problemDir, job.problem);
-    const ctr = await startContainer(job.problem, jobDir, join(repoRoot, "packages", "server", "dist"), undefined);
+    // orchestrate executor makes LLM calls from inside the container; bridge gives outbound internet access
+    const ctr = await startContainer(job.problem, jobDir, join(repoRoot, "packages", "server", "dist"), job.framework === "orchestrate" ? "bridge" : undefined);
 
     try {
       const serverArgs = [
