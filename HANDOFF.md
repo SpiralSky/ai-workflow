@@ -40,12 +40,14 @@ per framework-runner §6.5 (CLAUDE.md updated); large dev problem deferred until
    sidecar `packages/tools/python/aiw_sidecar` (dev venv via `npm run setup:venv`). Choices: tool-catalog
    A-30–A-34; refactor `unsure` kept per user (tools §6.4). Test group: A-35 (approved; coverage is
    line-only).
-   **Then:** the server (`LocalHost` wraps the catalog) and runner that consume `buildFramework`, then step 3.
+   **Done (2026-10-25):** `@aiw/server` (`packages/server/`): LocalHost, McpClientHost stub, MCP stdio server with tools/list + tools/call, throttled progress, durationMs meta. `@aiw/runner` (`packages/runner/`): full CLI (eval/report/problems/view), config/plan/scheduler/loop/rundir/combine; Docker ops (container.ts, mcp.ts, grade.ts) and problems build/check are stubs pending Docker environment.
+   **Then:** wire Docker stubs and run step 3 (clean `compare`).
    Engine packaging resolved 2026-10-24 (core-branch §4.1, I-11 revised): QuickJS-WASM default,
    isolated-vm optional, shipped beside the bundle; containers use `--engine isolated-vm`.
-3. Test the existing modes first: clean `compare` (baseline, branch-only, orchestrate) — Roadmap step 3.
-4. Only then: user's new orchestrate idea (adds one mode) — not yet presented; it goes through spec approval.
-5. After that: optional branch coverage for `coverage` (`sys.monitoring` BRANCH events; tools §6.5, A-35).
+3. Wire Docker stubs (`container.ts`, `mcp.ts`, `grade.ts` in `packages/runner/src/`) and `problems/` build+check, then run step 4.
+4. Test the existing modes first: clean `compare` (baseline, branch-only, orchestrate) — Roadmap step 3.
+5. Only then: user's new orchestrate idea (adds one mode) — not yet presented; it goes through spec approval.
+6. After that: optional branch coverage for `coverage` (`sys.monitoring` BRANCH events; tools §6.5, A-35).
 
 Commit spec/README changes as `docs:` commits when the user approves.
 
@@ -70,6 +72,30 @@ collisions are errors (framework-server §3 aligned).
 predates the architecture specs and does not match them (no isolate, instrumentation, recorder, `state` or renderers).
 Rebuild it per architecture/core-branch.md rather than patching it; the old `src/runner.ts` path is replaced afterwards.
 npm workspaces root (A-02) exists: `npm test` / `npm run typecheck` at the repo root; `framework/` is not a workspace.
-Workflow: the main session designs and orchestrates; subagents execute in small, self-contained steps. Use
-Sonnet subagents (`model: "sonnet"`) for implementation and Haiku (`model: "haiku"`, weaker) for simple mechanical
-tasks; the main agent reviews their output.
+
+---
+
+## Autonomous loop
+
+**To resume:** read this file, then continue the next steps above.
+
+**Subagent policy — for token efficiency and cache health, not speed:**
+The goal is to keep the main session context small and stable so the prompt cache stays warm across turns. Do NOT run subagents in parallel; run them sequentially, one step at a time.
+- Spawn an `implementer` agent (`model: "sonnet"`) for every self-contained code change. Pass it the spec section, exact files and what to build; get back a short report (findings + paths, no code dumps).
+- Spawn a `codebase-memory-scout` agent (`model: "haiku"`) for lookups (where is X, what calls Y). Haiku is cheap; keeps bulky tool output out of main context.
+- Spawn an `Explore` agent (`model: "haiku"`) for broad file searches.
+- Keep the main session to: reading HANDOFF.md, briefing subagents, reviewing their short reports, running `npm test`, committing, and updating HANDOFF.md. Do NOT do implementation or large reads inline.
+
+**Per step:**
+1. Read the relevant spec section (`docs/specifications/`).
+2. Spawn the appropriate subagent with a self-contained brief (spec reference, file paths, what to build/change).
+3. Review the report; run `npm test` at the repo root.
+4. Commit (message format per CLAUDE.md; `npm test` must pass first).
+5. Mark the step done in this file and move to the next.
+
+**Hard rules:**
+- NEVER edit `docs/specifications/features/` files. If a change is needed there, write it to `.claude/pending-review/YYYY-MM-DD-HH-MM-topic.md` (use `.claude/pending-review/TEMPLATE.md`) and continue to the next unblocked step.
+- Architecture specs (`docs/specifications/architecture/`) may be updated to record implementation choices; flag conflicts with a feature spec in pending-review instead of silently resolving them.
+- If a step needs a user decision (design choice, missing info, ambiguous spec), write it to `.claude/pending-review/` and continue.
+
+**Stop when:** all "Next (in order)" steps are done, or 2–3 milestones complete and it's a natural handoff point, or only blocked steps remain. Update this file with current state before stopping.
