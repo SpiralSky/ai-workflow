@@ -9,6 +9,7 @@ framework/prompt/.system.*.md
 
 # run outputs
 experiments/runs/
+experiments/problems/**/.selfcheck.json
 dev/out/
 .branch-traces/
 

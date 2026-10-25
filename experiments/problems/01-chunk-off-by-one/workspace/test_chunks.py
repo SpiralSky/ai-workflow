@@ -11,3 +11,6 @@ class TestChunk(unittest.TestCase):
     def test_bad_size(self):
         with self.assertRaises(ValueError):
             chunk([1], 0)
+
+if __name__ == "__main__":
+    unittest.main()

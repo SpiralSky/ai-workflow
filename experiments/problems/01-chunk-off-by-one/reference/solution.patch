@@ -1,0 +1,10 @@
+diff --git a/chunks.py b/chunks.py
+index 2a465bf..7931d8a 100644
+--- a/chunks.py
++++ b/chunks.py
+@@ -2,4 +2,4 @@ def chunk(items, size):
+     """Split items into lists of length `size` (last one may be shorter)."""
+     if size <= 0:
+         raise ValueError("size must be positive")
+-    return [items[i:i + size] for i in range(0, len(items) - size + 1, size)]
++    return [items[i:i + size] for i in range(0, len(items), size)]

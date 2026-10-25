@@ -1,0 +1,7 @@
+{
+  "id": "01-chunk-off-by-one",
+  "size": "smoke",
+  "set": "dev",
+  "turnLimit": 6,
+  "tags": ["bugfix"]
+}

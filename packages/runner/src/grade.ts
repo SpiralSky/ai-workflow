@@ -125,13 +125,13 @@ export async function gradeJob(
       }
     }
 
-    // 6. Copy checks over workspace
+    // 6. Copy checks/ directory into /work/ so check.sh lands at /work/checks/check.sh
     await execFile("docker", [
       "exec",
       gradeId,
       "sh",
       "-c",
-      "cp -r /tmp/checks/. /work/",
+      "cp -r /tmp/checks /work/",
     ]);
 
     // 7. Run check.sh with 120 s timeout
