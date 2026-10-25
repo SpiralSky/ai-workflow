@@ -71,10 +71,17 @@ per framework-runner §6.5 (CLAUDE.md updated); large dev problem deferred until
    - **Model used:** `deepseek/deepseek-v4.1-flash` ($0.00000002/token; practically free for dev).
      CLAUDE.md rule (`deepseek/deepseek-v4-flash`) applies to full/pilot runs.
    - **Orchestrate turn-limit:** expected for a dev model — not an infra bug.
-   - **To re-run:**
+   - **Done (2026-10-25, `e8ad223`):** `@aiw/viewer` (`packages/viewer/`): React+Vite app + Node
+     indexer. Indexer reads `experiments/runs/*/` → `dist/data/index.js` + per-job `.js` scripts
+     (A-19 script-injection pattern). App: sidebar (run groups), framework tabs, Summary/JobsMatrix/
+     Job views, ConversationView (events.jsonl → turn cards), DiffView, CheckLog, renderer registry.
+     Hash routing. `aiw view` stub replaced. Branch/orchestrate framework renderers deferred.
+     Server bundle rebuilt (2026-10-25). 298 tests pass.
+   - **To re-run (with viewer):**
      ```
      node packages/server/build.mjs   # only if server/core source changed
      OPENROUTER_API_KEY=sk-or-... PATH="$PATH:$(pwd)/node_modules/.bin" aiw eval --problems 01-chunk-off-by-one --mode compare --reps 1 --budget 0.50 --model deepseek/deepseek-v4.1-flash --tools S
+     # then: aiw view  (indexes runs + opens browser)
      ```
 5. Only then: user's new orchestrate idea (adds one mode) — not yet presented; it goes through spec approval.
 6. After that: optional branch coverage for `coverage` (`sys.monitoring` BRANCH events; tools §6.5, A-35).
