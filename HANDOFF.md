@@ -52,9 +52,14 @@ per framework-runner §6.5 (CLAUDE.md updated); large dev problem deferred until
    `task.json`, `workspace/`, `checks/`, `Dockerfile`). A smoke problem must be created at
    `experiments/problems/01-chunk-off-by-one/` (the spec placeholder) plus the `aiw-base` Docker
    image before `aiw problems check` and `aiw eval` can run.
-4. Create the smoke problem (`01-chunk-off-by-one`) in the new spec format and the `aiw-base` image,
-   then run `aiw problems check smoke` and `aiw eval --problems smoke --mode compare --reps 1
-   --budget 0.50`. — Roadmap step 3.
+4. **Done (2026-10-25):** Smoke problem + `aiw-base` image.
+   - `experiments/docker/aiw-base/Dockerfile`; `aiw-base:latest` image built.
+   - `experiments/problems/01-chunk-off-by-one/` fully rebuilt in new spec format.
+   - `grade.ts` fixed: `cp -r workspaceDir tmp/before` + `cwd: tmp` + relative paths in diff +
+     `git apply -p2`; also fixed `cp -r /tmp/checks /work/` (was `checks/.`) so check.sh lands
+     at `/work/checks/check.sh`. Committed `0f21309` + `c3e56bd`.
+   - `aiw problems check 01-chunk-off-by-one` → PASS (~7.8 s), 97 tests pass.
+   - **Next:** `aiw eval --problems 01-chunk-off-by-one --mode compare --reps 1 --budget 0.50`.
 5. Only then: user's new orchestrate idea (adds one mode) — not yet presented; it goes through spec approval.
 6. After that: optional branch coverage for `coverage` (`sys.monitoring` BRANCH events; tools §6.5, A-35).
 
