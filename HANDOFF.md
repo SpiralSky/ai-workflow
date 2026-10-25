@@ -141,7 +141,24 @@ per framework-runner §6.5 (CLAUDE.md updated); large dev problem deferred until
    > workspace (write a quick hidden test if the existing tests don't catch the bug). Confirm with
    > `aiw problems check <id>`.
 
-6. Once all 9 are ported: `aiw eval --problems all --mode compare --reps 3 --budget 1.00 --model deepseek/deepseek-v4-flash --tools S` (README roadmap step 3).
+6. **Done (2026-10-25, run `2026-10-25T12-10-04Z-797d`).** Full compare on 8 reported problems (03-discount-mismatch is `set:dev`, excluded).
+   Results (7 problems × 3 modes × 3 reps = 63 jobs):
+   | Mode | PASS | FAIL | Rate |
+   |------|------|------|------|
+   | baseline | 21/21 | 0 | 100% |
+   | branch-only | 1/21 | 20 | 5% |
+   | orchestrate | 10/21 | 11 | 48% |
+
+   **Anomaly: branch-only near-total failure.** Only `06-import-cycle.branch-only.0` passed; every
+   other branch-only job failed. This is not a noisy signal — branch-only is broken in this build.
+   Root cause unknown; needs investigation before interpreting orchestrate vs baseline gap.
+   Likely suspects: branch runtime (compile/isolate), tool routing under branch-only mode,
+   or the server not sending branch events back to the container grader.
+
+   **Before continuing** to step 7 or the user's new idea, diagnose branch-only failures.
+   Suggested approach: pick one job (e.g. `02-inventory-feature.branch-only.0`), read its
+   `events.jsonl` for turn-limit vs error vs wrong output, then narrow to root cause.
+
 7. User's new orchestrate idea (adds one mode) — not yet presented; it goes through spec approval.
 8. After that: optional branch coverage for `coverage` (`sys.monitoring` BRANCH events; tools §6.5, A-35).
 
