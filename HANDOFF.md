@@ -218,6 +218,40 @@ per framework-runner §6.5 (CLAUDE.md updated); large dev problem deferred until
    `05-report-refactor.branch-only.0` still FAIL (likely a harder problem for branch).
    `08-api-mismatch.baseline.0` FAIL — unexpected; may be model variance.
 
+   **Remaining branch-only issue: model behavior with the branch paradigm.**
+   `05-report-refactor.branch-only.0` failed despite `valueChars=800`. Root causes:
+
+   - **Compile errors (turns 2–3):** model wrote invalid branch syntax (`const file = await
+     tools.readFile(...)` instead of `async (tools, state) => { ... }`). Branch compiler
+     rejected both; 2 turns wasted recovering. Indicates the model doesn't reliably know the
+     required arrow-function wrapper syntax even with the system prompt.
+
+   - **Direct tool calls (turns 9–11):** model called `writeFile` and `bash` outside branch
+     (not through the `branch` tool) in 3 consecutive turns. Server returned "Unknown tool".
+     Even with the branch-only system prompt, the model reverts to direct calls for file writes.
+
+   Together: 5 of 12 turns wasted on paradigm errors → only 7 effective turns for a
+   multi-function refactor. The other 4 problems passed, so these issues are not universal —
+   longer / more complex tasks expose them more.
+
+   **Options to address (decide in next session):**
+   - **P1 (prompt — branch syntax):** Add a concrete code example in the branch-only system
+     prompt showing the exact `async (tools, state) => { ... }` wrapper. This is a feature-spec
+     change (branch-only.md §3 or a new §Examples section). Low risk; no arch change.
+   - **P2 (prompt — no direct calls):** Add an explicit rule in the branch-only prompt:
+     "Do not call tool names directly; they are only available inside a `branch` program."
+     The tool list in the branch description already implies this, but a direct prohibition
+     may help. Feature-spec change; low risk.
+   - **P3 (compile error feedback):** The branch tool currently returns a compile-error trace
+     when syntax is wrong. Consider making the error more prominent (e.g. include the
+     offending line and a syntax hint). Architecture spec change (core-branch §6).
+   - **P4 (reject unknown tools with a hint):** When the server receives a direct call for a
+     tool that only exists inside branch, return "Unknown tool X — call it via `branch`" instead
+     of just "Unknown tool X". Small server change; no spec change needed.
+
+   P1 + P2 are the recommended starting point: low-risk prompt changes that address both failure
+   modes. P4 is a cheap defensive addition. P3 is optional.
+
    **Blocked: OpenRouter key needs more credits.**
    Top up the key at openrouter.ai/workspaces/default/keys or provide a new key,
    then re-run the full compare. The server bundle and runner are correct as of `11acdcb`.
