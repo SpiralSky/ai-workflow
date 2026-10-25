@@ -149,15 +149,74 @@ per framework-runner §6.5 (CLAUDE.md updated); large dev problem deferred until
    | branch-only | 1/21 | 20 | 5% |
    | orchestrate | 10/21 | 11 | 48% |
 
-   **Anomaly: branch-only near-total failure.** Only `06-import-cycle.branch-only.0` passed; every
-   other branch-only job failed. This is not a noisy signal — branch-only is broken in this build.
-   Root cause unknown; needs investigation before interpreting orchestrate vs baseline gap.
-   Likely suspects: branch runtime (compile/isolate), tool routing under branch-only mode,
-   or the server not sending branch events back to the container grader.
+   **Anomaly: branch-only near-total failure — root cause found and fixed (2026-10-25).**
+   Only `06-import-cycle.branch-only.0` passed; every other branch-only job failed.
 
-   **Before continuing** to step 7 or the user's new idea, diagnose branch-only failures.
-   Suggested approach: pick one job (e.g. `02-inventory-feature.branch-only.0`), read its
-   `events.jsonl` for turn-limit vs error vs wrong output, then narrow to root cause.
+   **Investigation** (`02-inventory-feature.branch-only.0`, `events.jsonl`):
+   - All branch tool calls returned `ok: true` — the branch runtime itself was fine.
+   - Events that look like direct `readFile`/`bash` calls inside branch turns are server-side
+     events (s: prefix IDs) emitted when the branch program invokes those tools internally.
+     The model was NOT calling them directly.
+   - Failure mode: `reason: turn-limit` after 20 turns. The model spent turns re-reading
+     the same files and never converging on a fix.
+
+   **Root causes (both fixed in commit `737e492`):**
+
+   1. **Framework instructions missing from system prompt.** `job.ts` called
+      `buildSystemPrompt("")` — hardcoded empty string. The branch-only prompt (`branch-only.md`:
+      "All work goes through the `branch` tool…") was advertised by the server via MCP
+      `instructions` but never read. Fix: `mcp.ts` now calls `client.getInstructions()` after
+      connect; `MCPSession.instructions` is populated; `job.ts` passes it to `buildSystemPrompt`.
+
+   2. **Turn limit defaulted to 20.** `cli.ts` passed `turnLimits: {}` so all problems fell
+      through to the `?? 20` default in `job.ts`, ignoring `task.json`'s `turnLimit` field.
+      Fix: `job.ts` now reads `task.json` directly: `turnLimits[problem] ?? taskJson.turnLimit ?? 20`.
+
+   **Validation run result (2026-10-25, run `2026-10-25T13-13-28Z-1db8`):** 0/3 PASS.
+   Both fixes applied; still failing. Investigation continued.
+
+   **Third finding: `valueChars: 200` causes file-reading loops.**
+   The branch trace truncates every tool-call result to 200 chars (spec'd in core-branch.md §5,
+   `DEFAULT_TRACE_LIMITS`). `inventory.py` is ~450 bytes (~300 chars), so the model sees only
+   ~half the file per read attempt. Pattern observed in `02-inventory-feature.branch-only.0`:
+   - Turns 1–6: model re-reads inventory.py via different methods (readFile, bash cat, python3)
+     trying to get the full content; input tokens grew 400/turn (1538 → 5773 over 12 turns).
+   - Turn 7: model attempted `edit({old: '    def get_stock(self, name):', ...})` — hallucinated
+     a method name (`get_stock`) not in the file, likely because it never saw the complete
+     method list in a single truncated read.
+   - Turn 8–11: more reads to get exact content for the correct edit.
+   - Turn 12: model called `writeFile` with the full correct rewrite — but grading is intentionally
+     skipped on `turn-limit` per spec (§6.1), so the fix was never evaluated.
+   - The model did NOT use `state` to cache file content across turns (even with the branch-only
+     system prompt now telling it to); this is a prompt-effectiveness gap.
+
+   **The model needs more turns, or better state usage, to solve these problems in branch-only mode.**
+   With 12 turns allocated (matching what baseline uses), ~6 turns go to file reading, leaving
+   only ~6 for understanding + editing + verifying — not enough for a feature-addition problem.
+
+   **Spec-correct behaviours (not bugs):**
+   - `valueChars: 200` is spec-defined (core-branch.md) and a provenance field; changing it
+     requires user approval and a spec edit.
+   - Grading is skipped on `turn-limit` per framework-runner §6.1.
+   - Turn limits per problem are correct; the runner now reads them from `task.json`.
+
+   **Options (need user decision before proceeding):**
+   A. **Accept** branch-only results as a valid measurement: the trace constraint (200-char
+      values) is part of what makes branch-only distinct from baseline. Re-run the full compare
+      and report the gap honestly — branch-only is harder in trace mode.
+   B. **Increase `valueChars`** (e.g. 400 or 800) before the full run — spec change needed.
+   C. **Use `--branch-context full`** for the full run — no value truncation in full mode
+      (spec §5, `full` mode); this is already a supported flag. Results would show branch-only
+      without the truncation constraint.
+   D. **Improve the branch-only prompt** to explicitly show the state-caching pattern for files;
+      this is a feature-spec change.
+
+   **Pending user decision.** Do not run the full compare until the approach is chosen.
+
+   **To re-run full compare (once approach is decided):**
+   ```
+   OPENROUTER_API_KEY=sk-or-... PATH="$PATH:$(pwd)/node_modules/.bin" aiw eval --problems all --mode compare --reps 3 --budget 1.00 --model deepseek/deepseek-v4-flash --tools S [--branch-context full]
+   ```
 
 7. User's new orchestrate idea (adds one mode) — not yet presented; it goes through spec approval.
 8. After that: optional branch coverage for `coverage` (`sys.monitoring` BRANCH events; tools §6.5, A-35).
