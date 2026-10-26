@@ -106,6 +106,7 @@ export async function runJobAttempt(opts: JobOptions): Promise<JobResult> {
           "--executor-model", config.models.secondary,
           "--executor-api-key", apiKey,
           "--executor-base-url", baseURL,
+          "--secondary-cap", String(config.secondaryCap),
         ] : []),
       ];
       const serverDescriptor = await startServer(ctr, serverArgs);

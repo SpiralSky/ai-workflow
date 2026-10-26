@@ -39742,7 +39742,8 @@ async function startServer(opts) {
     orchestrateOpts = {
       client,
       model: opts.orchestrateModel,
-      workspaceRoot: opts.orchestrateWorkspaceRoot ?? process.cwd()
+      workspaceRoot: opts.orchestrateWorkspaceRoot ?? process.cwd(),
+      ...opts.secondaryCap !== void 0 ? { turns: opts.secondaryCap } : {}
     };
   }
   const framework = buildFramework(opts.kind, registry2, {
@@ -39866,6 +39867,8 @@ var branchContext = branchContextRaw === "trace" || branchContextRaw === "annota
 var executorModel = typeof values["executor-model"] === "string" ? values["executor-model"] : void 0;
 var executorApiKey = typeof values["executor-api-key"] === "string" ? values["executor-api-key"] : process.env["OPENROUTER_API_KEY"] ?? process.env["OPENAI_API_KEY"];
 var executorBaseURL = typeof values["executor-base-url"] === "string" ? values["executor-base-url"] : process.env["OPENAI_BASE_URL"];
+var secondaryCapRaw = typeof values["secondary-cap"] === "string" ? parseInt(values["secondary-cap"], 10) : void 0;
+var secondaryCap = secondaryCapRaw !== void 0 && !isNaN(secondaryCapRaw) ? secondaryCapRaw : void 0;
 var host;
 if (hostMode === "local") {
   host = new LocalHost(tier, { root });
@@ -39890,7 +39893,8 @@ startServer({
   orchestrateModel: executorModel,
   orchestrateApiKey: executorApiKey,
   orchestrateBaseURL: executorBaseURL,
-  orchestrateWorkspaceRoot: root
+  orchestrateWorkspaceRoot: root,
+  secondaryCap
 }).catch((err) => {
   console.error("aiw-server: fatal error:", err);
   process.exit(1);

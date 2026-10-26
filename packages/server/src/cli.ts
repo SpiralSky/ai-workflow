@@ -79,6 +79,8 @@ const executorApiKey = typeof values["executor-api-key"] === "string"
 const executorBaseURL = typeof values["executor-base-url"] === "string"
   ? values["executor-base-url"]
   : process.env["OPENAI_BASE_URL"];
+const secondaryCapRaw = typeof values["secondary-cap"] === "string" ? parseInt(values["secondary-cap"] as string, 10) : undefined;
+const secondaryCap = secondaryCapRaw !== undefined && !isNaN(secondaryCapRaw) ? secondaryCapRaw : undefined;
 
 // Build host based on --host flag.
 let host;
@@ -112,6 +114,7 @@ startServer({
   orchestrateApiKey: executorApiKey,
   orchestrateBaseURL: executorBaseURL,
   orchestrateWorkspaceRoot: root,
+  secondaryCap,
 }).catch((err) => {
   console.error("aiw-server: fatal error:", err);
   process.exit(1);

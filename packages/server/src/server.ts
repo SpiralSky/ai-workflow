@@ -38,6 +38,8 @@ export interface ServerOptions {
   orchestrateBaseURL?: string;
   /** Orchestrate executor: workspace root (default: process.cwd()). */
   orchestrateWorkspaceRoot?: string;
+  /** Orchestrate executor: per-executor turn cap (default 4). */
+  secondaryCap?: number;
 }
 
 /**
@@ -64,6 +66,7 @@ export async function startServer(opts: ServerOptions): Promise<void> {
       client,
       model: opts.orchestrateModel,
       workspaceRoot: opts.orchestrateWorkspaceRoot ?? process.cwd(),
+      ...(opts.secondaryCap !== undefined ? { turns: opts.secondaryCap } : {}),
     };
   }
 
