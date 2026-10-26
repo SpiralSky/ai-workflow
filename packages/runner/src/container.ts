@@ -54,11 +54,15 @@ export async function startContainer(
 ): Promise<Container> {
   const tag = `aiw-problem-${problem}`;
   const networkArg = network ?? "none";
+  // bridge network needs explicit DNS; Docker's embedded DNS doesn't forward to external resolvers
+  // on all host configurations (observed: bridge resolves LAN but not internet hostnames).
+  const dnsArgs = network === "bridge" ? ["--dns", "8.8.8.8"] : [];
   const { stdout } = await execFile("docker", [
     "run",
     "-d",
     "--network",
     networkArg,
+    ...dnsArgs,
     "--mount",
     `type=bind,src=${jobDir},dst=/out`,
     "--mount",
