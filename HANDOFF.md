@@ -234,31 +234,22 @@ per framework-runner §6.5 (CLAUDE.md updated); large dev problem deferred until
    multi-function refactor. The other 4 problems passed, so these issues are not universal —
    longer / more complex tasks expose them more.
 
-   **Options to address (decide in next session):**
-   - **P1 (prompt — branch syntax):** Add a concrete code example in the branch-only system
-     prompt showing the exact `async (tools, state) => { ... }` wrapper. This is a feature-spec
-     change (branch-only.md §3 or a new §Examples section). Low risk; no arch change.
-   - **P2 (prompt — no direct calls):** Add an explicit rule in the branch-only prompt:
-     "Do not call tool names directly; they are only available inside a `branch` program."
-     The tool list in the branch description already implies this, but a direct prohibition
-     may help. Feature-spec change; low risk.
-   - **P3 (compile error feedback):** The branch tool currently returns a compile-error trace
-     when syntax is wrong. Consider making the error more prominent (e.g. include the
-     offending line and a syntax hint). Architecture spec change (core-branch §6).
-   - **P4 (reject unknown tools with a hint):** When the server receives a direct call for a
-     tool that only exists inside branch, return "Unknown tool X — call it via `branch`" instead
-     of just "Unknown tool X". Small server change; no spec change needed.
-
-   P1 + P2 are the recommended starting point: low-risk prompt changes that address both failure
-   modes. P4 is a cheap defensive addition. P3 is optional.
+   **P1+P2+P4 done (2026-10-26, commit `41aeae4`):**
+   - P1: `branch-only.md` now has a concrete `async (tools, state) => { ... }` code example.
+   - P2: explicit rule added — "Never call tool names directly as MCP tools."
+   - P4: server returns "Unknown tool X — use the `branch` tool to call it" in branch-only mode.
+   - P3 (compile error feedback) deferred; optional arch change.
+   - Server bundle must be rebuilt before the next eval run (`node packages/server/build.mjs`).
 
    **Blocked: OpenRouter key needs more credits.**
    Top up the key at openrouter.ai/workspaces/default/keys or provide a new key,
-   then re-run the full compare. The server bundle and runner are correct as of `11acdcb`.
+   then re-run the full compare.
+
+   **Server bundle is current** as of `d65d49c` (includes P1/P2/P4 branch-only prompt
+   improvements; render test fixed for valueChars 800; 298 tests pass).
 
    **Re-run command (when credits are available):**
    ```
-   node packages/server/build.mjs   # only if source changed since 11acdcb
    OPENROUTER_API_KEY=sk-or-... PATH="$PATH:$(pwd)/node_modules/.bin" \
      aiw eval --problems all --mode compare --reps 3 --budget 1.00 \
      --model deepseek/deepseek-v4-flash --tools S
