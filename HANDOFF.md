@@ -277,42 +277,17 @@ per framework-runner §6.5 (CLAUDE.md updated); large dev problem deferred until
    3 reads burn the budget with no room left to write. `08-api-mismatch` passes because
    it is short enough that the executor writes within 3 reads.
 
-   **Bugs found (not yet fixed):**
+   **Done (2026-10-26, commit `e49795f`):**
+   - **B1 fixed:** `--secondary-cap` now flows runner→server: `job.ts` passes the flag,
+     `cli.ts` parses and forwards to `startServer`, `server.ts` sets `turns` on
+     `orchestrateOpts`.
+   - **P5/P6/P7 applied:** Three new branch efficiency rules added to `branch-only.md`
+     and `executor.md`: single read per file, combine read+write+test in one call,
+     no re-reads after write. Updated example in `branch-only.md`.
+   - Server bundle rebuilt (`e49795f`).
 
-   **B1 — `--secondary-cap` is dead code (runner + server):**
-   - `packages/runner/src/job.ts`: `config.secondaryCap` is never passed as
-     `--secondary-cap` in the `serverArgs` array. Server always starts without it.
-   - `packages/server/src/cli.ts`: `values["secondary-cap"]` is parsed but never
-     forwarded to `startServer(...)`.
-   - `packages/server/src/server.ts`: `orchestrateOpts` is built without a `turns`
-     field regardless; executor always falls through to `DEFAULT_TURNS = 4`
-     (`packages/core/src/orchestrate/executor.ts:21`).
-   - Fix: (1) add `"--secondary-cap", String(config.secondaryCap)` to `serverArgs` in
-     `job.ts`; (2) pass `secondaryCap` through `ServerOptions` in `server.ts` and set
-     `turns: opts.secondaryCap` in `orchestrateOpts`.
-
-   **P5 — Prompt: batch read + write + test in one branch call:**
-   Models consistently issue one operation per branch call when they could combine them.
-   Add to `branch-only.md` and `executor.md` (both need this):
-   - Explicit rule: "Combine read, write, and test in a single branch program where
-     the results are available. Avoid making separate branch calls for each step."
-   - Concrete example showing read → applyFix → writeFile → bash pytest in one call.
-
-   **P6 — Prompt: no re-reads after a write:**
-   After writing, models re-read to "verify" instead of running tests immediately.
-   Add to `branch-only.md` and `executor.md`:
-   - "After writing or editing a file, run tests in the next branch call — do not
-     re-read the file to verify the write."
-
-   **P7 — Prompt: enforce single read per file:**
-   Models read the same file 3–5 times before writing. The `state` caching instruction
-   already exists but is ignored. Strengthen it:
-   - "Read each file at most once. Store the content in `state` on the first read and
-     reuse it. Never issue two branch calls that both readFile the same path."
-
-   **Server bundle is current** as of `d65d49c` (includes P1/P2/P4 branch-only prompt
-   improvements; render test fixed for valueChars 800; 298 tests pass). DNS fix is in
-   runner source only — no bundle rebuild needed.
+   **Server bundle is current** as of `e49795f` (includes all prompt improvements
+   P1/P2/P4/P5/P6/P7; render test fixed for valueChars 800; 298 tests pass).
 
    **Re-run command (when credits available):**
    ```
@@ -320,6 +295,7 @@ per framework-runner §6.5 (CLAUDE.md updated); large dev problem deferred until
      aiw eval --problems all --mode compare --reps 3 --budget 1.00 \
      --model deepseek/deepseek-v4-flash --tools S
    ```
+   Note: rebuild server bundle first if source changed: `node packages/server/build.mjs`
 
 7. User's new orchestrate idea (adds one mode) — not yet presented; it goes through spec approval.
 8. After that: optional branch coverage for `coverage` (`sys.monitoring` BRANCH events; tools §6.5, A-35).
