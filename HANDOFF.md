@@ -241,14 +241,33 @@ per framework-runner §6.5 (CLAUDE.md updated); large dev problem deferred until
    - P3 (compile error feedback) deferred; optional arch change.
    - Server bundle must be rebuilt before the next eval run (`node packages/server/build.mjs`).
 
-   **Blocked: OpenRouter key needs more credits.**
-   Top up the key at openrouter.ai/workspaces/default/keys or provide a new key,
-   then re-run the full compare.
+   **Audit run (2026-10-26, free model `nvidia/nemotron-3-ultra-550b-a55b:free`):**
+   Run `2026-10-26T07-09-55Z-b795` on 4 failing problems × branch-only+orchestrate × 1 rep.
+
+   **Bug found and fixed (commit `a65157a`):** Docker bridge network on this machine can't
+   resolve external DNS. All orchestrate executor LLM calls were silently timing out —
+   `openrouter.ai` DNS lookup failed inside the container. Fix: `--dns 8.8.8.8` added
+   to the Docker run for orchestrate containers in `container.ts`. Verified working.
+
+   | Problem | branch-only | orchestrate |
+   |---------|-------------|-------------|
+   | 05-report-refactor | **PASS** | FAIL turn-limit (executor write didn't persist, planner retried 5×) |
+   | 07-async-race | FAIL turn-limit | FAIL turn-limit (same pattern) |
+   | 08-api-mismatch | **PASS** | **PASS** |
+   | 09-cache-invalidation | FAIL turn-limit | FAIL turn-limit |
+
+   **Remaining open issues:**
+   - `07-async-race` / `09-cache-invalidation`: turn-limit in both modes — re-read loops +
+     tight turn limits. deepseek-v4-flash run needed to confirm (may be model-specific).
+   - Orchestrate executor write failures: executor's fix-apply returns ~137B, changes don't
+     persist; planner retries until turn-limit. Root cause unknown — executor transcript not
+     captured in events.jsonl (would need `/out/transcript.jsonl` from inside the container).
 
    **Server bundle is current** as of `d65d49c` (includes P1/P2/P4 branch-only prompt
-   improvements; render test fixed for valueChars 800; 298 tests pass).
+   improvements; render test fixed for valueChars 800; 298 tests pass). DNS fix is in
+   runner source only — no bundle rebuild needed.
 
-   **Re-run command (when credits are available):**
+   **Re-run command (when credits available):**
    ```
    OPENROUTER_API_KEY=sk-or-... PATH="$PATH:$(pwd)/node_modules/.bin" \
      aiw eval --problems all --mode compare --reps 3 --budget 1.00 \
