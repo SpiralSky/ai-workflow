@@ -78,10 +78,11 @@ export async function callTool(
   args: Record<string, unknown>,
   meta: { "aiw/parent": string; "aiw/harnessId": string },
 ): Promise<MCPCallResult> {
-  const result = await session._client.callTool({
-    name,
-    arguments: { ...args, _meta: meta },
-  });
+  const result = await session._client.callTool(
+    { name, arguments: { ...args, _meta: meta } },
+    undefined,
+    { timeout: 300_000 },
+  );
 
   // Extract aiw metadata from the response _meta if present
   const rawMeta = (result as Record<string, unknown>)._meta as Record<string, unknown> | undefined;
