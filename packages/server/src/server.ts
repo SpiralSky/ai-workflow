@@ -101,7 +101,7 @@ export async function startServer(opts: ServerOptions): Promise<void> {
     const toolDef = framework.tools.find((t) => t.name === req.params.name);
     if (!toolDef) {
       return {
-        content: [{ type: "text", text: `Unknown tool: ${req.params.name}` }],
+        content: [{ type: "text", text: opts.kind === "branch-only" ? `Unknown tool: ${req.params.name} — use the \`branch\` tool to call it` : `Unknown tool: ${req.params.name}` }],
         isError: true,
         _meta: { "aiw/durationMs": Date.now() - start },
       };
