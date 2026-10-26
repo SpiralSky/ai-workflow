@@ -256,12 +256,59 @@ per framework-runner §6.5 (CLAUDE.md updated); large dev problem deferred until
    | 08-api-mismatch | **PASS** | **PASS** |
    | 09-cache-invalidation | FAIL turn-limit | FAIL turn-limit |
 
-   **Remaining open issues:**
-   - `07-async-race` / `09-cache-invalidation`: turn-limit in both modes — re-read loops +
-     tight turn limits. deepseek-v4-flash run needed to confirm (may be model-specific).
-   - Orchestrate executor write failures: executor's fix-apply returns ~137B, changes don't
-     persist; planner retries until turn-limit. Root cause unknown — executor transcript not
-     captured in events.jsonl (would need `/out/transcript.jsonl` from inside the container).
+   **Detailed failure analysis (2026-10-26):**
+
+   Branch-only efficiency (Nemotron 550B, confirmed by event traces):
+   | Job | Max consec. reads | Wasted turns | Outcome |
+   |-----|-------------------|--------------|---------|
+   | 08-api-mismatch | 2 | 1 | PASS (7T) |
+   | 05-report-refactor | 5 | 4 | PASS (10T) |
+   | 07-async-race | 5 | 4 | FAIL — correct fix applied in T6, pytest in T10, needed T11 to confirm |
+   | 09-cache-invalidation | 5 | 5 | FAIL — correct edit applied in T7, re-read T8–9, findTests T10 (never ran) |
+
+   Root cause of `07-async-race`/`09-cache-invalidation` failures is **re-read loops**,
+   not the turn limit itself. Optimal path is 3 turns (read → write → test); these used
+   10 with 4–5 spent re-reading the same file before writing. Bumping turnLimit treats
+   the symptom; fixing the prompt treats the cause (see P5–P7 below).
+
+   Orchestrate executor failures: Nemotron 550B as executor loops on reads and rarely
+   writes (26 reads / 0 writes for `05-report-refactor`; 19 reads / 1 write for
+   `07-async-race`). The 4-turn executor cap (see bug B2 below) amplifies this:
+   3 reads burn the budget with no room left to write. `08-api-mismatch` passes because
+   it is short enough that the executor writes within 3 reads.
+
+   **Bugs found (not yet fixed):**
+
+   **B1 — `--secondary-cap` is dead code (runner + server):**
+   - `packages/runner/src/job.ts`: `config.secondaryCap` is never passed as
+     `--secondary-cap` in the `serverArgs` array. Server always starts without it.
+   - `packages/server/src/cli.ts`: `values["secondary-cap"]` is parsed but never
+     forwarded to `startServer(...)`.
+   - `packages/server/src/server.ts`: `orchestrateOpts` is built without a `turns`
+     field regardless; executor always falls through to `DEFAULT_TURNS = 4`
+     (`packages/core/src/orchestrate/executor.ts:21`).
+   - Fix: (1) add `"--secondary-cap", String(config.secondaryCap)` to `serverArgs` in
+     `job.ts`; (2) pass `secondaryCap` through `ServerOptions` in `server.ts` and set
+     `turns: opts.secondaryCap` in `orchestrateOpts`.
+
+   **P5 — Prompt: batch read + write + test in one branch call:**
+   Models consistently issue one operation per branch call when they could combine them.
+   Add to `branch-only.md` and `executor.md` (both need this):
+   - Explicit rule: "Combine read, write, and test in a single branch program where
+     the results are available. Avoid making separate branch calls for each step."
+   - Concrete example showing read → applyFix → writeFile → bash pytest in one call.
+
+   **P6 — Prompt: no re-reads after a write:**
+   After writing, models re-read to "verify" instead of running tests immediately.
+   Add to `branch-only.md` and `executor.md`:
+   - "After writing or editing a file, run tests in the next branch call — do not
+     re-read the file to verify the write."
+
+   **P7 — Prompt: enforce single read per file:**
+   Models read the same file 3–5 times before writing. The `state` caching instruction
+   already exists but is ignored. Strengthen it:
+   - "Read each file at most once. Store the content in `state` on the first read and
+     reuse it. Never issue two branch calls that both readFile the same path."
 
    **Server bundle is current** as of `d65d49c` (includes P1/P2/P4 branch-only prompt
    improvements; render test fixed for valueChars 800; 298 tests pass). DNS fix is in
