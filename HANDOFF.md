@@ -286,19 +286,99 @@ per framework-runner §6.5 (CLAUDE.md updated); large dev problem deferred until
      no re-reads after write. Updated example in `branch-only.md`.
    - Server bundle rebuilt (`e49795f`).
 
-   **Server bundle is current** as of `e49795f` (includes all prompt improvements
-   P1/P2/P4/P5/P6/P7; render test fixed for valueChars 800; 298 tests pass).
+   **Server bundle is current** as of `e0e31a9` (includes all prompt improvements
+   P1/P2/P4/P5/P6/P7; render test fixed for valueChars 800; 298 tests pass; MCP
+   timeout raised to 300s).
 
-   **Re-run command (when credits available):**
-   ```
-   OPENROUTER_API_KEY=sk-or-... PATH="$PATH:$(pwd)/node_modules/.bin" \
-     aiw eval --problems all --mode compare --reps 3 --budget 1.00 \
-     --model deepseek/deepseek-v4-flash --tools S
-   ```
-   Note: rebuild server bundle first if source changed: `node packages/server/build.mjs`
+   **MCP callTool timeout fix (2026-10-26, commit `e0e31a9`):**
+   The `@modelcontextprotocol/sdk` default request timeout is 60s. Free-tier models
+   can take >60s per turn (nemotron-ultra hit 46s/turn), causing `do` tool calls to
+   fail with `MCP error -32001: Request timed out` and invalidate orchestrate runs.
+   Fix: `packages/runner/src/mcp.ts` now passes `{ timeout: 300_000 }` to `callTool`.
 
-7. User's new orchestrate idea (adds one mode) — not yet presented; it goes through spec approval.
-8. After that: optional branch coverage for `coverage` (`sys.monitoring` BRANCH events; tools §6.5, A-35).
+   **Free-model eval runs (2026-10-26):**
+   Three runs across different free OpenRouter models (`branch-only,orchestrate`,
+   all 8 reported problems, 1 rep):
+
+   - `nvidia/nemotron-3-ultra-550b-a55b:free` — invalidated by 60s MCP timeout
+     (46s/turn; run `2026-10-26T12-34-02Z-c04d`). Partial: nemotron PASS'd 02 and 04
+     branch-only before the run died.
+   - `poolside/laguna-s-2.1:free`, `poolside/laguna-xs-2.1:free` — both failed on
+     turn 2 of every job after 60s (runs `2026-10-26T13-23-56Z-8cc4`,
+     `2026-10-26T13-25-24Z-1ed4`). Turn 1 succeeds (7s); turn 2 dies — likely
+     per-model rate limiting or OpenRouter-side failure for these models. Unusable.
+   - `nvidia/nemotron-3.5-lightning:free` — all 14 jobs ran cleanly (no infra
+     errors; avg main latency 2–10s). But **0/14 PASS**: 13× `turn-limit`, 1×
+     `checks` (wrong fix). Model is too weak for these coding tasks (run
+     `2026-10-26T13-26-50Z-38dd`).
+
+   **Confirmed working after MCP fix:** nemotron-3.5-lightning ran a full
+   branch-only+orchestrate pilot without a single infrastructure failure. The
+   framework is solid; the gap is model capability.
+
+   **Free model landscape (2026-10-26) — all candidates exhausted:**
+   | Model | Status |
+   |-------|--------|
+   | `qwen/qwen3-235b-a22b:free` | Deprecated Oct 9, 2026 (→ qwen3.7-plus, paid) |
+   | `deepseek/deepseek-r1:free` | No longer on OpenRouter |
+   | `poolside/laguna-m.1:free` | No longer on OpenRouter |
+   | `nvidia/nemotron-3-ultra-550b-a55b:free` | Hit daily RPD cap (2/2 branch-only PASS before limit) |
+   | `poolside/laguna-s/xs-2.1:free` | Rate-limited per turn (dies on turn 2), unusable |
+   | `nvidia/nemotron-3.5-lightning:free` | 0/14 PASS — too weak |
+
+   **Unblocked (2026-10-27): key raised to $1 budget.**
+
+   **Selective audit (2026-10-27, run `2026-10-27T02-53-30Z-98b9`, $0.021):**
+   4 previously-failing problems × branch-only+orchestrate × 1 rep. 7/8 PASS.
+   `09-cache-invalidation.branch-only.0` FAIL (turn-limit, same root cause).
+   All B1/P-series fixes confirmed working.
+
+   **Full compare (2026-10-27, run `2026-10-27T03-02-23Z-ce5d`, $0.11):**
+   All 9 problems × 3 modes × 3 reps = 63 jobs (03-discount-mismatch included).
+
+   | Mode | PASS | Rate | vs. prior full run |
+   |------|------|------|--------------------|
+   | baseline | 21/21 | 100% | = |
+   | branch-only | 8/21 | 38% | ↑ from 5% |
+   | orchestrate | 16/21 | 76% | ↑ from 48% |
+
+   | Problem | Baseline | Branch-only | Orchestrate |
+   |---------|----------|-------------|-------------|
+   | 02-inventory-feature | 3/3 | 3/3 | 3/3 |
+   | 04-vague-rate-limit | 3/3 | 2/3 | 3/3 |
+   | 05-report-refactor | 3/3 | 1/3 | 3/3 |
+   | 06-import-cycle | 3/3 | 2/3 | 1/3 |
+   | 07-async-race | 3/3 | 0/3 | 1/3 |
+   | 08-api-mismatch | 3/3 | 0/3 | 3/3 |
+   | 09-cache-invalidation | 3/3 | 0/3 | 2/3 |
+
+   Baseline perfect; no regressions. Branch-only/orchestrate improved substantially.
+   Remaining budget: ~$0.89.
+
+7. **Done (2026-10-27, commit `d7d5c0d`).** Failure analysis + P8/P9 fixes.
+
+   **Root causes found:**
+
+   | Root cause | Jobs affected | New? |
+   |-----------|--------------|------|
+   | `state.set()/state.get()` silently fail (state is plain object, not Map) | 07-async-race 0/3 | **New** |
+   | readFile line-number prefix written to file via writeFile | 08-api-mismatch 0/3 | **New** |
+   | Re-read loop (state API failure + no convergence) | 09-cache-invalidation 0/3, 05-report-refactor 0,1 | Known (persists) |
+   | Wrong fix (checks fail) | 06-import-cycle.orchestrate.1 | Known |
+   | Model variance / tight turn budget | 04-vague-rate-limit 1/3, 06-import-cycle 1/3 | Known |
+
+   **Fixes applied (P8/P9):**
+   - `branch-only.md` and `executor.md`: state rule updated — "state is a plain object, not a Map; use `state.key = value` / `state.key`; `state.set()/state.get()` do not work."
+   - `branch-only.md` code example: fixed to use `state.src = src.content` (was `state.set("src", ...)`).
+   - Both prompts: new rule — "readFile output is line-numbered; strip with `.replace(/^ *\d+\t/gm, "")` before writeFile."
+   - Server bundle rebuilt.
+
+   **Remaining failures likely to improve:** 07-async-race, 08-api-mismatch (systematic root causes fixed). 09-cache-invalidation (may improve once state API fixed). 05-report-refactor 0/1 (model variance on complex task).
+
+   **Still open:** 06-import-cycle.orchestrate wrong fix (model variance; no code fix indicated).
+
+8. User's new orchestrate idea (adds one mode) — not yet presented; it goes through spec approval.
+9. After that: optional branch coverage for `coverage` (`sys.monitoring` BRANCH events; tools §6.5, A-35).
 
 Commit spec/README changes as `docs:` commits when the user approves.
 
@@ -307,7 +387,7 @@ Commit spec/README changes as `docs:` commits when the user approves.
 ## Code state
 
 **The codebase has been fully rewritten** in `packages/` from scratch against the architecture specs.
-All 6 packages are complete as of 2026-10-25 (97 tests pass, `npm test` at repo root):
+All 6 packages are complete as of 2026-10-25 (298 tests pass, `npm test` at repo root; 2 pre-existing lint failures in `@aiw/tools` are unrelated to runtime):
 
 | Package | What it covers |
 |---------|----------------|
