@@ -286,9 +286,8 @@ per framework-runner §6.5 (CLAUDE.md updated); large dev problem deferred until
      no re-reads after write. Updated example in `branch-only.md`.
    - Server bundle rebuilt (`e49795f`).
 
-   **Server bundle is current** as of `e0e31a9` (includes all prompt improvements
-   P1/P2/P4/P5/P6/P7; render test fixed for valueChars 800; 298 tests pass; MCP
-   timeout raised to 300s).
+   **Server bundle is current** as of `73075c5` (includes all prompt improvements
+   P1/P2/P4–P11; valueChars 2000; bash example fixed; 298 tests pass).
 
    **MCP callTool timeout fix (2026-10-26, commit `e0e31a9`):**
    The `@modelcontextprotocol/sdk` default request timeout is 60s. Free-tier models
@@ -376,6 +375,25 @@ per framework-runner §6.5 (CLAUDE.md updated); large dev problem deferred until
    **Remaining failures likely to improve:** 07-async-race, 08-api-mismatch (systematic root causes fixed). 09-cache-invalidation (may improve once state API fixed). 05-report-refactor 0/1 (model variance on complex task).
 
    **Still open:** 06-import-cycle.orchestrate wrong fix (model variance; no code fix indicated).
+
+   **Validation run (2026-10-27, run `2026-10-27T05-07-13Z-e8ab`, $0.021):** P8/P9 confirmed.
+   08-api-mismatch: 2/2 PASS (was 0/3). 07-async-race: 0/2. 09-cache-invalidation: 0/2.
+
+   **New root causes found and fixed (P10/P11, commit `73075c5`):**
+   - **P10:** `branch-only.md` code example used `bash({ command: "..." })` — wrong param name
+     (bash tool uses `cmd`). Also `test.exitCode`/`test.stdout` → `test.code`/`test.out`. This
+     caused verification calls in 07-async-race to silently fail, consuming turns without test
+     output, hitting turn limit.
+   - **P11:** `DEFAULT_TRACE_LIMITS.valueChars` raised 800 → 2000. `service.py` (09-cache-
+     invalidation) is 1355 bytes / 40 lines → ~1475 chars with line-number prefixes. At 800 chars
+     the model never saw the `update()` method body, hallucinated the replace string, all replace
+     calls failed. 2000 covers all current problem files (largest: test_api.py at ~1666 chars).
+     Spec (core-branch.md) and render test updated. Server bundle rebuilt.
+
+   **Validation run (2026-10-27, run `2026-10-27T05-18-25Z-ed96`):** 4/4 PASS on 07+09 branch-only.
+
+   **Full compare in progress** (2026-10-27, run `2026-10-27T05-20-16Z-9216`, all 9 problems ×
+   3 modes × 3 reps = 63 jobs). Rep 0 results visible so far: all PASS. Final results pending.
 
 8. User's new orchestrate idea (adds one mode) — not yet presented; it goes through spec approval.
 9. After that: optional branch coverage for `coverage` (`sys.monitoring` BRANCH events; tools §6.5, A-35).
