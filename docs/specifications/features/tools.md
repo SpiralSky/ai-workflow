@@ -138,6 +138,7 @@ is left unchanged and listed in `unsure: [{ path, line }]`, so the caller can ch
 | `moveSymbol` | write | Move a function/class/constant to another module (created if missing); rewrites imports in all users; leaves a re-export only if `keepReexport: true`. |
 | `moveModule` | write | Move or rename a module/package and rewrite every import of it. |
 | `extractFunction` | write | Turn a line range into a new function (name given), replacing it with a call. Parameters and return values are inferred. |
+| `replaceSymbol` | write | Replace the entire body of a named symbol (`path#Name` or `path#Class.method`) with new source text. Takes `dryRun`. Fails if the symbol is not found or is ambiguous. Use instead of `edit` when the planner dispatches a write by symbol name and the executor should not need to read the current content first. |
 | `inlineSymbol` | write | Replace calls to a function, or uses of a variable, with its body/value, then remove it. |
 | `changeSignature` | write | Add (with default), remove, rename or reorder parameters; updates every call site. |
 | `extractVariable` | write | Pull an expression into a named variable or module constant. |

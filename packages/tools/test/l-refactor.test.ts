@@ -43,7 +43,7 @@ const BASE_OUT = "ab_cd X 8";
 
 test("refactor tools throw `no sidecar` without a sidecar", async () => {
   const root = makeWorkspace(REFACTOR_PKG);
-  const names = ["renameSymbol", "moveSymbol", "moveModule", "extractFunction", "inlineSymbol", "changeSignature", "extractVariable", "organizeImports"];
+  const names = ["renameSymbol", "moveSymbol", "moveModule", "extractFunction", "inlineSymbol", "changeSignature", "extractVariable", "organizeImports", "replaceSymbol"];
   const tools = catalog("L", { root }).filter((t) => t.meta.category === "refactor");
   assert.deepEqual(tools.map((t) => t.name), names);
   assert.ok(tools.every((t) => t.meta.effect === "write"));
@@ -399,5 +399,62 @@ test("nav results see the refactored files", { skip: skipReason }, async () => {
     await ws.run("moveModule", { from: "pkg/util.py", to: "pkg/helpers.py" });
     assert.ok((await ws.run("overview", {})).modules.some((m: any) => JSON.stringify(m).includes("helpers")));
     await assert.rejects(ws.run("outline", { path: "pkg/util.py" }), /./);
+  } finally { ws.done(); }
+});
+
+test("replaceSymbol: replace a function, dryRun returns diff without writing", { skip: skipReason }, async () => {
+  const ws = setup();
+  try {
+    const before = tree(ws.root);
+    const newImpl = "def shout(t):\n    return t.upper() + \"!\"";
+    const dry = await ws.run("replaceSymbol", { symbol: "pkg/util.py#shout", content: newImpl, dryRun: true });
+    // dryRun: workspace unchanged
+    assert.deepEqual(tree(ws.root), before);
+    assert.ok(dry.diff, "dry run should include a diff");
+    assert.match(dry.diff, /\+.*"!"/);
+    assert.equal(dry.files.length, 1);
+    assert.equal(dry.files[0].path, "pkg/util.py");
+    // real run: file is written
+    const r = await ws.run("replaceSymbol", { symbol: "pkg/util.py#shout", content: newImpl });
+    assert.equal(r.files.length, 1);
+    const util = readFileSync(join(ws.root, "pkg/util.py"), "utf8");
+    assert.match(util, /return t\.upper\(\) \+ "!"/);
+    // module still imports and the other functions still work
+    assert.equal(py(ws.root, "import pkg; print(pkg.slugify('A B'))"), "a-b");
+  } finally { ws.done(); }
+});
+
+test("replaceSymbol: replace a method inside a class", { skip: skipReason }, async () => {
+  const ws = setup();
+  try {
+    const newMethod = "    def slug(self) -> str:\n        return self.name.lower().replace(\" \", \"-\")";
+    await ws.run("replaceSymbol", { symbol: "pkg/models.py#User.slug", content: newMethod });
+    const models = readFileSync(join(ws.root, "pkg/models.py"), "utf8");
+    assert.match(models, /replace\(" ", "-"\)/);
+    // method body no longer calls slugify (import may still exist at the top)
+    assert.doesNotMatch(models, /return slugify/);
+  } finally { ws.done(); }
+});
+
+test("replaceSymbol: symbol not found throws; non-Python throws unsupported language", { skip: skipReason }, async () => {
+  const ws = setup();
+  try {
+    await failsUntouched(ws, "replaceSymbol", { symbol: "pkg/util.py#nonexistent", content: "def nonexistent(): pass" }, /symbol not found/);
+    await failsUntouched(ws, "replaceSymbol", { symbol: "pkg/util.py#User.missing", content: "def missing(self): pass" }, /symbol not found/);
+    await failsUntouched(ws, "replaceSymbol", { symbol: "notes.txt#something", content: "x" }, /unsupported language/);
+  } finally { ws.done(); }
+});
+
+test("replaceSymbol: Python sidecar used for AST location; result parses", { skip: skipReason }, async () => {
+  const ws = setup();
+  try {
+    // Replace with a decorated function
+    const withDecorator = "@staticmethod\ndef double(x):\n    return x * 3";
+    await ws.run("replaceSymbol", { symbol: "pkg/util.py#double", content: withDecorator });
+    const util = readFileSync(join(ws.root, "pkg/util.py"), "utf8");
+    assert.match(util, /@staticmethod/);
+    assert.match(util, /x \* 3/);
+    // file must still parse (sidecar validates)
+    assert.doesNotThrow(() => py(ws.root, "import ast, pkg.util"));
   } finally { ws.done(); }
 });

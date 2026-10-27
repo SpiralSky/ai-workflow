@@ -10,17 +10,17 @@ test("S order and unique names", () => {
   assert.equal(new Set(tools.map((t) => t.name)).size, tools.length);
 });
 
-test("L: 53 tools, S objects unchanged, unique names, fs, nav, graph, refactor, test, check, vcs, external groups", () => {
+test("L: 54 tools, S objects unchanged, unique names, fs, nav, graph, refactor, test, check, vcs, external groups", () => {
   assert.deepEqual(fullL.slice(0, 6), tools);
   fullL.slice(0, 6).forEach((t, i) => assert.equal(t, tools[i]));
   assert.equal(new Set(fullL.map((t) => t.name)).size, fullL.length);
-  assert.equal(fullL.length, 53);
-  assert.equal(fullL.length, 6 + 4 + 5 + 5 + 8 + 6 + 2 + 3 + 14);
-  assert.deepEqual(fullL.slice(6, 39).map((t) => t.name), [
+  assert.equal(fullL.length, 54);
+  assert.equal(fullL.length, 6 + 4 + 5 + 5 + 9 + 6 + 2 + 3 + 14);
+  assert.deepEqual(fullL.slice(6, 40).map((t) => t.name), [
     "multiEdit", "moveFile", "deleteFile", "listDir",
     "outline", "readSymbol", "findDefinition", "findReferences", "signature",
     "overview", "callGraph", "importGraph", "impact", "dataFlow",
-    "renameSymbol", "moveSymbol", "moveModule", "extractFunction", "inlineSymbol", "changeSignature", "extractVariable", "organizeImports",
+    "renameSymbol", "moveSymbol", "moveModule", "extractFunction", "inlineSymbol", "changeSignature", "extractVariable", "organizeImports", "replaceSymbol",
     "runTests", "listTests", "coverage", "runSnippet", "traceCalls", "stressRun",
     "check", "format",
     "diff", "history", "restore",
@@ -55,7 +55,7 @@ test("refactor tools: cross-references in whenNotToUse, all write tools", () => 
   assert.match(by.moveModule!.meta.whenNotToUse!, /moveFile/);
   assert.match(by.moveFile!.meta.whenNotToUse!, /moveModule/);
   const refactor = fullL.filter((t) => t.meta.category === "refactor");
-  assert.equal(refactor.length, 8);
+  assert.equal(refactor.length, 9);
   assert.ok(refactor.every((t) => t.meta.effect === "write"));
   assert.ok(refactor.every((t) => "dryRun" in (t.parameters as { properties: object }).properties));
 });

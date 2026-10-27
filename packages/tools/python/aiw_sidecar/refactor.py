@@ -1240,6 +1240,64 @@ def organize_imports(root, p):
     return run(root, p, build, allow_empty=True)
 
 
+# ---- replaceSymbol -------------------------------------------------------------------------
+
+def _find_def_checked(tree, qualified, symbol):
+    """Find a named symbol in the AST, raising `symbol not found` or `ambiguous symbol` as needed.
+
+    Walks the `qualified` dotted path (e.g. ``Class.method``) through the tree body at each level,
+    checking for duplicate names to detect ambiguity.
+    """
+    body = tree.body
+    node = None
+    for part in qualified.split("."):
+        matches = [n for n in body if isinstance(n, (ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef)) and n.name == part]
+        if len(matches) == 0:
+            raise ValueError("symbol not found: %s" % symbol)
+        if len(matches) > 1:
+            raise ValueError("ambiguous symbol: %s" % symbol)
+        node = matches[0]
+        body = node.body
+    if node is None:
+        raise ValueError("symbol not found: %s" % symbol)
+    return node
+
+
+def replace_symbol(root, p):
+    """Replace the entire body of a named Python symbol by address.
+
+    Locates the symbol via AST, then replaces from the first decorator (or ``def``/``class``
+    line) through the end of the node, writing ``content`` as-is.  Validates with ``run``
+    so the result always parses.
+    """
+    symbol = p.get("symbol")
+    if not isinstance(symbol, str) or "#" not in symbol:
+        raise ValueError("symbol must be path#Name or path#Class.method")
+    path_part, qualified = symbol.split("#", 1)
+    if not qualified:
+        raise ValueError("symbol must be path#Name or path#Class.method")
+    path = _py(root, path_part)
+    abs_path = resolve(root, path)
+    content = p.get("content")
+    if not isinstance(content, str):
+        raise ValueError("content is required")
+
+    lines_list, tree = nav.parse(abs_path)
+    node = _find_def_checked(tree, qualified, symbol)
+    # First decorator line (if any), else the def/class line itself
+    start_line = node.decorator_list[0].lineno if node.decorator_list else node.lineno
+    end_line = node.end_lineno
+
+    def build(s):
+        text = s.text(path)
+        file_lines = text.split("\n")
+        replacement = content.splitlines()
+        new_lines = file_lines[:start_line - 1] + replacement + file_lines[end_line:]
+        s.resource(path).write("\n".join(new_lines))
+
+    return run(root, p, build)
+
+
 METHODS = {
     "renameSymbol": rename_symbol,
     "moveSymbol": move_symbol,
@@ -1249,4 +1307,5 @@ METHODS = {
     "changeSignature": change_signature,
     "extractVariable": extract_variable,
     "organizeImports": organize_imports,
+    "replaceSymbol": replace_symbol,
 }
