@@ -403,6 +403,27 @@ per framework-runner §6.5 (CLAUDE.md updated); large dev problem deferred until
    Only failure: `07-async-race.orchestrate.2` — model variance (all other reps/modes PASS).
    Branch-only is now perfect; all systematic prompt bugs P1–P11 resolved.
 
+7a. **Orchestrate re-read reduction (2026-10-27).** Full-compare analysis: orchestrate
+   costs ~6× baseline; write `do` calls re-read the file the previous read `do` already returned,
+   because executors start cold (orchestrate.md §11.3). Decision: fix with **deterministic** means;
+   `llmEdit` deferred (tools.md §2.5 forbids LLM-backed tools; revisit post-L-catalog eval).
+   Changes committed:
+   - `af86bbd` — planner prompt: replaced "find/apply/test = 3 dispatches" with §3.1 boundary rule
+     (stop where judgment is needed; conditional hypothesis = 1 step) + reference-passing sentence
+     for write dispatches that follow a read.
+   - `fe6c2b1` — `replaceSymbol` tool added to §6.4 refactor catalog (54 tools); Python sidecar
+     `_find_def_checked` + `replace_symbol`; 4 new tests; catalog count updated.
+   - `b7cd376` — server bundle rebuilt (includes prompt fix + replaceSymbol).
+   **Next: run compare** (step 5) and compare cost against baseline `2026-10-27T05-20-16Z-9216`
+   (orchestrate 95%, ~6× baseline cost). Use default $0.50 budget for pilot:
+   ```
+   OPENROUTER_API_KEY=sk-or-... PATH="$PATH:$(pwd)/node_modules/.bin" \
+   aiw eval --mode compare --reps 3 --budget 0.50 --model deepseek/deepseek-v4.1-flash --tools L
+   ```
+   Then: `aiw view` to inspect. Check orchestrate cost reduction and whether `replaceSymbol` is
+   used by the model. If cost drops substantially, step 7a is done.
+   Pending-review notes resolved: `2026-10-27-14-30` (option 3 applied), `2026-10-27-14-31`
+   (deferred). Wording approval record: `2026-10-27-15-00`. Spec record: `2026-10-27-15-10`.
 8. User's new orchestrate idea (adds one mode) — not yet presented; it goes through spec approval.
 9. After that: optional branch coverage for `coverage` (`sys.monitoring` BRANCH events; tools §6.5, A-35).
 
