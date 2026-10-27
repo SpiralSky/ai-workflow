@@ -20,7 +20,7 @@ async (tools, state) => {
   const stripped = src.content.replace(/^ *\d+\t/gm, "");  // strip line-number prefix
   const fixed = stripped.replace(/def get_stock\b/, "def get_stock_level");
   await tools.writeFile({ path: "src/inventory.py", content: fixed });
-  const test = await tools.bash({ command: "cd /work && python -m pytest tests/" });
-  return { passed: test.exitCode === 0, output: test.stdout.slice(0, 400) };
+  const test = await tools.bash({ cmd: "cd /work && python -m pytest tests/" });
+  return { passed: test.code === 0, output: test.out.slice(0, 400) };
 }
 ```

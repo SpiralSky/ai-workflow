@@ -148,10 +148,10 @@ test("event budget elides but keeps the final return", () => {
 });
 
 test("value truncation marker; full mode does not truncate", () => {
-  const long = "x".repeat(900);
+  const long = "x".repeat(2100);
   const trace = [start(1, 1, "t", {}), end(1, 1, 1, long)];
   const out = render(ok(trace));
-  assert.ok(out.includes(`"${"x".repeat(799)}…(+102 chars)`), out);
+  assert.ok(out.includes(`"${"x".repeat(1999)}…(+102 chars)`), out);
   assert.ok(render(ok(trace), "", "full").includes(`"${long}"`));
   assert.equal(compact({ code: 0, out: "", "a-b": [1, null] }, Infinity), '{code:0, out:"", "a-b":[1, null]}');
 });

@@ -79,7 +79,7 @@ export interface TraceLimits {
   /** Max rendered events (default 60); the final return/error is always kept. */
   eventBudget: number;
 }
-export const DEFAULT_TRACE_LIMITS: TraceLimits = { valueChars: 800, loopCollapse: 3, eventBudget: 60 };
+export const DEFAULT_TRACE_LIMITS: TraceLimits = { valueChars: 2000, loopCollapse: 3, eventBudget: 60 };
 
 export interface RunOptions {
   signal?: AbortSignal;
