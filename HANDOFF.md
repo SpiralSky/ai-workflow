@@ -392,8 +392,16 @@ per framework-runner §6.5 (CLAUDE.md updated); large dev problem deferred until
 
    **Validation run (2026-10-27, run `2026-10-27T05-18-25Z-ed96`):** 4/4 PASS on 07+09 branch-only.
 
-   **Full compare in progress** (2026-10-27, run `2026-10-27T05-20-16Z-9216`, all 9 problems ×
-   3 modes × 3 reps = 63 jobs). Rep 0 results visible so far: all PASS. Final results pending.
+   **Full compare (2026-10-27, run `2026-10-27T05-20-16Z-9216`, 63 jobs):**
+
+   | Mode | PASS | Rate | vs. prior full run |
+   |------|------|------|--------------------|
+   | baseline | 21/21 | 100% | = |
+   | branch-only | 21/21 | **100%** | ↑ from 38% |
+   | orchestrate | 20/21 | 95% | ↑ from 76% |
+
+   Only failure: `07-async-race.orchestrate.2` — model variance (all other reps/modes PASS).
+   Branch-only is now perfect; all systematic prompt bugs P1–P11 resolved.
 
 8. User's new orchestrate idea (adds one mode) — not yet presented; it goes through spec approval.
 9. After that: optional branch coverage for `coverage` (`sys.monitoring` BRANCH events; tools §6.5, A-35).
