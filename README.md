@@ -1,8 +1,16 @@
 # AI Workflow
 
-**Research harness for context-efficient coding agents.**
+> **Vibe coded** · Research harness for context-efficient agentic coding · LLM eval · Multi-agent orchestration
+
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.x-blue?logo=typescript)](https://www.typescriptlang.org/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-green)](LICENSE)
+[![Model: DeepSeek v3](https://img.shields.io/badge/Model-DeepSeek%20v3-purple)](https://deepseek.com)
+
+**An experimental research harness that benchmarks context-efficient agentic coding strategies.**
 
 Three agentic coding strategies — differing in how much raw tool output enters model context — are evaluated against the same 9 Python repair/feature problems so pass rates and costs can be compared fairly.
+
+**Keywords:** agentic coding · LLM evaluation · context efficiency · multi-agent orchestration · code generation · AI benchmarking · sandboxed execution · tool use · vibe coding · DeepSeek · TypeScript · AI agents · coding assistant research
 
 The central thesis: keep raw file contents and raw tool output *out of context by capability, not by prompt instruction*. If a coordinator model has no `read_file` tool, it cannot accumulate file contents regardless of what the prompt says.
 
