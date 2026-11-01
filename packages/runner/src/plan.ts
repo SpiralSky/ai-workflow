@@ -101,7 +101,8 @@ function loadHistory(repoRoot: string): JobJSON[] {
 function meanCost(history: JobJSON[], problem: string, framework: string): number | undefined {
   const matching = history.filter((j) => j.problem === problem && j.framework === framework);
   if (matching.length === 0) return undefined;
-  const total = matching.reduce((sum, j) => sum + (j.costUsdAllAttempts ?? 0), 0);
+  if (matching.some((j) => typeof j.costUsdAllAttempts !== "number" || !Number.isFinite(j.costUsdAllAttempts))) return undefined;
+  const total = matching.reduce((sum, j) => sum + j.costUsdAllAttempts!, 0);
   return total / matching.length;
 }
 

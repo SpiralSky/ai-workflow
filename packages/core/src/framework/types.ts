@@ -75,7 +75,7 @@ export interface BuildOptions {
   /** Already checked/composed by the caller. */
   host: Host;
   /** Variant keys: `branch-only[toolSearch]`, `catalog=N` (any framework), `orchestrate[hotPaths]`, `orchestrate[executor=calls]`. */
-  variant?: { toolSearch?: boolean; catalog?: number; hotPaths?: boolean; executor?: "branch" | "calls" };
+  variant?: import("./variant.ts").FrameworkVariantKeys;
   /** Required for `orchestrate`. */
   orchestrate?: OrchestrateOptions;
   /** Default QuickJS. */

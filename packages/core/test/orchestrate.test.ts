@@ -296,3 +296,27 @@ test("catalog=N pads with the fixed distractor set, for any framework", async ()
   assert.ok(!r.isError, r.text);
   assert.match(String(t.llm.requests.at(-2)?.messages[0].content ?? t.llm.requests[0].messages[0].content), /readFile\(/);
 });
+
+test("parsed secondary variants change actual executor turn budget", async () => {
+  const { parseFrameworkVariant } = await import("../src/index.ts");
+  for (const cap of [1, 2]) {
+    const parsed = parseFrameworkVariant(`orchestrate[secondary=${cap},rerank=none]`);
+    const t = await setup(() => run("branch", `return await tools.readFile({ q: "a.ts" });`), { variant: parsed.variant });
+    await t.tool("do").handle({ instruction: "read file", tools: ["readFile"] }, t.call());
+    assert.equal(t.llm.requests.length, cap, "effective requests must match labeled cap");
+    const handoff = t.events.find((e: any) => e.kind === "attach" && e.key === "orchestrate.handoff") as any;
+    assert.equal(handoff.data.budget.turns, cap);
+  }
+});
+
+test("parsed rerank variants toggle actual selection model calls", async () => {
+  const { parseFrameworkVariant } = await import("../src/index.ts");
+  for (const rerank of ["none", "llm"] as const) {
+    const parsed = parseFrameworkVariant(`orchestrate[rerank=${rerank}]`);
+    const t = await setup((user) => user.startsWith("Task:") ? '["readFile"]' : "Finished reading.", { variant: parsed.variant });
+    await t.tool("do").handle({ instruction: "read the contents of a file" }, t.call());
+    const selections = t.events.filter((e: any) => e.kind === "turn" && e.role === "selection");
+    assert.equal(selections.length, rerank === "llm" ? 1 : 0);
+    assert.equal(t.llm.requests.length, rerank === "llm" ? 2 : 1);
+  }
+});

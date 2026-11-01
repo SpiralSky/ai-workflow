@@ -1,3 +1,12 @@
+---
+id: "architecture/system-overview"
+title: "Architecture: System Overview"
+status: "review"
+author: "mixed"
+migration_source_commit: "b2e781f83976e6807f341debea216dcc56a6ff5d"
+migration_source_status: "unspecified (legacy architecture index)"
+implements: ["feature/branching-framework", "feature/orchestrate", "feature/references", "feature/framework-runner", "feature/tools", "feature/problems", "feature/viewer", "feature/harness-integration"]
+---
 # Architecture: System Overview
 
 **Derived from:** all feature specs  

@@ -14,8 +14,8 @@
 
 import { parseArgs } from "node:util";
 import { LocalHost } from "./local.ts";
-import { startServer, type VariantKeys } from "./server.ts";
-import type { FrameworkKind } from "@aiw/core";
+import { startServer } from "./server.ts";
+import { parseFrameworkVariant } from "@aiw/core";
 
 const { values } = parseArgs({
   options: {
@@ -38,27 +38,7 @@ const { values } = parseArgs({
   strict: false,
 });
 
-/**
- * Parses the `--framework` string into a kind and variant keys.
- * Format: `base[key=value,key,...]`, e.g. `branch-only[toolSearch]`, `orchestrate[secondary=2]`.
- * @param raw - raw flag value
- * @returns kind and variant keys
- */
-function parseFramework(raw: string): { kind: FrameworkKind; variant: VariantKeys } {
-  const bracket = raw.indexOf("[");
-  const base = bracket === -1 ? raw : raw.slice(0, bracket);
-  const keyStr = bracket === -1 ? "" : raw.slice(bracket + 1).replace(/]$/, "");
-
-  const kind = base as FrameworkKind;
-  const variant: VariantKeys = {};
-  for (const part of keyStr.split(",").filter(Boolean)) {
-    if (part === "toolSearch") variant.toolSearch = true;
-    else if (part.startsWith("catalog=")) variant.catalog = parseInt(part.slice(8), 10);
-  }
-  return { kind, variant };
-}
-
-const { kind, variant } = parseFramework(String(values.framework ?? "branch-only"));
+const { kind, variant } = parseFrameworkVariant(String(values.framework ?? "branch-only"));
 const tier = String(values.tier ?? "S") === "L" ? "L" : "S";
 const root = String(values.root ?? process.cwd());
 const hostMode = String(values.host ?? "local");

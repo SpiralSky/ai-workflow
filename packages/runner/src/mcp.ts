@@ -61,6 +61,7 @@ export interface MCPCallResult {
   durationMs?: number;
   /** True when the server signals an infra error inside an executor. */
   infraError?: string;
+  isError?: boolean;
 }
 
 /**
@@ -79,7 +80,7 @@ export async function callTool(
   meta: { "aiw/parent": string; "aiw/harnessId": string },
 ): Promise<MCPCallResult> {
   const result = await session._client.callTool(
-    { name, arguments: { ...args, _meta: meta } },
+    { name, arguments: args, _meta: meta },
     undefined,
     { timeout: 300_000 },
   );
@@ -93,6 +94,7 @@ export async function callTool(
     content: result.content as MCPCallResult["content"],
     durationMs,
     infraError,
+    isError: result.isError === true,
   };
 }
 

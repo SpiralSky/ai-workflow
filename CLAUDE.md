@@ -2,7 +2,7 @@
 
 ## Specifications are the source of truth
 
-- `docs/specifications/features/` — feature specs, one per feature (index: its `README.md`)
+- `docs/specifications/features/` — feature specs, one per feature (index: its `INFO.md`)
 - `docs/specifications/architecture/` — architecture specs derived from features
 - `docs/ideas/` — rough exploratory notes; not scheduled or specced
 
@@ -40,3 +40,9 @@ things easy to get wrong; the spec wins.
 - Never commit experiment run outputs (`experiments/runs/`).
 - Commit framework changes before starting an eval run, so results map to a known state.
 - Issue files: mark closed issues DONE with a date, then delete the file on the next commit that touches issues.
+
+## Experimental Specplane development
+
+Read `AGENTS.md` and `.specplane/config.yaml`. Imported specifications retain their historical
+requirements but are marked review; development does not fabricate approval. Architecture drives
+implementation detail; contradictions block only affected work. Final merge remains human-only.

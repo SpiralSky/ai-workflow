@@ -171,7 +171,7 @@ export function buildFramework(kind: FrameworkKind, realRegistry: Registry, opts
     if (opts.variant?.hotPaths) throw new Error("hot paths not built yet");
     if (opts.variant?.executor === "calls") throw new Error("executor variant `calls` is not built yet");
     task = o.task ?? new Task({ workspaceRoot: o.workspaceRoot });
-    const reranker = (o.rerank ?? "llm") === "none" ? noneReranker : llmReranker(o.client, { model: o.rerankModel ?? o.model });
+    const reranker = (opts.variant?.rerank ?? o.rerank ?? "llm") === "none" ? noneReranker : llmReranker(o.client, { model: o.rerankModel ?? o.model });
     const planner = {
       task, registry, host: opts.host, client: o.client, model: o.model, temperature: o.temperature, transcript: o.transcript,
       selector: o.selector ?? createSelector({ reranker }),
@@ -179,7 +179,7 @@ export function buildFramework(kind: FrameworkKind, realRegistry: Registry, opts
       pathExists: o.pathExists ?? fsPathExists(o.workspaceRoot),
       runtime: opts.runtime,
       limits: {
-        turns: o.turns, reportMaxChars: o.reportMaxChars, outputCap: opts.outputCap, timeoutMs: opts.timeoutMs,
+        turns: opts.variant?.secondary ?? o.turns, reportMaxChars: o.reportMaxChars, outputCap: opts.outputCap, timeoutMs: opts.timeoutMs,
         memoryMb: opts.memoryMb, branchContext: opts.branchContext,
       },
     };

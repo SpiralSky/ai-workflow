@@ -55,7 +55,7 @@ export function Job({ runId, jobName, onBack }: Props) {
           {data.reason ? ` (${data.reason})` : ""}
         </span>
         <span style={{ color: "var(--fg3)", fontSize: 12, marginLeft: "auto" }}>
-          ${data.costUsdAllAttempts.toFixed(4)} · {Math.round(data.durationMs / 1000)}s
+          {data.costUsdAllAttempts == null ? "unknown" : "$" + data.costUsdAllAttempts.toFixed(4)} · {Math.round(data.durationMs / 1000)}s
         </span>
       </div>
 

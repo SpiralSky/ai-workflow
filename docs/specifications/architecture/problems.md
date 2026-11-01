@@ -1,3 +1,12 @@
+---
+id: "architecture/problems"
+title: "Architecture: Problem Pipeline"
+status: "review"
+author: "mixed"
+migration_source_commit: "b2e781f83976e6807f341debea216dcc56a6ff5d"
+migration_source_status: "unspecified (legacy architecture index)"
+implements: ["feature/problems"]
+---
 # Architecture: Problem Pipeline
 
 **Derived from:** [problems.md](../features/problems.md), [framework-runner.md §6.1, §6.4](../features/framework-runner.md)  

@@ -91,7 +91,7 @@ interface RunJSON {
     models: { main: string; secondary?: string };
     [key: string]: unknown;
   };
-  totals: { jobs: number; pass: number; fail: number; costUsd: number; attempts: number };
+  totals: { jobs: number; pass: number; fail: number; costUsd: number | null; attempts: number };
   startedAt: string;
   endedAt?: string;
   provenance: Record<string, unknown>;
@@ -104,8 +104,8 @@ interface JobJSON {
   rep: number;
   outcome: "pass" | "fail";
   reason: string | null;
-  attempts: Array<{ n: number; final?: boolean; infraError?: string; costUsd?: number }>;
-  costUsdAllAttempts: number;
+  attempts: Array<{ n: number; final?: boolean; infraError?: string; costUsd?: number | null }>;
+  costUsdAllAttempts: number | null;
   durationMs: number;
 }
 
@@ -136,10 +136,8 @@ function deriveJobFromEvents(
   const outcome = (endEvent?.outcome as string) === "pass" ? "pass" : "fail";
   const reason = (endEvent?.reason as string) ?? null;
 
-  // Sum cost from turn events
-  const costUsd = events
-    .filter((e) => e.kind === "turn")
-    .reduce((s, e) => s + ((e.costUsd as number) ?? 0), 0);
+  // A partial log without job.json cannot establish complete billed cost.
+  const costUsd = null;
 
   // Duration: last ts - first ts
   const timestamps = events.map((e) => e.ts).filter((t) => typeof t === "number") as number[];
@@ -173,7 +171,7 @@ function processRun(
   frameworks: string[];
   problems: string[];
   models: { main: string; secondary?: string };
-  totals: { jobs: number; pass: number; fail: number; costUsd: number; attempts: number };
+  totals: { jobs: number; pass: number; fail: number; costUsd: number | null; attempts: number };
   provenance: Record<string, unknown>;
   jobs: Array<{
     name: string;
@@ -182,7 +180,7 @@ function processRun(
     rep: number;
     outcome: "pass" | "fail";
     reason: string | null;
-    costUsdAllAttempts: number;
+    costUsdAllAttempts: number | null;
     durationMs: number;
     attempts: number;
   }>;
@@ -217,7 +215,7 @@ function processRun(
     rep: number;
     outcome: "pass" | "fail";
     reason: string | null;
-    costUsdAllAttempts: number;
+    costUsdAllAttempts: number | null;
     durationMs: number;
     attempts: number;
   }> = [];

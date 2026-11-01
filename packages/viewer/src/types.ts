@@ -9,7 +9,7 @@ export interface RunEntry {
   frameworks: string[];
   problems: string[];
   models: { main: string; secondary?: string };
-  totals: { jobs: number; pass: number; fail: number; costUsd: number; attempts: number };
+  totals: { jobs: number; pass: number; fail: number; costUsd: number | null; attempts: number };
   provenance: Record<string, unknown>;
   jobs: JobSummary[];
 }
@@ -22,7 +22,7 @@ export interface JobSummary {
   rep: number;
   outcome: "pass" | "fail";
   reason: string | null;
-  costUsdAllAttempts: number;
+  costUsdAllAttempts: number | null;
   durationMs: number;
   attempts: number;
 }
@@ -52,7 +52,7 @@ export interface JobData {
   rep: number;
   outcome: "pass" | "fail";
   reason: string | null;
-  costUsdAllAttempts: number;
+  costUsdAllAttempts: number | null;
   durationMs: number;
   attempts: AttemptRecord[];
   events: RawEvent[];
@@ -65,7 +65,7 @@ export interface AttemptRecord {
   n: number;
   final?: boolean;
   infraError?: string;
-  costUsd?: number;
+  costUsd?: number | null;
 }
 
 /** The global registration namespace injected by data scripts. */

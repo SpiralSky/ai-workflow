@@ -1,3 +1,11 @@
+---
+id: "feature/tools"
+title: "Feature: Tool Catalog"
+status: "review"
+author: "mixed"
+migration_source_commit: "b2e781f83976e6807f341debea216dcc56a6ff5d"
+migration_source_status: "Final (legacy index)"
+---
 # Feature: Tool Catalog
 
 **Area:** Evaluation / tools  

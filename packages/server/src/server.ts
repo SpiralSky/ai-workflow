@@ -2,15 +2,12 @@ import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { CallToolRequestSchema, ListToolsRequestSchema } from "@modelcontextprotocol/sdk/types.js";
 import { buildFramework, buildRegistry, type Host } from "@aiw/core";
-import { createReporter, NoopSink, FileSink } from "@aiw/telemetry";
+import { createReporter, NoopSink, FileSink, fromMeta } from "@aiw/telemetry";
 import { createChatClient } from "@aiw/llm";
 import type { FrameworkKind } from "@aiw/core";
 
-/** Parsed variant keys from the --framework flag. */
-export interface VariantKeys {
-  toolSearch?: boolean;
-  catalog?: number;
-}
+/** Parsed variant keys shared with runner/core. */
+export type VariantKeys = import("@aiw/core").FrameworkVariantKeys;
 
 /** Options for `startServer`. */
 export interface ServerOptions {
@@ -98,6 +95,10 @@ export async function startServer(opts: ServerOptions): Promise<void> {
     })),
   }));
 
+  // One writer/counter per server process prevents overlapping request IDs.
+  const eventSink = opts.eventsPath ? new FileSink(opts.eventsPath) : new NoopSink();
+  const eventRoot = createReporter({ sink: eventSink, writer: "s" });
+
   // 5. Handle tool calls.
   mcpServer.setRequestHandler(CallToolRequestSchema, async (req, extra) => {
     const start = Date.now();
@@ -110,16 +111,8 @@ export async function startServer(opts: ServerOptions): Promise<void> {
       };
     }
 
-    // Build a reporter for this call.
-    const sink = opts.eventsPath ? new FileSink(opts.eventsPath) : new NoopSink();
-    const reporter = createReporter({ sink, writer: "s" });
-
-    // Extract telemetry parent from _meta if provided.
     const meta = req.params._meta as Record<string, unknown> | undefined;
-    const harnessId = typeof meta?.["aiw/harnessId"] === "string" ? meta["aiw/harnessId"] : undefined;
-    const parentId = typeof meta?.["aiw/parent"] === "string" ? meta["aiw/parent"] : undefined;
-    void parentId; // reserved for future telemetry correlation
-    void harnessId;
+    const reporter = fromMeta(meta, eventRoot);
 
     // Abort controller for this call.
     const ac = new AbortController();

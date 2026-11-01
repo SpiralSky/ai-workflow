@@ -14,7 +14,8 @@ import { callTool } from "./mcp.ts";
 export interface LoopMetrics {
   turns: number;
   toolCalls: number;
-  costUsd: number;
+  costUsd: number | null;
+  costIncompleteReasons?: string[];
 }
 
 /** Result of a model loop execution. */
@@ -84,10 +85,11 @@ async function dispatchToolCalls(
   session: MCPSession,
   reporter: Reporter,
   framework: string,
-): Promise<{ messages: unknown[]; totalCost: number }> {
+): Promise<{ messages: unknown[]; totalCost: number; costIncomplete: boolean }> {
   const sequential = isCatalogOnly(framework);
   const messages: unknown[] = [];
   let totalCost = 0;
+  let costIncomplete = false;
 
   async function dispatch(call: { id: string; function: { name: string; arguments: string } }) {
     let args: Record<string, unknown>;
@@ -114,6 +116,10 @@ async function dispatchToolCalls(
       result = { content: [{ type: "text", text: `Error: ${errorMsg}` }], durationMs: 0 };
     }
 
+    // Only `do` can hide nested model work; ordinary catalog/tool errors are not charges.
+    if (framework.split("[")[0] === "orchestrate" && call.function.name === "do" && (!ok || result.isError || result.infraError)) {
+      costIncomplete = true;
+    }
     const durationMs = result.durationMs ?? (Date.now() - startTs);
     reporter.tool({
       id: eventId,
@@ -143,7 +149,7 @@ async function dispatchToolCalls(
     // (Promise.all preserves order, so messages are already ordered)
   }
 
-  return { messages, totalCost };
+  return { messages, totalCost, costIncomplete };
 }
 
 /**
@@ -159,14 +165,15 @@ export async function runLoop(opts: LoopOptions): Promise<LoopResult> {
 
   let turns = 0;
   let toolCalls = 0;
-  let costUsd = 0;
+  let costUsd: number | null = 0;
+  const costIncompleteReasons: string[] = [];
 
   while (true) {
     if (opts.signal?.aborted) {
-      return { outcome: "infra-error", metrics: { turns, toolCalls, costUsd }, infraError: "cancelled" };
+      return { outcome: "infra-error", metrics: { turns, toolCalls, costUsd, costIncompleteReasons }, infraError: "cancelled" };
     }
     if (turns >= opts.turnLimit) {
-      return { outcome: "turn-limit", metrics: { turns, toolCalls, costUsd } };
+      return { outcome: "turn-limit", metrics: { turns, toolCalls, costUsd, costIncompleteReasons } };
     }
 
     let completion: import("@aiw/telemetry").LLMCompletion;
@@ -180,18 +187,20 @@ export async function runLoop(opts: LoopOptions): Promise<LoopResult> {
         signal: opts.signal,
       });
     } catch (e) {
+      costIncompleteReasons.push("unobserved-failed-model-request");
       if (e instanceof LLMError) {
         if (e.kind === "context-limit") {
-          return { outcome: "context-limit", metrics: { turns, toolCalls, costUsd } };
+          return { outcome: "context-limit", metrics: { turns, toolCalls, costUsd, costIncompleteReasons } };
         }
         // infra errors bubble to job.ts for retry
-        return { outcome: "infra-error", metrics: { turns, toolCalls, costUsd }, infraError: e.message };
+        return { outcome: "infra-error", metrics: { turns, toolCalls, costUsd, costIncompleteReasons }, infraError: e.message };
       }
       throw e;
     }
 
     turns++;
-    costUsd += (completion.costUsd ?? 0);
+    costUsd = costUsd === null || completion.costUsd === undefined || !Number.isFinite(completion.costUsd) || completion.costUsd < 0
+      ? null : costUsd + completion.costUsd;
 
     const response = completion.response as {
       choices?: Array<{ message?: { content?: string; tool_calls?: Array<{ id: string; function: { name: string; arguments: string } }> } }>;
@@ -210,14 +219,15 @@ export async function runLoop(opts: LoopOptions): Promise<LoopResult> {
     }
 
     toolCalls += msg.tool_calls.length;
-    const { messages: toolMessages } = await dispatchToolCalls(
+    const { messages: toolMessages, costIncomplete } = await dispatchToolCalls(
       msg.tool_calls,
       opts.session,
       opts.reporter,
       opts.framework,
     );
+    if (costIncomplete) costIncompleteReasons.push("failed-tool-may-have-unobserved-charges");
     messages.push(...toolMessages);
   }
 
-  return { outcome: "done", metrics: { turns, toolCalls, costUsd } };
+  return { outcome: "done", metrics: { turns, toolCalls, costUsd, costIncompleteReasons } };
 }

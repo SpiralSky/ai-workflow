@@ -1,0 +1,31 @@
+# Experimental development policy authorized by user 2026-11-01.
+# This permits drafting/development, never approval or final merge.
+spec_roots:
+  - name: base
+    path: docs/specifications
+specs:
+  pin_bases: warn
+  feature:
+    authorship: either
+    llm_role: draft
+    forbid_architecture: true
+    leak_guard_allow: []
+  architecture:
+    authorship: either
+    llm_role: draft
+    require_approved_features: true
+plans:
+  dir: plans
+  require_approved_specs: none
+  status_source: git
+  merge: pull_request
+  dependency_mode: stack
+  archive_done: false
+  setup_hook: ""
+  test_command: node scripts/test-cloud.mjs
+  forge: none
+execution:
+  backend: worktree
+  worktree_dir: ../.specplane-worktrees
+decisions:
+  dir: docs/decisions
