@@ -48,3 +48,23 @@ Source commit `56536b7`; canonical artifact correction `0977349`. Exact environm
 No broad tools allowance, test weakening, dependency/lockfile edit or Jedi behavior change.
 Default-parallel nondeterminism remains an open issue for independent investigation; this patch
 must not be described as fixing it. No live benchmark or monetary/quality improvement claimed.
+
+## Stacked regression boundary repair
+
+The shared migration regression file is restored byte-for-byte to the current
+DeepSeek parent snapshot. The additional tool-environment scope regression now
+lives in `scripts/check-tool-env-preservation.test.mjs`, automatically discovered
+by the existing cloud test entry. It uses the same snapshot-only fixture approach
+and unchanged assertion. This avoids adjacent end-of-file additions conflicting
+across independently published stacked branches; no regression is removed.
+
+Only test organization and this record change. Runtime source, generated bundle,
+original inventories, strict preservation rules and approved-state history remain
+unchanged. This is an autonomous development repair, not approval or a merge.
+
+Validation: all 24 script tests pass with zero skips/failures, including the moved
+regression and snapshot-only preservation. Full Specplane preservation confirms
+115 explicit runtime deltas and original spec/history records; runtime hygiene
+passes. Read-only three-tree analysis against current DeepSeek parent reports no
+conflicts. Package/runtime/bundle bytes are unchanged, so no package, Docker or
+live-model rerun is claimed for this test-only reorganization.
