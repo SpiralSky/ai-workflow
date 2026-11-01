@@ -10,6 +10,7 @@ export interface Reporter {
     providerSystemFingerprint?: string;
     role: Role;
     usage: Usage;
+    deepseekEstimate?: { basis: string; estimatedUsd: number; cacheHitTokens: number; cacheMissTokens: number; outputTokens: number };
     costUsd?: number;
     cacheHit?: boolean;
     latencyMs: number;

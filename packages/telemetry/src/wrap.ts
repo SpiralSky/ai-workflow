@@ -73,6 +73,7 @@ export function fromMeta(meta: Record<string, unknown> | undefined, root: Report
 export interface LLMCompletion {
   response: unknown;
   usage: Usage;
+  deepseekEstimate?: { basis: string; estimatedUsd: number; cacheHitTokens: number; cacheMissTokens: number; outputTokens: number };
   costUsd?: number;
   cacheHit?: boolean;
 }
@@ -113,7 +114,7 @@ export function wrapLLM(
       };
       const turnId = reporter.turn({
         ...observed,
-        model: req.model, role, usage: res.usage, costUsd: res.costUsd, cacheHit: res.cacheHit, latencyMs,
+        model: req.model, role, usage: res.usage, deepseekEstimate: res.deepseekEstimate, costUsd: res.costUsd, cacheHit: res.cacheHit, latencyMs,
       });
       if (opts.transcript && opts.session) {
         opts.transcript.record({

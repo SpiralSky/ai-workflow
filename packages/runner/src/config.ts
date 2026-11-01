@@ -128,8 +128,9 @@ export interface EvalFlags {
   secondaryCap: number;
   untilReps?: number;
   combineWith?: string;
-  provider?: "openrouter" | "chatgpt";
-  usageMode?: "monetary" | "subscription";
+  provider?: "openrouter" | "chatgpt" | "deepseek";
+  usageMode?: "monetary" | "subscription" | "estimated";
+  estimatedLimits?: import("./estimated.ts").EstimatedLimits;
   subscriptionLimits?: SubscriptionLimits;
 }
 
@@ -205,8 +206,9 @@ export function resolveConfig(
   if (!Number.isSafeInteger(concurrency) || concurrency < 1) throw new Error("concurrency must be a positive integer");
   const provider = flags.provider ?? "openrouter";
   const usageMode = flags.usageMode ?? "monetary";
-  if (provider !== "openrouter" && provider !== "chatgpt") throw new Error("Unknown provider");
-  if (usageMode !== "monetary" && usageMode !== "subscription") throw new Error("Unknown usage mode");
+  if (provider !== "openrouter" && provider !== "chatgpt" && provider !== "deepseek") throw new Error("Unknown provider");
+  if (usageMode !== "monetary" && usageMode !== "subscription" && usageMode !== "estimated") throw new Error("Unknown usage mode");
+  if ((provider === "deepseek") !== (usageMode === "estimated")) throw new Error("DeepSeek requires explicit estimated usage mode");
   if ((provider === "chatgpt") !== (usageMode === "subscription")) throw new Error("ChatGPT requires explicit subscription usage mode; OpenRouter requires monetary mode");
   if (provider === "chatgpt") {
     if (!flags.subscriptionLimits) throw new Error("Subscription usage requires explicit call, token and duration limits");
@@ -214,6 +216,13 @@ export function resolveConfig(
     if (concurrency !== 1) throw new Error("Subscription campaigns require concurrency 1");
     if (!flags.model || flags.model.includes("/")) throw new Error("Select an explicit account-available OpenAI model slug");
   } else if (flags.subscriptionLimits) throw new Error("Subscription limits require ChatGPT provider");
+  if (provider === "deepseek") {
+    if (!flags.estimatedLimits) throw new Error("DeepSeek requires explicit estimate, call, token and duration limits");
+    validateSubscriptionLimits(flags.estimatedLimits);
+    if (!Number.isFinite(flags.estimatedLimits.estimateLimitUsd) || flags.estimatedLimits.estimateLimitUsd <= 0) throw new Error("Invalid estimate limit");
+    if (concurrency !== 1) throw new Error("DeepSeek campaigns require concurrency 1");
+    if (flags.model !== "deepseek-flash" || (flags.secondaryModel && flags.secondaryModel !== "deepseek-flash")) throw new Error("Select deepseek-flash; retired aliases are not supported");
+  } else if (flags.estimatedLimits) throw new Error("Estimated limits require DeepSeek provider");
   validateModel(flags.model);
   if (flags.secondaryModel) validateModel(flags.secondaryModel);
 
@@ -236,8 +245,9 @@ export function resolveConfig(
     frameworks,
     tier: flags.tools,
     reps: flags.reps,
-    budgetUsd: usageMode === "subscription" ? null : flags.budget,
+    budgetUsd: usageMode !== "monetary" ? null : flags.budget,
     provider, usageMode,
+    ...(flags.estimatedLimits ? { estimatedLimits: flags.estimatedLimits } : {}),
     ...(flags.subscriptionLimits ? { subscriptionLimits: flags.subscriptionLimits } : {}),
     concurrency,
     models: {

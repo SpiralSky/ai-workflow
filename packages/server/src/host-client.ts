@@ -11,6 +11,7 @@ const HostCompletionSchema = ResultSchema.extend({
     cachedRead: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER).optional(), cacheWrite: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER).optional() }).refine((usage) => (usage.cachedRead ?? 0) <= usage.input),
   costUsd: z.number().finite().nonnegative().optional(),
   cacheHit: z.boolean().optional(),
+  deepseekEstimate: z.object({ basis: z.literal("deepseek-flash:2026-11-01:off-peak"), estimatedUsd: z.number().finite().nonnegative(), cacheHitTokens: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER), cacheMissTokens: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER), outputTokens: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER) }).strict().optional(),
 });
 
 /** Only nonsecret error classification may cross the inference boundary. */
@@ -40,7 +41,7 @@ export function createHostLLMClient(server: () => Server<Request, Notification>,
         const result = await endpoint.request({ method: "aiw/llm/complete", params: {
           requestId, system: req.system, messages: req.messages, tools: req.tools,
         } }, HostCompletionSchema, { signal, timeout: timeoutMs });
-        return { response: result.response, usage: result.usage, costUsd: result.costUsd, cacheHit: result.cacheHit };
+        return { response: result.response, usage: result.usage, costUsd: result.costUsd, cacheHit: result.cacheHit, ...(result.deepseekEstimate ? { deepseekEstimate: result.deepseekEstimate } : {}) };
       } catch (error) {
         cancel();
         if (callerSignal?.aborted) throw new DOMException("Host LLM request cancelled", "AbortError");

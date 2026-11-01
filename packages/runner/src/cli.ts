@@ -15,8 +15,9 @@ import { createRunDir, generateRunId, writeRunJSON } from "./rundir.ts";
 import { runScheduler } from "./scheduler.ts";
 import { combineRuns } from "./combine.ts";
 import { buildProblems, checkProblems } from "./problems/index.ts";
-import { createChatGPTAuth, createChatGPTClient, listChatGPTModels } from "@aiw/llm";
+import { createDeepSeekClient, createChatGPTAuth, createChatGPTClient, listChatGPTModels } from "@aiw/llm";
 import { boundSubscriptionClient } from "./subscription.ts";
+import { boundEstimatedClient } from "./estimated.ts";
 import { authCommand } from "./auth-cli.ts";
 
 /** Repo root: find upward from this file. */
@@ -38,8 +39,8 @@ Usage:
               [--budget 0.50]  [--full]  [--concurrency 1]
               [--branch-context trace|annotated|full]
               [--secondary-cap 4]
-              [--provider openrouter|chatgpt] [--usage-mode monetary|subscription]
-              [--account <saved-id>] [--max-calls N --max-tokens N --max-duration-ms N]
+              [--provider openrouter|chatgpt|deepseek] [--usage-mode monetary|subscription|estimated]
+              [--estimate-limit-usd N] [--account <saved-id>] [--max-calls N --max-tokens N --max-duration-ms N]
               [--until-reps N]  [--combine-with <report>]
 
   aiw report  <run-dir>... --name <report-name>
@@ -62,6 +63,7 @@ async function evalCommand(argv: string[]): Promise<void> {
       model: { type: "string" },
       provider: { type: "string", default: "openrouter" },
       "usage-mode": { type: "string", default: "monetary" },
+      "estimate-limit-usd": { type: "string" },
       account: { type: "string" },
       "max-calls": { type: "string" },
       "max-tokens": { type: "string" },
@@ -85,12 +87,15 @@ async function evalCommand(argv: string[]): Promise<void> {
     process.stderr.write("--tools must be S or L\n"); process.exit(1);
   }
 
+  const useDeepSeek = values.provider === "deepseek";
+  if (useDeepSeek && (!values.model || values.budget !== undefined || values.temperature !== undefined)) throw new Error("DeepSeek requires explicit --model deepseek-flash and estimate limits, not --budget or --temperature");
+  if (!useDeepSeek && values["estimate-limit-usd"] !== undefined) throw new Error("Estimate limit requires DeepSeek");
   const useChatGPT = values.provider === "chatgpt";
   if (useChatGPT && (!values.model || !values.account)) throw new Error("ChatGPT runs require explicit --account and --model; run aiw auth signin separately");
   if (useChatGPT && (values.budget !== undefined || values.temperature !== undefined)) throw new Error("ChatGPT plan runs do not accept --budget or --temperature; use explicit subscription limits");
   if (!useChatGPT && values.account) throw new Error("--account is only for ChatGPT plan usage");
-  const apiKey = useChatGPT ? "" : process.env["OPENAI_API_KEY"] ?? process.env["OPENROUTER_API_KEY"] ?? "";
-  const baseURL = useChatGPT ? "https://api.openai.com/v1" : process.env["OPENAI_BASE_URL"] ?? "https://openrouter.ai/api/v1";
+  const apiKey = useChatGPT ? "" : useDeepSeek ? process.env["DEEPSEEK_API_KEY"] ?? "" : process.env["OPENAI_API_KEY"] ?? process.env["OPENROUTER_API_KEY"] ?? "";
+  const baseURL = useDeepSeek ? "https://api.deepseek.com" : useChatGPT ? "https://api.openai.com/v1" : process.env["OPENAI_BASE_URL"] ?? "https://openrouter.ai/api/v1";
 
   const root = repoRoot();
   const problemsDir = join(root, "experiments", "problems");
@@ -115,9 +120,10 @@ async function evalCommand(argv: string[]): Promise<void> {
 
   const config = resolveConfig(
     {
-      provider: values.provider as "openrouter" | "chatgpt",
-      usageMode: values["usage-mode"] as "monetary" | "subscription",
-      ...((values["max-calls"] || values["max-tokens"] || values["max-duration-ms"]) ? { subscriptionLimits: {
+      provider: values.provider as "openrouter" | "chatgpt" | "deepseek",
+      usageMode: values["usage-mode"] as "monetary" | "subscription" | "estimated",
+      ...(useDeepSeek ? { estimatedLimits: { maxCalls: Number(values["max-calls"]), maxTokens: Number(values["max-tokens"]), maxDurationMs: Number(values["max-duration-ms"]), estimateLimitUsd: Number(values["estimate-limit-usd"]) } } : {}),
+      ...((!useDeepSeek && (values["max-calls"] || values["max-tokens"] || values["max-duration-ms"])) ? { subscriptionLimits: {
         maxCalls: Number(values["max-calls"]), maxTokens: Number(values["max-tokens"]), maxDurationMs: Number(values["max-duration-ms"]),
       } } : {}),
       problems: values.problems!,
@@ -149,7 +155,7 @@ async function evalCommand(argv: string[]): Promise<void> {
   const provenance = collectStaticProvenance(root, config, {
     ...buildProvenance(root),
     inference: { provider: config.provider!, usageMode: config.usageMode!, mainModel: config.models.main, secondaryModel: config.models.secondary,
-      temperature: useChatGPT ? null : config.temperature, ...(useChatGPT ? { stream: true as const, store: false as const } : {}) },
+      temperature: useChatGPT || useDeepSeek ? null : config.temperature, ...(useChatGPT ? { stream: true as const, store: false as const } : {}) },
   });
 
   let subscription: ReturnType<typeof boundSubscriptionClient> | undefined;
@@ -164,6 +170,8 @@ async function evalCommand(argv: string[]): Promise<void> {
     subscription = boundSubscriptionClient(createChatGPTClient({ accessToken }), config.subscriptionLimits!);
   }
 
+  const estimated = useDeepSeek ? boundEstimatedClient(createDeepSeekClient({ apiKey }), config.estimatedLimits!) : undefined;
+
   const runId = generateRunId();
 
   const runDir = createRunDir(root, runId, config, provenance);
@@ -175,7 +183,7 @@ async function evalCommand(argv: string[]): Promise<void> {
     status: "in-progress" as const,
     config,
     provenance,
-    totals: { jobs: 0, attempts: 0, costUsd: config.usageMode === "subscription" ? null : 0, pass: 0, fail: 0 },
+    totals: { jobs: 0, attempts: 0, costUsd: config.usageMode !== "monetary" ? null : 0, pass: 0, fail: 0 },
     startedAt: new Date().toISOString(),
   };
 
@@ -187,7 +195,7 @@ async function evalCommand(argv: string[]): Promise<void> {
       repoRoot: root,
       apiKey,
       baseURL,
-      subscription,
+      subscription, estimated,
       turnLimits: {}, // populated from provenance in full impl
       problemsDir,
       onJobDone: (job, result) => {

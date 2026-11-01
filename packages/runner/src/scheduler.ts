@@ -14,16 +14,22 @@ export interface SchedulerOptions {
   /** Deterministic execution seam; defaults to the real attempt implementation. */
   runAttempt?: typeof runJobAttempt;
   /** Host-only bounded provider; never serialized into run configuration. */
+  estimated?: ReturnType<typeof import("./estimated.ts").boundEstimatedClient>;
   subscription?: ReturnType<typeof import("./subscription.ts").boundSubscriptionClient>;
 }
 
 /** Schedules bounded concurrent jobs and records each attempt's complete cost or lower bound. */
 export async function runScheduler(opts: SchedulerOptions, runJSON: RunJSON): Promise<string | undefined> {
   if (!Number.isSafeInteger(opts.config.concurrency) || opts.config.concurrency < 1) throw new Error("concurrency must be a positive integer");
+  const estimatedMode = opts.config.provider === "deepseek" && opts.config.usageMode === "estimated";
+  if ((opts.config.provider === "deepseek" || opts.config.usageMode === "estimated") && !estimatedMode) throw new Error("Invalid DeepSeek usage mode");
+  if (estimatedMode && (!opts.estimated || !opts.config.estimatedLimits || opts.config.concurrency !== 1)) throw new Error("DeepSeek requires bounded host runtime");
+  if (opts.estimated && (!estimatedMode || opts.subscription)) throw new Error("Estimated runtime cannot be mixed with another provider");
+  const bounded = opts.estimated ?? opts.subscription;
   const subscriptionMode = opts.config.provider === "chatgpt" && opts.config.usageMode === "subscription";
   if ((opts.config.provider === "chatgpt" || opts.config.usageMode === "subscription") && !subscriptionMode) throw new Error("Invalid provider/usage mode pairing");
   if (subscriptionMode && (!opts.subscription || !opts.config.subscriptionLimits || opts.config.concurrency !== 1)) throw new Error("Subscription campaigns require a bounded host client and serial execution");
-  if (!subscriptionMode && (opts.config.budgetUsd === null || !Number.isFinite(opts.config.budgetUsd) || opts.config.budgetUsd <= 0)) throw new Error("Monetary campaigns require a positive finite dollar budget");
+  if (!subscriptionMode && !estimatedMode && (opts.config.budgetUsd === null || !Number.isFinite(opts.config.budgetUsd) || opts.config.budgetUsd <= 0)) throw new Error("Monetary campaigns require a positive finite dollar budget");
   const attempt = opts.runAttempt ?? runJobAttempt;
   const controller = new AbortController();
   let knownCostUsd = 0;
@@ -40,13 +46,15 @@ export async function runScheduler(opts: SchedulerOptions, runJSON: RunJSON): Pr
   }
   /** Writes counters after attempts and terminal jobs, including exhausted failures. */
   function flush(): void {
-    runJSON.totals = { jobs: pass + fail, attempts, costUsd: subscriptionMode || incomplete ? null : knownCostUsd, knownCostUsd, pass, fail };
+    runJSON.totals = { jobs: pass + fail, attempts, costUsd: subscriptionMode || estimatedMode || incomplete ? null : knownCostUsd, knownCostUsd, pass, fail };
+    if (estimatedMode) runJSON.estimatedUsage = opts.estimated!.snapshot();
     if (subscriptionMode) runJSON.subscriptionUsage = opts.subscription!.snapshot();
     writeRunJSON(opts.runPath, runJSON);
   }
   /** Executes one attempt only; diagnosis and another paid run require an explicit new campaign. */
   async function runOne(original: Job): Promise<void> {
     const job = { ...original, dir: original.dir ?? createJobDir(opts.runPath, original) };
+    const estimateBefore = opts.estimated?.snapshot().knownEstimatedUsd ?? 0;
     const records: AttemptRecord[] = [];
     let jobKnown = 0;
     const reasons = new Set<string>();
@@ -87,15 +95,15 @@ export async function runScheduler(opts: SchedulerOptions, runJSON: RunJSON): Pr
       records.push({ n, costUsd: cost.costUsd, knownCostUsd: cost.knownCostUsd,
         ...(cost.costIncompleteReasons.length ? { costIncompleteReasons: [...new Set(cost.costIncompleteReasons)] } : {}),
         ...(failed ? { infraError: error instanceof Error ? error.message : String(error) } : { final: true as const }) });
-      if (!subscriptionMode) {
+      if (!subscriptionMode && !estimatedMode) {
         if (cost.costUsd === null) stop("cost-incomplete");
         else if (knownCostUsd >= opts.config.budgetUsd!) stop("budget");
       } else {
         // Only absent per-request USD is expected for subscription usage. Corrupt/missing
         // telemetry and unobserved lifecycle work still invalidate the campaign.
-        if (opts.subscription!.snapshot().incomplete || cost.knownCostUsd !== 0 ||
+        if (bounded!.snapshot().incomplete || cost.knownCostUsd !== 0 ||
             cost.costIncompleteReasons.some(reason => !["missing-or-invalid-turn-cost", "incomplete-attempt-cost"].includes(reason))) {
-          stop("subscription-usage-incomplete");
+          stop(estimatedMode ? "estimated-usage-incomplete" : "subscription-usage-incomplete");
         }
       }
       if (failed || result?.outcome !== "pass") stop(`job-failed:${job.problem}.${job.framework}.${job.rep}`);
@@ -108,6 +116,9 @@ export async function runScheduler(opts: SchedulerOptions, runJSON: RunJSON): Pr
       outcome, reason: result?.reason ?? null, attempts: records,
       costUsdAllAttempts: reasons.size ? null : jobKnown, knownCostUsdAllAttempts: jobKnown,
       ...(reasons.size ? { costIncompleteReasons: [...reasons] } : {}),
+      ...(estimatedMode ? { estimatedCost: { basis: opts.estimated!.snapshot().priceBasis,
+        estimatedUsd: opts.estimated!.snapshot().incomplete ? null : opts.estimated!.snapshot().knownEstimatedUsd - estimateBefore,
+        knownEstimatedUsd: opts.estimated!.snapshot().knownEstimatedUsd - estimateBefore } } : {}),
       durationMs, rollups: result?.rollups,
     };
     writeJobJSON(job.dir, jobJSON);
@@ -117,7 +128,7 @@ export async function runScheduler(opts: SchedulerOptions, runJSON: RunJSON): Pr
   /** Workers claim indices synchronously before awaiting, so no job is dispatched twice. */
   async function worker(): Promise<void> {
     while (!controller.signal.aborted && next < opts.jobs.length) {
-      if (subscriptionMode && opts.subscription!.stopReason()) { stop(opts.subscription!.stopReason()!); break; }
+      if ((subscriptionMode || estimatedMode) && bounded!.stopReason()) { stop(bounded!.stopReason()!); break; }
       const job = opts.jobs[next++]!;
       try { await runOne(job); }
       catch (error) {

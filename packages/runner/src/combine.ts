@@ -37,6 +37,8 @@ export interface FrameworkStats {
   passRate: number;
   wilson95: [number, number];
   costPerSuccessUsd: number | null;
+  meanEstimatedCostUsd?: number | null;
+  estimateBasis?: string;
   meanCostUsd: number | null;
   turns: { main: number; secondary: number };
   toolCalls: { topLevel: number; leaf: number };
@@ -150,6 +152,7 @@ function validateProvenance(runs: RunJSON[]): RunJSON["provenance"] {
     if ((run.config.provider ?? "openrouter") !== (first.config.provider ?? "openrouter") ||
         (run.config.usageMode ?? "monetary") !== (first.config.usageMode ?? "monetary") ||
         !isDeepStrictEqual(run.config.subscriptionLimits, first.config.subscriptionLimits) ||
+        !isDeepStrictEqual(run.config.estimatedLimits, first.config.estimatedLimits) ||
         !isDeepStrictEqual(run.provenance.inference, first.provenance.inference)) {
       throw new Error(`Run ${run.id} has mismatched provider, usage mode, limits or inference settings`);
     }
@@ -212,6 +215,11 @@ function aggregateFramework(jobs: JobJSON[]): FrameworkStats {
     wilson95,
     costPerSuccessUsd,
     meanCostUsd,
+    ...(jobs.some(j => j.estimatedCost) ? {
+      estimateBasis: jobs[0]?.estimatedCost?.basis,
+      meanEstimatedCostUsd: jobs.every(j => j.estimatedCost?.basis === jobs[0]?.estimatedCost?.basis && typeof j.estimatedCost?.estimatedUsd === "number" && Number.isFinite(j.estimatedCost.estimatedUsd) && j.estimatedCost.estimatedUsd >= 0)
+        ? jobs.reduce((sum, j) => sum + j.estimatedCost!.estimatedUsd!, 0) / n : null,
+    } : {}),
     turns: { main: 0, secondary: 0 }, // rollup data not yet implemented
     toolCalls: { topLevel: 0, leaf: 0 },
     failures,
@@ -293,6 +301,9 @@ function generateMarkdown(report: CombinedReport): string {
     );
   }
   lines.push("");
+  for (const [framework, stats] of Object.entries(report.frameworks)) {
+    if (stats.meanEstimatedCostUsd !== undefined) lines.push(`${framework}: mean price-table ESTIMATE per task ${stats.meanEstimatedCostUsd === null ? "unknown" : "$" + stats.meanEstimatedCostUsd.toFixed(6)} (${stats.estimateBasis ?? "unknown basis"}); actual billed dollars remain unknown.`);
+  }
   if (report.paired.length > 0) {
     lines.push("## Paired Comparisons", "");
     for (const p of report.paired) {

@@ -215,7 +215,7 @@ export async function runLoop(opts: LoopOptions): Promise<LoopResult> {
       ? null : costUsd + completion.costUsd;
 
     const response = completion.response as {
-      choices?: Array<{ message?: { responses_output?: unknown[]; content?: string; tool_calls?: Array<{ id: string; function: { name: string; arguments: string } }> } }>;
+      choices?: Array<{ message?: { reasoning_content?: string; responses_output?: unknown[]; content?: string; tool_calls?: Array<{ id: string; function: { name: string; arguments: string } }> } }>;
     };
     const msg = response?.choices?.[0]?.message;
     if (!msg) break;
@@ -224,6 +224,7 @@ export async function runLoop(opts: LoopOptions): Promise<LoopResult> {
     if (msg.content) assistantMessage.content = msg.content;
     if (msg.tool_calls?.length) assistantMessage.tool_calls = msg.tool_calls;
     if (msg.responses_output) assistantMessage.responses_output = msg.responses_output;
+    if (typeof msg.reasoning_content === "string") assistantMessage.reasoning_content = msg.reasoning_content;
     messages.push(assistantMessage);
 
     if (!msg.tool_calls?.length) {

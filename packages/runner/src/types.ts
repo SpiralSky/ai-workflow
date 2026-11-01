@@ -30,8 +30,9 @@ export interface RunConfig {
   /** Monetary API budget; null for explicitly bounded subscription mode. */
   budgetUsd: number | null;
   /** Both roles share this provider; omitted preserves the legacy OpenRouter default. */
-  provider?: "openrouter" | "chatgpt";
-  usageMode?: "monetary" | "subscription";
+  provider?: "openrouter" | "chatgpt" | "deepseek";
+  usageMode?: "monetary" | "subscription" | "estimated";
+  estimatedLimits?: import("./estimated.ts").EstimatedLimits;
   subscriptionLimits?: import("./subscription.ts").SubscriptionLimits;
   concurrency: number;
   models: { main: string; secondary: string };
@@ -84,6 +85,7 @@ export interface JobJSON {
   outcome: "pass" | "fail";
   reason: null | "checks" | "turn-limit" | "timeout" | "patch-failed" | "context-limit";
   attempts: AttemptRecord[];
+  estimatedCost?: { basis: string; estimatedUsd: number | null; knownEstimatedUsd: number };
   costUsdAllAttempts: number | null;
   knownCostUsdAllAttempts?: number;
   costIncompleteReasons?: string[];
@@ -101,6 +103,7 @@ export interface RunJSON {
   config: RunConfig;
   provenance: Provenance;
   totals: { jobs: number; attempts: number; costUsd: number | null; knownCostUsd?: number; pass: number; fail: number };
+  estimatedUsage?: import("./estimated.ts").EstimatedUsage;
   subscriptionUsage?: import("./subscription.ts").SubscriptionUsage;
   startedAt: string;
   endedAt?: string;
