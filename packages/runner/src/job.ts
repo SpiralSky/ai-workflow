@@ -83,7 +83,7 @@ export async function runJobAttempt(opts: JobOptions): Promise<JobResult> {
   const client = opts.subscription?.client ?? createChatClient({ baseURL, apiKey, timeoutMs: 300_000 });
 
   // Validate treatment before creating artifacts or starting any container.
-  const launch = frameworkLaunch(job.framework, config, { apiKey, baseURL });
+  const launch = frameworkLaunch(job.framework, config);
   const jobDir = job.dir ?? createJobDir(runPath, job);
   const eventsPath = join(jobDir, "events.jsonl");
   const sink = new FileSink(eventsPath);
@@ -111,8 +111,8 @@ export async function runJobAttempt(opts: JobOptions): Promise<JobResult> {
     signal?.throwIfAborted();
     await buildImage(problemDir, job.problem);
     signal?.throwIfAborted();
-    // orchestrate executor makes LLM calls from inside the container; bridge gives outbound internet access
-    const ctr = await startContainer(job.problem, jobDir, join(repoRoot, "packages", "server", "dist"), launch.needsExecutor && config.provider !== "chatgpt" ? "bridge" : undefined);
+    // Every executor uses the closed-until-attested host broker; task containers need no egress.
+    const ctr = await startContainer(job.problem, jobDir, join(repoRoot, "packages", "server", "dist"), launch.network);
 
     const settleCancellation = onCancellation(signal, async () => {
       if (modelLoopStarted) costReasons.push("cancelled-container-lifecycle");
@@ -135,7 +135,7 @@ export async function runJobAttempt(opts: JobOptions): Promise<JobResult> {
         ...launch.executorArgs,
       ];
       const serverDescriptor = await startServer(ctr, serverArgs);
-      session = await openMCPSession(serverDescriptor, config.provider === "chatgpt" && launch.needsExecutor
+      session = await openMCPSession(serverDescriptor, launch.needsExecutor
         ? { secondaryClient: client, secondaryModel: config.models.secondary, signal } : undefined);
 
       signal?.throwIfAborted();

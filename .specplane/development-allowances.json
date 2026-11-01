@@ -2,7 +2,7 @@
   "version": 1,
   "kind": "post-migration-development",
   "base_commit": "75ab542c626bc7276d2ee9575956899c79b6d75d",
-  "verified_development_head": "eb95315ad698b0b94058408c64b5aaa62cac7f80",
+  "verified_development_head": "b7f801e247f1735c8dd396f4b068550b39714ac0",
   "authorization_kind": "development requests only; final approval and merge remain human-only",
   "user_requests": [
     "Add sign in to open ai support for ai-workflow workflow runs",
@@ -22,7 +22,8 @@
   "draft_plans": [
     "plans/2026-11-01-failfast-campaign/PLAN.md",
     "plans/2026-11-01-openai-plan-signin/PLAN.md",
-    "plans/2026-11-01-provenance-readiness/PLAN.md"
+    "plans/2026-11-01-provenance-readiness/PLAN.md",
+    "plans/2026-11-01-all-provider-host-broker/PLAN.md"
   ],
   "changes": [
     {
@@ -168,6 +169,20 @@
       "rationale": "OpenAI sign-in, bounded host-brokered workflow usage and security regressions; fail-fast cancellation where shared with runner/core/server."
     },
     {
+      "path": "packages/llm/src/client.ts",
+      "before": {
+        "path": "packages/llm/src/client.ts",
+        "mode": "100644",
+        "sha256": "da11ab306f6e3b35f49351a053eecf7a23fc205204dffe1015c9a0c69f101483"
+      },
+      "after": {
+        "path": "packages/llm/src/client.ts",
+        "mode": "100644",
+        "sha256": "a31c467a633ef7634fa942915d5eefd39a9538afa4b2db3a7554b07e10f3d50b"
+      },
+      "rationale": "Regression for host-only orchestration provider credentials and network-none task launch."
+    },
+    {
       "path": "packages/llm/src/index.ts",
       "before": {
         "path": "packages/llm/src/index.ts",
@@ -287,9 +302,9 @@
       "after": {
         "path": "packages/runner/src/container.ts",
         "mode": "100644",
-        "sha256": "541f8d6b140041d1c9f8eeda35e1c783eb0c887764786478fc45a6a34ec45631"
+        "sha256": "91a6e7cd7424403ea2ddbac4687350d9a0d8dd1f4f7bd59a1f84949f2a87ee51"
       },
-      "rationale": "Selected verified immutable image identity and case-preserving Docker references; no CI wrapper/fixtures imported."
+      "rationale": "Selected verified immutable image identity and case-preserving Docker references; no CI wrapper/fixtures imported. Security follow-up: all orchestration credentials/inference stay host-side, typed sanitized provider errors."
     },
     {
       "path": "packages/runner/src/framework-launch.ts",
@@ -301,9 +316,9 @@
       "after": {
         "path": "packages/runner/src/framework-launch.ts",
         "mode": "100644",
-        "sha256": "a10544e5002228d77d17920197726ad607d9ee319b2d083eab7e69e11220a183"
+        "sha256": "fbd8bae883636ed8e0a3876e897bff12c84809c65860f8db7ca248759084420a"
       },
-      "rationale": "OpenAI sign-in, bounded host-brokered workflow usage and security regressions; fail-fast cancellation where shared with runner/core/server."
+      "rationale": "OpenAI sign-in, bounded host-brokered workflow usage and security regressions; fail-fast cancellation where shared with runner/core/server. Security follow-up: all orchestration credentials/inference stay host-side, typed sanitized provider errors."
     },
     {
       "path": "packages/runner/src/grade.ts",
@@ -329,9 +344,9 @@
       "after": {
         "path": "packages/runner/src/job.ts",
         "mode": "100644",
-        "sha256": "d86c775b336f0102ca2369f3d2b9817f22b8e6135bcc6b8b74c132304ef132ad"
+        "sha256": "b4ae20460a2c3463405c355c20692bac1f348ad01c9486e20be3f6fdaac9b87c"
       },
-      "rationale": "OpenAI sign-in, bounded host-brokered workflow usage and security regressions; fail-fast cancellation where shared with runner/core/server. Follow-up: actual runtime provenance gate and immutable observed-image grading. Security follow-up: reject reverse inference until provenance is persisted; revoke on cleanup."
+      "rationale": "OpenAI sign-in, bounded host-brokered workflow usage and security regressions; fail-fast cancellation where shared with runner/core/server. Follow-up: actual runtime provenance gate and immutable observed-image grading. Security follow-up: reject reverse inference until provenance is persisted; revoke on cleanup. Security follow-up: all orchestration credentials/inference stay host-side, typed sanitized provider errors."
     },
     {
       "path": "packages/runner/src/llm-broker.ts",
@@ -339,9 +354,9 @@
       "after": {
         "path": "packages/runner/src/llm-broker.ts",
         "mode": "100644",
-        "sha256": "af7317faee876570a1e2e6bf9ee509946b7677a056d3c8bf5f474be917b94139"
+        "sha256": "29296410c8487aee4677ae450b2db4ed96bff3c6d13469009e295f8ddce6695a"
       },
-      "rationale": "OpenAI sign-in, bounded host-brokered workflow usage and security regressions; fail-fast cancellation where shared with runner/core/server. Security follow-up: reject reverse inference until provenance is persisted; revoke on cleanup."
+      "rationale": "OpenAI sign-in, bounded host-brokered workflow usage and security regressions; fail-fast cancellation where shared with runner/core/server. Security follow-up: reject reverse inference until provenance is persisted; revoke on cleanup. Security follow-up: all orchestration credentials/inference stay host-side, typed sanitized provider errors."
     },
     {
       "path": "packages/runner/src/loop.ts",
@@ -530,14 +545,38 @@
       "rationale": "Selected verified immutable image identity and case-preserving Docker references; no CI wrapper/fixtures imported. Follow-up: actual runtime provenance gate and immutable observed-image grading."
     },
     {
+      "path": "packages/runner/test/framework-launch.test.ts",
+      "before": {
+        "path": "packages/runner/test/framework-launch.test.ts",
+        "mode": "100644",
+        "sha256": "3a9949b1995f9a38c4552632ba1f161afde72e7a05429049ec3c9e08a980696c"
+      },
+      "after": {
+        "path": "packages/runner/test/framework-launch.test.ts",
+        "mode": "100644",
+        "sha256": "5a0e219dcb691045153037bc49731abfd5d71a120ffcd6dd38d9e9f7b5cc66cd"
+      },
+      "rationale": "Regression for host-only orchestration provider credentials and network-none task launch."
+    },
+    {
       "path": "packages/runner/test/llm-broker.test.ts",
       "before": null,
       "after": {
         "path": "packages/runner/test/llm-broker.test.ts",
         "mode": "100644",
-        "sha256": "55cec0408f357bcfecdc1ca5b9e7026bb85149f9109e32ebd8724bf1e617f476"
+        "sha256": "39953049b003ab9c6b2345cc00ac8737c2f798f4e14d7a8653a2cc65ea210613"
       },
-      "rationale": "OpenAI sign-in, bounded host-brokered workflow usage and security regressions; fail-fast cancellation where shared with runner/core/server. Security follow-up: reject reverse inference until provenance is persisted; revoke on cleanup."
+      "rationale": "OpenAI sign-in, bounded host-brokered workflow usage and security regressions; fail-fast cancellation where shared with runner/core/server. Security follow-up: reject reverse inference until provenance is persisted; revoke on cleanup. Security follow-up: all orchestration credentials/inference stay host-side, typed sanitized provider errors."
+    },
+    {
+      "path": "packages/runner/test/openrouter-hostbroker.test.ts",
+      "before": null,
+      "after": {
+        "path": "packages/runner/test/openrouter-hostbroker.test.ts",
+        "mode": "100644",
+        "sha256": "301525b9c2f671a9ba5965d620330e23adfc02c4ef3cce831228c13260325644"
+      },
+      "rationale": "Regression for host-only orchestration provider credentials and network-none task launch."
     },
     {
       "path": "packages/runner/test/provenance-fixture.ts",
@@ -565,9 +604,9 @@
       "after": {
         "path": "packages/runner/test/subscription.test.ts",
         "mode": "100644",
-        "sha256": "06242a03c8a21770eb7c2054dda2c60bb09b7f8a9176977d1f65b9ff5a819423"
+        "sha256": "1d6174a8d4374b2a0ec010035c576b8269068c84a8c5bc561c69289ef17ae183"
       },
-      "rationale": "OpenAI sign-in, bounded host-brokered workflow usage and security regressions; fail-fast cancellation where shared with runner/core/server. Follow-up: actual runtime provenance gate and immutable observed-image grading."
+      "rationale": "OpenAI sign-in, bounded host-brokered workflow usage and security regressions; fail-fast cancellation where shared with runner/core/server. Follow-up: actual runtime provenance gate and immutable observed-image grading. Security follow-up: all orchestration credentials/inference stay host-side, typed sanitized provider errors."
     },
     {
       "path": "packages/server/build.mjs",
@@ -593,9 +632,9 @@
       "after": {
         "path": "packages/server/dist/aiw-server.mjs",
         "mode": "100755",
-        "sha256": "e0d5c75ce0f63972b261c9ac336382a6bb3a46db04f08b482aed3a7475a1557b"
+        "sha256": "6e5009e1e38a831309bb3f214bda1d405400b6f35c5295f542c298e86c44097f"
       },
-      "rationale": "Rebuild/verify coherent tracked runtime and honor explicit engine selection without silent fallback. Follow-up: verified packaged native/tierL resources and lifecycle integration. Follow-up: awaited graceful sidecar descendant shutdown. Follow-up: actual runtime provenance gate and immutable observed-image grading."
+      "rationale": "Rebuild/verify coherent tracked runtime and honor explicit engine selection without silent fallback. Follow-up: verified packaged native/tierL resources and lifecycle integration. Follow-up: awaited graceful sidecar descendant shutdown. Follow-up: actual runtime provenance gate and immutable observed-image grading. Security follow-up: all orchestration credentials/inference stay host-side, typed sanitized provider errors."
     },
     {
       "path": "packages/server/dist/fixtures/external/ciStatus.json",
@@ -891,9 +930,9 @@
       "after": {
         "path": "packages/server/src/host-client.ts",
         "mode": "100644",
-        "sha256": "ea3e7554f63f3d783330ecce8d61563e49736d399815fba26dfe52591d6fd419"
+        "sha256": "d3a6032e0bbb2b5846d0fa26601b5372ff64316116de749677012b90f2d918d0"
       },
-      "rationale": "OpenAI sign-in, bounded host-brokered workflow usage and security regressions; fail-fast cancellation where shared with runner/core/server."
+      "rationale": "OpenAI sign-in, bounded host-brokered workflow usage and security regressions; fail-fast cancellation where shared with runner/core/server. Security follow-up: all orchestration credentials/inference stay host-side, typed sanitized provider errors."
     },
     {
       "path": "packages/server/src/local.ts",
@@ -1936,6 +1975,151 @@
           "path": "packages/runner/test/llm-broker.test.ts",
           "mode": "100644",
           "sha256": "55cec0408f357bcfecdc1ca5b9e7026bb85149f9109e32ebd8724bf1e617f476"
+        }
+      }
+    ]
+  },
+  "all_provider_hostbroker_followup": {
+    "base_commit": "179ac10803e579dd7e696b7699ed57d3199331b1",
+    "source_commit": "12cbb388a9b51e41457210a755f1510a53130d7c",
+    "changes": [
+      {
+        "path": "packages/llm/src/client.ts",
+        "before": {
+          "path": "packages/llm/src/client.ts",
+          "mode": "100644",
+          "sha256": "da11ab306f6e3b35f49351a053eecf7a23fc205204dffe1015c9a0c69f101483"
+        },
+        "after": {
+          "path": "packages/llm/src/client.ts",
+          "mode": "100644",
+          "sha256": "a31c467a633ef7634fa942915d5eefd39a9538afa4b2db3a7554b07e10f3d50b"
+        }
+      },
+      {
+        "path": "packages/runner/src/container.ts",
+        "before": {
+          "path": "packages/runner/src/container.ts",
+          "mode": "100644",
+          "sha256": "541f8d6b140041d1c9f8eeda35e1c783eb0c887764786478fc45a6a34ec45631"
+        },
+        "after": {
+          "path": "packages/runner/src/container.ts",
+          "mode": "100644",
+          "sha256": "91a6e7cd7424403ea2ddbac4687350d9a0d8dd1f4f7bd59a1f84949f2a87ee51"
+        }
+      },
+      {
+        "path": "packages/runner/src/framework-launch.ts",
+        "before": {
+          "path": "packages/runner/src/framework-launch.ts",
+          "mode": "100644",
+          "sha256": "a10544e5002228d77d17920197726ad607d9ee319b2d083eab7e69e11220a183"
+        },
+        "after": {
+          "path": "packages/runner/src/framework-launch.ts",
+          "mode": "100644",
+          "sha256": "fbd8bae883636ed8e0a3876e897bff12c84809c65860f8db7ca248759084420a"
+        }
+      },
+      {
+        "path": "packages/runner/src/job.ts",
+        "before": {
+          "path": "packages/runner/src/job.ts",
+          "mode": "100644",
+          "sha256": "d86c775b336f0102ca2369f3d2b9817f22b8e6135bcc6b8b74c132304ef132ad"
+        },
+        "after": {
+          "path": "packages/runner/src/job.ts",
+          "mode": "100644",
+          "sha256": "b4ae20460a2c3463405c355c20692bac1f348ad01c9486e20be3f6fdaac9b87c"
+        }
+      },
+      {
+        "path": "packages/runner/src/llm-broker.ts",
+        "before": {
+          "path": "packages/runner/src/llm-broker.ts",
+          "mode": "100644",
+          "sha256": "af7317faee876570a1e2e6bf9ee509946b7677a056d3c8bf5f474be917b94139"
+        },
+        "after": {
+          "path": "packages/runner/src/llm-broker.ts",
+          "mode": "100644",
+          "sha256": "29296410c8487aee4677ae450b2db4ed96bff3c6d13469009e295f8ddce6695a"
+        }
+      },
+      {
+        "path": "packages/runner/test/framework-launch.test.ts",
+        "before": {
+          "path": "packages/runner/test/framework-launch.test.ts",
+          "mode": "100644",
+          "sha256": "3a9949b1995f9a38c4552632ba1f161afde72e7a05429049ec3c9e08a980696c"
+        },
+        "after": {
+          "path": "packages/runner/test/framework-launch.test.ts",
+          "mode": "100644",
+          "sha256": "5a0e219dcb691045153037bc49731abfd5d71a120ffcd6dd38d9e9f7b5cc66cd"
+        }
+      },
+      {
+        "path": "packages/runner/test/llm-broker.test.ts",
+        "before": {
+          "path": "packages/runner/test/llm-broker.test.ts",
+          "mode": "100644",
+          "sha256": "55cec0408f357bcfecdc1ca5b9e7026bb85149f9109e32ebd8724bf1e617f476"
+        },
+        "after": {
+          "path": "packages/runner/test/llm-broker.test.ts",
+          "mode": "100644",
+          "sha256": "39953049b003ab9c6b2345cc00ac8737c2f798f4e14d7a8653a2cc65ea210613"
+        }
+      },
+      {
+        "path": "packages/runner/test/openrouter-hostbroker.test.ts",
+        "before": null,
+        "after": {
+          "path": "packages/runner/test/openrouter-hostbroker.test.ts",
+          "mode": "100644",
+          "sha256": "301525b9c2f671a9ba5965d620330e23adfc02c4ef3cce831228c13260325644"
+        }
+      },
+      {
+        "path": "packages/runner/test/subscription.test.ts",
+        "before": {
+          "path": "packages/runner/test/subscription.test.ts",
+          "mode": "100644",
+          "sha256": "06242a03c8a21770eb7c2054dda2c60bb09b7f8a9176977d1f65b9ff5a819423"
+        },
+        "after": {
+          "path": "packages/runner/test/subscription.test.ts",
+          "mode": "100644",
+          "sha256": "1d6174a8d4374b2a0ec010035c576b8269068c84a8c5bc561c69289ef17ae183"
+        }
+      },
+      {
+        "path": "packages/server/dist/aiw-server.mjs",
+        "before": {
+          "path": "packages/server/dist/aiw-server.mjs",
+          "mode": "100755",
+          "sha256": "e0d5c75ce0f63972b261c9ac336382a6bb3a46db04f08b482aed3a7475a1557b"
+        },
+        "after": {
+          "path": "packages/server/dist/aiw-server.mjs",
+          "mode": "100755",
+          "sha256": "6e5009e1e38a831309bb3f214bda1d405400b6f35c5295f542c298e86c44097f"
+        }
+      },
+      {
+        "path": "packages/server/src/host-client.ts",
+        "before": {
+          "path": "packages/server/src/host-client.ts",
+          "mode": "100644",
+          "sha256": "ea3e7554f63f3d783330ecce8d61563e49736d399815fba26dfe52591d6fd419"
+        },
+        "after": {
+          "path": "packages/server/src/host-client.ts",
+          "mode": "100644",
+          "sha256": "d3a6032e0bbb2b5846d0fa26601b5372ff64316116de749677012b90f2d918d0"
         }
       }
     ]

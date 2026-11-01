@@ -40064,21 +40064,21 @@ function createChatClient(opts) {
           signal: abort
         });
         text = await res.text();
-      } catch (e) {
-        if (signal instanceof AbortSignal && signal.aborted) throw e;
-        throw new LLMError("infra", `request failed: ${e.message}`);
+      } catch {
+        if (signal instanceof AbortSignal && signal.aborted) throw new DOMException("Model request cancelled", "AbortError");
+        throw new LLMError("infra", "Model request failed");
       }
       let json2;
       try {
         json2 = JSON.parse(text);
       } catch {
         const kind2 = res.ok ? "infra" : classifyAPIError(res.status, text);
-        throw new LLMError(kind2, `HTTP ${res.status}: unparseable body: ${text.slice(0, 300)}`, res.status);
+        throw new LLMError(kind2, `HTTP ${res.status}: invalid provider response`, res.status);
       }
       if (!res.ok || json2?.error) {
         const message = String(json2?.error?.message ?? text).slice(0, 500);
         const status = res.ok ? numericCode(json2?.error?.code) : res.status;
-        throw new LLMError(classifyAPIError(status, message), `HTTP ${res.status}: ${message}`, status);
+        throw new LLMError(classifyAPIError(status, message), `HTTP ${res.status}: provider request rejected`, status);
       }
       const choice = json2?.choices?.[0];
       if (choice?.finish_reason === "content_filter") {
@@ -40086,7 +40086,7 @@ function createChatClient(opts) {
       }
       const msg = choice?.message;
       if (!msg || !msg.content && !msg.tool_calls?.length) {
-        throw new LLMError("infra", `empty response: ${text.slice(0, 300)}`, res.status);
+        throw new LLMError("infra", "empty provider response", res.status);
       }
       return { response: json2, ...normaliseUsage("openai-chat", json2) };
     }
@@ -40117,6 +40117,10 @@ var HostCompletionSchema = ResultSchema.extend({
   costUsd: external_exports.number().finite().nonnegative().optional(),
   cacheHit: external_exports.boolean().optional()
 });
+var HostErrorDataSchema = external_exports.object({ aiwLLMError: external_exports.object({
+  kind: external_exports.enum(["infra", "context-limit", "other"]),
+  status: external_exports.number().int().min(100).max(599).optional()
+}).strict() }).strict();
 function createHostLLMClient(server, opts = {}) {
   const timeoutMs = opts.timeoutMs ?? 3e5;
   if (!Number.isSafeInteger(timeoutMs) || timeoutMs < 1) throw new Error("Invalid host LLM timeout");
@@ -40146,8 +40150,13 @@ function createHostLLMClient(server, opts = {}) {
         return { response: result.response, usage: result.usage, costUsd: result.costUsd, cacheHit: result.cacheHit };
       } catch (error62) {
         cancel();
-        if (callerSignal?.aborted) throw error62;
-        throw new LLMError("infra", "Host LLM request failed");
+        if (callerSignal?.aborted) throw new DOMException("Host LLM request cancelled", "AbortError");
+        const classified = HostErrorDataSchema.safeParse(error62 instanceof McpError ? error62.data : void 0);
+        throw new LLMError(
+          classified.success ? classified.data.aiwLLMError.kind : "infra",
+          "Host LLM request failed",
+          classified.success ? classified.data.aiwLLMError.status : void 0
+        );
       } finally {
         signal?.removeEventListener("abort", cancel);
       }

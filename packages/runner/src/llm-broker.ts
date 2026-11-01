@@ -1,6 +1,7 @@
 import type { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { RequestSchema, NotificationSchema, McpError, ErrorCode } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
+import { LLMError } from "@aiw/llm";
 import type { LLMClient } from "@aiw/telemetry";
 
 /** Opt-in reverse LLM channel. Credentials and provider settings remain on the host. */
@@ -84,9 +85,13 @@ export function installHostLLMBroker(client: Client, opts: HostLLMBrokerOptions)
       return { response: completion.response, usage: completion.usage,
         ...(completion.costUsd !== undefined ? { costUsd: completion.costUsd } : {}),
         ...(completion.cacheHit !== undefined ? { cacheHit: completion.cacheHit } : {}) };
-    } catch {
+    } catch (error) {
       // Provider errors can contain headers or request details. Never reflect them into the sandbox.
-      throw new McpError(ErrorCode.InternalError, signal.aborted ? "Host LLM request cancelled" : "Host LLM request failed");
+      const classified = !signal.aborted && error instanceof LLMError && ["infra", "context-limit", "other"].includes(error.kind)
+        ? { aiwLLMError: { kind: error.kind,
+            ...(Number.isInteger(error.status) && error.status! >= 100 && error.status! <= 599 ? { status: error.status } : {}) } }
+        : undefined;
+      throw new McpError(ErrorCode.InternalError, signal.aborted ? "Host LLM request cancelled" : "Host LLM request failed", classified);
     } finally { active.delete(requestId); }
   });
   return admission;

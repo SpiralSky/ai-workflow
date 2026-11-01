@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import type { Server } from "@modelcontextprotocol/sdk/server/index.js";
-import { ResultSchema, type Request, type Notification } from "@modelcontextprotocol/sdk/types.js";
+import { ResultSchema, McpError, type Request, type Notification } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
 import type { LLMClient, LLMCompletion } from "@aiw/telemetry";
 import { LLMError } from "@aiw/llm";
@@ -12,6 +12,12 @@ const HostCompletionSchema = ResultSchema.extend({
   costUsd: z.number().finite().nonnegative().optional(),
   cacheHit: z.boolean().optional(),
 });
+
+/** Only nonsecret error classification may cross the inference boundary. */
+const HostErrorDataSchema = z.object({ aiwLLMError: z.object({
+  kind: z.enum(["infra", "context-limit", "other"]),
+  status: z.number().int().min(100).max(599).optional(),
+}).strict() }).strict();
 
 /** Creates a credential-free executor using the explicitly opted-in host's stdio broker. */
 export function createHostLLMClient(server: () => Server<Request, Notification>, opts: { timeoutMs?: number } = {}): LLMClient {
@@ -37,8 +43,10 @@ export function createHostLLMClient(server: () => Server<Request, Notification>,
         return { response: result.response, usage: result.usage, costUsd: result.costUsd, cacheHit: result.cacheHit };
       } catch (error) {
         cancel();
-        if (callerSignal?.aborted) throw error;
-        throw new LLMError("infra", "Host LLM request failed");
+        if (callerSignal?.aborted) throw new DOMException("Host LLM request cancelled", "AbortError");
+        const classified = HostErrorDataSchema.safeParse(error instanceof McpError ? error.data : undefined);
+        throw new LLMError(classified.success ? classified.data.aiwLLMError.kind : "infra", "Host LLM request failed",
+          classified.success ? classified.data.aiwLLMError.status : undefined);
       } finally { signal?.removeEventListener("abort", cancel); }
     },
   };

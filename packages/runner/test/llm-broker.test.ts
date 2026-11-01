@@ -225,3 +225,58 @@ test("campaign cancellation permanently revokes admission even before it opens",
   assert.throws(() => admission.open());
   assert.equal(calls, 0);
 });
+
+test("raw peer provider, model, endpoint and generation overrides are rejected before dispatch", async () => {
+  let calls = 0;
+  const f = await fixture({ secondaryClient: { complete: async () => { calls++; return completion; } } });
+  try {
+    for (const override of [{ provider: "other" }, { model: "other" }, { baseURL: "https://other.invalid" }, { apiKey: "SENTINEL" },
+      { temperature: 0.9 }, { top_p: 0.5 }, { max_tokens: 99999 }]) {
+      await assert.rejects(f.server.request({ method: "aiw/llm/complete", params: { requestId: randomUUID(), system: "s", tools: [], messages: [], ...override } }, ResultSchema));
+    }
+    assert.equal(calls, 0);
+  } finally { await f.close(); }
+});
+
+test("MCP cancellation aborts pending mocked OpenRouter HTTP traffic without retries", async () => {
+  const { createChatClient } = await import("@aiw/llm");
+  let entered!: () => void, stopped!: () => void, calls = 0;
+  const started = new Promise<void>(resolve => { entered = resolve; });
+  const aborted = new Promise<void>(resolve => { stopped = resolve; });
+  const provider = createChatClient({ baseURL: "https://openrouter.ai/api/v1", apiKey: "SENTINEL-PRIVATE",
+    fetch: (async (_url, init) => {
+      calls++; entered();
+      return new Promise((_resolve, reject) => {
+        init!.signal!.addEventListener("abort", () => { stopped(); reject(new Error("SENTINEL-PRIVATE transport aborted")); }, { once: true });
+      });
+    }) as typeof fetch });
+  const f = await fixture({ secondaryClient: provider });
+  const cancel = new AbortController();
+  try {
+    const pending = f.executor.complete({ ...request, signal: cancel.signal });
+    const rejected = assert.rejects(pending, error => !String(error).includes("SENTINEL"));
+    await started; cancel.abort(); await aborted; await rejected;
+    assert.equal(calls, 1);
+  } finally { await f.close(); }
+});
+
+test("broker preserves allowlisted provider error kinds/status without raw diagnostics", async () => {
+  const { createChatClient, LLMError } = await import("@aiw/llm");
+  for (const [status, message, kind] of [[400, "maximum context length", "context-limit"], [429, "rate limit", "infra"], [401, "invalid key", "other"]] as const) {
+    const f = await fixture({ secondaryClient: createChatClient({ baseURL: "https://openrouter.ai/api/v1", apiKey: "SENTINEL-KEY",
+      fetch: (async () => new Response(JSON.stringify({ error: { message: `${message} SENTINEL-KEY https://private-endpoint.invalid` } }), { status })) as typeof fetch }) });
+    try {
+      await assert.rejects(f.executor.complete(request), error => {
+        assert.ok(error instanceof LLMError);
+        assert.equal(error.kind, kind); assert.equal(error.status, status);
+        assert.doesNotMatch(String(error), /SENTINEL|private-endpoint|maximum context|invalid key/);
+        return true;
+      });
+      await assert.rejects(f.server.request({ method: "aiw/llm/complete", params: { requestId: randomUUID(), system: "s", tools: [], messages: [] } }, ResultSchema), (error: any) => {
+        assert.deepEqual(error.data, { aiwLLMError: { kind, status } });
+        assert.doesNotMatch(JSON.stringify(error), /SENTINEL|private-endpoint/);
+        return true;
+      });
+    } finally { await f.close(); }
+  }
+});

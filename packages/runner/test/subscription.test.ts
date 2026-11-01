@@ -72,7 +72,7 @@ test("subscription configuration is explicit, serial, bounded, and rejects mixed
     { subscriptionLimits: { ...limits, maxCalls: 0 } }, { model: "deepseek/deepseek-v4-flash" } ]) {
     assert.throws(() => resolveConfig({ ...flags, ...changed } as EvalFlags, registry));
   }
-  const launch = frameworkLaunch("orchestrate", resolveConfig(flags, registry), { apiKey: "never-serialize-me", baseURL: "https://attacker.invalid" });
+  const launch = frameworkLaunch("orchestrate", resolveConfig(flags, registry));
   assert.ok(launch.executorArgs.includes("host"));
   assert.ok(!JSON.stringify(launch).includes("never-serialize-me"));
   assert.ok(!JSON.stringify(launch).includes("attacker"));

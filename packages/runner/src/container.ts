@@ -104,6 +104,13 @@ export async function startContainer(
   return { id, problem, jobDir, networkId: network };
 }
 
+/** Minimal host Docker-client environment; provider credentials and endpoints never enter descriptors. */
+export function dockerClientEnvironment(source: Record<string, string | undefined> = process.env): Record<string, string> {
+  const allowed = ["PATH", "HOME", "USER", "LOGNAME", "TMPDIR", "TEMP", "TMP", "SYSTEMROOT", "WINDIR",
+    "DOCKER_HOST", "DOCKER_CONTEXT", "DOCKER_CONFIG", "DOCKER_CERT_PATH", "DOCKER_TLS_VERIFY"];
+  return Object.fromEntries(allowed.flatMap((name) => source[name] === undefined ? [] : [[name, source[name]!]]));
+}
+
 /**
  * Returns a spawn descriptor for starting the MCP server inside the container via docker exec.
  * The descriptor is passed to openMCPSession in mcp.ts, which spawns the process as a stdio transport.
@@ -128,7 +135,7 @@ export async function startServer(
       "/opt/aiw/bundle/aiw-server.mjs",
       ...serverArgs,
     ],
-    env: { ...process.env, ...(env ?? {}) } as Record<string, string>,
+    env: { ...dockerClientEnvironment(), ...dockerClientEnvironment(env ?? {}) },
   };
 }
 
