@@ -62,3 +62,13 @@ PR #2 had two hygiene-only add/add conflicts after independent base/head additio
 - GitHub verified all four PRs clean/mergeable, draft and unmerged. This is not approval.
 - Full unchanged test inventories passed serialized: 537/551/595 package tests respectively, plus23 script tests each, zero skips/failures. Typecheck, snapshot preservation, freshness and10 focused postcommit checks passed.
 - Normal parallel sign-in runs twice reproduced the existing Jedi unsure-list failure; isolated24-test and serialized101-tool suites passed. Assertions/repository test configuration were not weakened. An isolated root-cause investigation is active, not claiming the flaky default is fixed. Prior Docker tests apply to unchanged runtime artifacts, not a fresh whole-snapshot rerun.
+
+## Local-tool credential protection — 2026-11-01 14:22 UTC
+
+PR #4 now includes direct-host environment filtering for DEEPSEEK_, TYPESAFE_ and defensive CHATGPT_ prefixes, plus filtering on both ripgrep launch paths. Runner containers were already protected; this fixes a separate local-host route and is not a general sandbox. No real credentials were read. Synthetic tests cover all seven Node subprocess boundaries and a real Python descendant.
+
+Source `722cf5563ce22bfe309ba19e85fc34992b8dabc7` passed 598 package +24 script tests serialized, typecheck, preservation and canonical artifact freshness. Default-parallel Jedi unsure-list failure remains unresolved; bounded diagnostic branch `c3f09ef668563ffbbb92af56c4ad0a245c271ef8` records both passing reproduction attempts and an independent recurrence, not a fix. No assertion or default test configuration was weakened.
+
+Canonical runtime passed actual Node22.15.0 ABI127 relocated native/tier-L Docker validation: https://github.com/SpiralSky/ai-workflow/actions/runs/41315462595. The original dependency-symlink artifact was corrected before publication and independently rechecked.
+
+A subsequent adjacent test-addition conflict was resolved by moving the extra security regression into its own automatically discovered test file. Current PR #4 remote head `67b42ae04153079e84b1fdacdd0082a2e623ffc8`, exact local source `5bec9d36275e3cb34087430e43bd74982df8babd`, tree `d59fbd2a425f36a7738a42e693db82df320ac845`. All 24 script tests/preservation/hygiene passed; runtime and bundle are byte-identical to the Docker-tested source. GitHub verified all four draft PRs clean/mergeable and unmerged at 14:22 UTC. No plan or PR approved, no merge, no live model call or paid inference. Live evaluation and own-computer indexing blockers remain as above.
