@@ -1,0 +1,19 @@
+name: Docker environment smoke
+on:
+  push:
+    branches: [dot/docker-environment-smoke-20261101]
+permissions:
+  contents: read
+concurrency:
+  group: docker-environment-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  smoke:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Verify Docker and isolated Python container
+        shell: bash --noprofile --norc -euo pipefail {0}
+        run: |
+          docker version
+          docker run --rm --network none python:3.12-slim python -c 'import platform; print(platform.python_version())'
