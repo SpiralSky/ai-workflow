@@ -19,6 +19,8 @@ from .common import SKIP_DIRS
 
 # Set by the RPC loop when the request being served is cancelled (the client aborted).
 CANCEL = threading.Event()
+# Session termination is never cleared between queued requests.
+SHUTDOWN = threading.Event()
 
 CHILD_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "child.py")
 
@@ -49,11 +51,14 @@ def _read(path, limit):
 
 
 def _kill(proc):
+    if getattr(proc, "_aiw_group_reaped", False):
+        return
     try:
         os.killpg(proc.pid, signal.SIGKILL)
     except (ProcessLookupError, PermissionError):
         pass
     proc.wait()
+    proc._aiw_group_reaped = True
 
 
 def run_child(root, kind, request, timeout, out_cap=8000, err_cap=None):
@@ -65,6 +70,7 @@ def run_child(root, kind, request, timeout, out_cap=8000, err_cap=None):
 
     Raises ValueError("aborted") when the RPC loop cancels the request; the child is killed first.
     """
+    proc = None
     tmp = tempfile.mkdtemp(prefix="aiw-child-")
     try:
         req_f, res_f = os.path.join(tmp, "req.json"), os.path.join(tmp, "res.json")
@@ -78,7 +84,7 @@ def run_child(root, kind, request, timeout, out_cap=8000, err_cap=None):
             deadline = time.monotonic() + timeout
             status = "ok"
             while proc.poll() is None:
-                if CANCEL.is_set():
+                if CANCEL.is_set() or SHUTDOWN.is_set():
                     _kill(proc)
                     raise ValueError("aborted")
                 if time.monotonic() >= deadline:
@@ -88,16 +94,15 @@ def run_child(root, kind, request, timeout, out_cap=8000, err_cap=None):
                 time.sleep(0.02)
             else:
                 # the leader exited; reap any stragglers it left in the group
-                try:
-                    os.killpg(proc.pid, signal.SIGKILL)
-                except (ProcessLookupError, PermissionError):
-                    pass
+                _kill(proc)
         result = None
         if status == "ok" and os.path.exists(res_f):
             with open(res_f, encoding="utf-8") as f:
                 result = json.load(f)
         return {"status": status, "code": proc.returncode, "stdout": _read(out_f, out_cap), "stderr": _read(err_f, err_cap or out_cap), "result": result}
     finally:
+        if proc is not None:
+            _kill(proc)
         shutil.rmtree(tmp, ignore_errors=True)
 
 

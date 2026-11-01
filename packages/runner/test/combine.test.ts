@@ -237,3 +237,11 @@ test("combineRuns rejects mismatched provider, quota mode, admission limits and 
     await assert.rejects(combineRuns(dirs, "result", root), /mismatched provider/);
   }
 });
+
+test("legacy reports explicitly label provenance as unattested rather than verified", async (t) => {
+  const { root, dirs } = fixtureDirs(t, [fixtureRun("legacy")]);
+  await combineRuns(dirs, "legacy-label", root);
+  const report = JSON.parse(readFileSync(join(root, "experiments/reports/legacy-label/report.json"), "utf8"));
+  assert.equal(report.provenanceStatus, "legacy-unattested");
+  assert.match(readFileSync(join(root, "experiments/reports/legacy-label/report.md"), "utf8"), /not a verified baseline/);
+});

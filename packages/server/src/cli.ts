@@ -13,7 +13,7 @@
  */
 
 import { parseArgs } from "node:util";
-import { LocalHost } from "./local.ts";
+import { createLocalHost } from "./local.ts";
 import { startServer } from "./server.ts";
 import { parseFrameworkVariant, selectRuntime } from "@aiw/core";
 
@@ -76,15 +76,20 @@ const secondaryCap = secondaryCapRaw !== undefined && !isNaN(secondaryCapRaw) ? 
 // Build host based on --host flag.
 let host;
 if (hostMode === "local") {
-  host = new LocalHost(tier, { root });
+  host = await createLocalHost(tier, root);
 } else if (hostMode === "fallback") {
   // TODO: implement fallback host with CheckedHost(PolicyChecker, CompositeHost([LocalHost, ...McpClientHosts]))
   // For now fall back to local.
   console.error("aiw-server: --host fallback is not yet implemented; using local");
-  host = new LocalHost(tier, { root });
+  host = await createLocalHost(tier, root);
 } else {
   console.error(`aiw-server: unknown --host "${hostMode}"; using local`);
-  host = new LocalHost(tier, { root });
+  host = await createLocalHost(tier, root);
+}
+
+// CLI owns the host lifecycle; termination must not leave Python workers alive.
+for (const [signal, code] of [["SIGINT", 130], ["SIGTERM", 143]] as const) {
+  process.once(signal, () => { void host.close().finally(() => process.exit(code)); });
 }
 
 // TODO: --transcript, --blobs, --policy, --adapter, --mcp-config, --allow-server, --deny-server
@@ -108,7 +113,8 @@ startServer({
   orchestrateBaseURL: executorBaseURL,
   orchestrateWorkspaceRoot: root,
   secondaryCap,
-}).catch((err) => {
+}).catch(async (err) => {
+  await host.close();
   console.error("aiw-server: fatal error:", err);
   process.exit(1);
 });

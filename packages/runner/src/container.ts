@@ -17,25 +17,52 @@ export interface Container {
 }
 
 /**
- * Builds the Docker image for a problem if it is not already present.
+ * Map a canonical case-sensitive task ID injectively to a Docker reference.
+ * Repository names are lowercase, but tags permit ASCII letters in either case.
+ * Reject path/options/overlong IDs instead of normalizing them into collisions.
+ */
+export function problemImageRef(problem: string): string {
+  if (!/^[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}$/.test(problem)) {
+    throw new Error("Invalid problem ID for Docker image tag");
+  }
+  return `aiw-problem:${problem}`;
+}
+
+/** Injectable Docker command boundary; production uses execFile without a shell. */
+export type DockerImageCommand = (
+  command: string, args: string[], options: { maxBuffer: number },
+) => Promise<{ stdout: string }>;
+
+/**
+ * Builds a problem image and returns a validated immutable identity, never its mutable tag.
+ * Registry RepoDigests identify a repository manifest; a locally built image's .Id instead
+ * identifies its image configuration. These are distinct Docker identities, not equivalent hashes.
  * @param problemDir - path to the problem directory containing a Dockerfile
  * @param problem - problem id (used as the image tag)
- * @returns the image digest (sha256:...)
+ * @param run - injectable command boundary for offline tests
+ * @throws if build/inspection fails or Docker returns a missing or malformed identity
  */
-export async function buildImage(problemDir: string, problem: string): Promise<string> {
-  const tag = `aiw-problem-${problem}`;
-  await execFile("docker", ["build", "-t", tag, problemDir], {
-    maxBuffer: 10 * 1024 * 1024,
-  });
-  const { stdout } = await execFile("docker", [
-    "image",
-    "inspect",
-    "--format",
-    "{{index .RepoDigests 0}}",
-    tag,
-  ]);
-  const digest = stdout.trim();
-  return digest || tag;
+export async function buildImage(
+  problemDir: string,
+  problem: string,
+  run: DockerImageCommand = (command, args, options) => execFile(command, args, options),
+): Promise<string> {
+  const tag = problemImageRef(problem);
+  const options = { maxBuffer: 10 * 1024 * 1024 };
+  await run("docker", ["build", "-t", tag, problemDir], options);
+  const { stdout } = await run("docker", ["image", "inspect", tag], options);
+  const images: unknown = JSON.parse(stdout);
+  if (!Array.isArray(images) || images.length !== 1 ||
+      !images[0] || typeof images[0] !== "object") {
+    throw new Error("Docker inspection must return exactly one image");
+  }
+  const { Id: id, RepoDigests: repoDigests } = images[0] as Record<string, unknown>;
+  if (typeof id !== "string" || !/^sha256:[a-f0-9]{64}$/.test(id) ||
+      !Array.isArray(repoDigests) || repoDigests.some(digest =>
+        typeof digest !== "string" || !/^[^\s@]+@sha256:[a-f0-9]{64}$/.test(digest))) {
+    throw new Error("Docker inspection returned a missing or malformed immutable image identity");
+  }
+  return repoDigests[0] ?? id;
 }
 
 /**
@@ -44,6 +71,7 @@ export async function buildImage(problemDir: string, problem: string): Promise<s
  * @param jobDir - absolute path to the job output directory
  * @param serverBundle - absolute path to the server bundle
  * @param network - optional Docker network name (for orchestrate)
+ * @param run - injectable command boundary for offline tests
  * @returns container handle
  */
 export async function startContainer(
@@ -51,13 +79,14 @@ export async function startContainer(
   jobDir: string,
   serverBundle: string,
   network?: string,
+  run: DockerImageCommand = (command, args, options) => execFile(command, args, options),
 ): Promise<Container> {
-  const tag = `aiw-problem-${problem}`;
+  const tag = problemImageRef(problem);
   const networkArg = network ?? "none";
   // bridge network needs explicit DNS; Docker's embedded DNS doesn't forward to external resolvers
   // on all host configurations (observed: bridge resolves LAN but not internet hostnames).
   const dnsArgs = network === "bridge" ? ["--dns", "8.8.8.8"] : [];
-  const { stdout } = await execFile("docker", [
+  const { stdout } = await run("docker", [
     "run",
     "-d",
     "--network",
@@ -70,7 +99,7 @@ export async function startContainer(
     tag,
     "sleep",
     "infinity",
-  ]);
+  ], { maxBuffer: 10 * 1024 * 1024 });
   const id = stdout.trim();
   return { id, problem, jobDir, networkId: network };
 }

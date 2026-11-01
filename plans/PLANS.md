@@ -8,6 +8,7 @@
 |----|-------|--------|--------------|-------|
 | [2026-11-01-failfast-campaign](2026-11-01-failfast-campaign/PLAN.md) | Stop evaluation campaigns on first terminal failure | draft | — | architecture/runner, feature/framework-runner |
 | [2026-11-01-openai-plan-signin](2026-11-01-openai-plan-signin/PLAN.md) | Sign in with ChatGPT for workflow runs | draft | — | architecture/runner, architecture/framework-server, architecture/system-overview, feature/framework-runner |
+| [2026-11-01-provenance-readiness](2026-11-01-provenance-readiness/PLAN.md) | Attest actual evaluation runtime inputs before model work | draft | — | architecture/runner, feature/framework-runner |
 | [2026-11-01-specplane-migration](2026-11-01-specplane-migration/PLAN.md) | Experimental Specplane migration | draft | — | feature/harness-integration, feature/framework-runner |
 
 ## Archived plans
@@ -20,6 +21,7 @@ _None._
 graph TD
     p_2026_11_01_failfast_campaign[failfast-campaign]:::draft
     p_2026_11_01_openai_plan_signin[openai-plan-signin]:::draft
+    p_2026_11_01_provenance_readiness[provenance-readiness]:::draft
     p_2026_11_01_specplane_migration[specplane-migration]:::draft
     classDef draft fill:#f9fafb,color:#374151,stroke:#d1d5db
     classDef ready fill:#22c55e,color:#fff

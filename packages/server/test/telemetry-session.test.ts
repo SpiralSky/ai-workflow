@@ -16,6 +16,14 @@ test("server shares telemetry counter and parent correlation across successive r
     args: ["--import", "tsx", fileURLToPath(new URL("../src/cli.ts", import.meta.url)), "--framework", "branch-only", "--root", root, "--events", eventsPath], stderr: "pipe" });
   try {
     await client.connect(transport);
+    const listed = await client.listTools();
+    const observed = listed._meta?.["aiw/runtimeProvenance"] as any;
+    assert.equal(observed.engine, "quickjs"); // Actual default runtime, not the runner's requested native flag.
+    assert.match(observed.entryHash, /^[a-f0-9]{64}$/);
+    assert.equal(observed.nodeVersion, process.version);
+    assert.equal(observed.runtimePlatform.moduleABI, process.versions.modules);
+    for (const name of ["executor", "rerank", "base"]) assert.match(observed.prompts[name], /^[a-f0-9]{64}$/);
+    assert.match(observed.catalogHash, /^[a-f0-9]{64}$/);
     for (const n of [1, 2]) {
       const result = await client.callTool({ name: "branch", arguments: { code: 'async (tools) => await tools.bash({ cmd: "printf fixture" })' },
         _meta: { "aiw/parent": `r:${n}`, "aiw/harnessId": `call-${n}` } });

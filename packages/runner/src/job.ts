@@ -17,11 +17,15 @@ import { runLoop } from "./loop.ts";
 import { createJobDir } from "./rundir.ts";
 import { readAttemptCost, AttemptFailure } from "./accounting.ts";
 import { frameworkLaunch } from "./framework-launch.ts";
+import { attestJob, verifyStaticProvenance, inspectContainerImage } from "./provenance.ts";
 import { onCancellation } from "./cancellation.ts";
 
 /** Options for running a single job attempt. */
 export interface JobOptions {
   job: Job;
+  provenance?: import("./types.ts").Provenance;
+  /** Persist observations before any model request; failure stops the attempt. */
+  onProvenance?: () => void | Promise<void>;
   /** Zero-based retry number for per-attempt telemetry. */
   attempt?: number;
   config: RunConfig;
@@ -122,6 +126,7 @@ export async function runJobAttempt(opts: JobOptions): Promise<JobResult> {
         "--engine", "isolated-vm",
         "--framework", launch.id,
         "--tier", config.tier ?? "S",
+        "--branch-context", config.branch.context,
         "--host", "local",
         "--root", "/work",
         "--events", "/out/events.jsonl",
@@ -133,6 +138,12 @@ export async function runJobAttempt(opts: JobOptions): Promise<JobResult> {
       session = await openMCPSession(serverDescriptor, config.provider === "chatgpt" && launch.needsExecutor
         ? { secondaryClient: client, secondaryModel: config.models.secondary, signal } : undefined);
 
+      signal?.throwIfAborted();
+      if (!opts.provenance || !opts.onProvenance) throw new Error("job lacks persisted provenance gate");
+      verifyStaticProvenance(repoRoot, config, opts.provenance, job.problem);
+      if (turnLimits[job.problem] !== undefined && turnLimits[job.problem] !== opts.provenance.problems[job.problem]?.turnLimit) throw new Error("turn-limit override differs from attested problem");
+      attestJob(opts.provenance, config, job.problem, launch.id, await inspectContainerImage(ctr.id), session);
+      await opts.onProvenance();
       signal?.throwIfAborted();
       const taskText = readTaskText(problemsDir, job.problem);
       const systemPrompt = buildSystemPrompt(session.instructions ?? "");
@@ -146,6 +157,7 @@ export async function runJobAttempt(opts: JobOptions): Promise<JobResult> {
 
       signal?.throwIfAborted();
       modelLoopStarted = true;
+      session.inferenceAdmission?.open();
       const loopResult = await runLoop({
         client,
         reporter,
@@ -160,6 +172,7 @@ export async function runJobAttempt(opts: JobOptions): Promise<JobResult> {
         onInfraError: opts.onFailure,
       });
 
+      session.inferenceAdmission?.close();
       modelLoopStarted = false;
       costReasons.push(...(loopResult.metrics.costIncompleteReasons ?? []));
 
@@ -176,8 +189,10 @@ export async function runJobAttempt(opts: JobOptions): Promise<JobResult> {
         await closeMCPSession(session);
         session = undefined;
         signal?.throwIfAborted();
-        const gradeResult = await gradeJob(ctr, problemDir, jobDir);
+        verifyStaticProvenance(repoRoot, config, opts.provenance!, job.problem);
+        const gradeResult = await gradeJob(ctr, problemDir, jobDir, opts.provenance!.images[job.problem]);
         signal?.throwIfAborted();
+        verifyStaticProvenance(repoRoot, config, opts.provenance!, job.problem);
         if (gradeResult.pass) {
           outcome = "pass";
           reason = null;

@@ -9,6 +9,7 @@ already rejected them).
 import json
 import os
 import queue
+import signal
 import sys
 import threading
 import time
@@ -42,6 +43,15 @@ def main():
     lock = threading.Lock()
     state = {"current": None, "cancelled": set()}
 
+    def shutdown(*_args):
+        """Stop accepting work and cancel exec children before the sidecar exits."""
+        execution.SHUTDOWN.set()
+        execution.CANCEL.set()
+        inbox.put(None)
+
+    signal.signal(signal.SIGTERM, shutdown)
+    signal.signal(signal.SIGINT, shutdown)
+
     def reader():
         for line in sys.stdin:
             line = line.strip()
@@ -59,12 +69,12 @@ def main():
                         execution.CANCEL.set()
                 continue
             inbox.put(req)
-        inbox.put(None)
+        shutdown()
 
     threading.Thread(target=reader, daemon=True).start()
     while True:
         req = inbox.get()
-        if req is None:
+        if req is None or execution.SHUTDOWN.is_set():
             return
         rid = req.get("id")
         with lock:
@@ -85,5 +95,7 @@ def main():
         with lock:
             state["current"] = None
             state["cancelled"].discard(rid)
+        if execution.SHUTDOWN.is_set():
+            return
         out.write(json.dumps(resp) + "\n")
         out.flush()

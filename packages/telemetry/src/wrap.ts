@@ -106,7 +106,13 @@ export function wrapLLM(
       const t0 = performance.now();
       const res = await client.complete(req);
       const latencyMs = Math.round(performance.now() - t0);
+      const response = res.response as { model?: unknown; system_fingerprint?: unknown } | null;
+      const observed = {
+        ...(typeof response?.model === "string" && response.model ? { providerModel: response.model } : {}),
+        ...(typeof response?.system_fingerprint === "string" && response.system_fingerprint ? { providerSystemFingerprint: response.system_fingerprint } : {}),
+      };
       const turnId = reporter.turn({
+        ...observed,
         model: req.model, role, usage: res.usage, costUsd: res.costUsd, cacheHit: res.cacheHit, latencyMs,
       });
       if (opts.transcript && opts.session) {

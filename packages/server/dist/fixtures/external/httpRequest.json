@@ -1,0 +1,45 @@
+{
+  "cases": [
+    {
+      "match": {
+        "url": "/health"
+      },
+      "result": {
+        "status": 200,
+        "headers": {
+          "content-type": "application/json"
+        },
+        "body": "{\"status\":\"ok\",\"version\":\"1.8.3\",\"uptime\":86412}"
+      }
+    },
+    {
+      "match": {
+        "method": "POST"
+      },
+      "result": {
+        "status": 201,
+        "headers": {
+          "content-type": "application/json"
+        },
+        "body": "{\"id\":\"res-5521\",\"created\":true}"
+      }
+    },
+    {
+      "match": {
+        "method": "DELETE"
+      },
+      "result": {
+        "status": 204,
+        "headers": {},
+        "body": ""
+      }
+    }
+  ],
+  "default": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": "{\"ok\":true,\"url\":\"{{url}}\"}"
+  }
+}

@@ -11237,8 +11237,146 @@ function cutList(items, maxCount, hint) {
 }
 
 // packages/tools/src/sidecar.ts
+import { spawn as spawn2 } from "node:child_process";
 import { fileURLToPath } from "node:url";
-var PYTHON_DIR = fileURLToPath(new URL("../python", import.meta.url));
+import { createInterface } from "node:readline";
+var PYTHON_DIR = fileURLToPath(new URL("./python", import.meta.url));
+var Sidecar = class {
+  proc;
+  pending = /* @__PURE__ */ new Map();
+  nextId = 1;
+  closing = /* @__PURE__ */ new Set();
+  opts;
+  constructor(opts) {
+    this.opts = opts;
+  }
+  /** Process id of the running sidecar (for tests); undefined when not started. */
+  get pid() {
+    return this.proc?.pid;
+  }
+  /** Starts the process if it is not running. */
+  start() {
+    if (this.proc) return this.proc;
+    const base = this.opts.env ?? process.env;
+    const venv = base.AIW_VENV || "/opt/aiw/venv";
+    const env = { ...toolEnv(base), PYTHONPATH: PYTHON_DIR, PYTHONUNBUFFERED: "1", PYTHONDONTWRITEBYTECODE: "1" };
+    const proc = spawn2(`${venv}/bin/python`, ["-m", "aiw_sidecar", this.opts.root], { cwd: this.opts.root, env, detached: process.platform !== "win32", stdio: ["pipe", "pipe", "pipe"] });
+    this.proc = proc;
+    let stderr = "";
+    proc.stderr.on("data", (d2) => stderr = (stderr + d2).slice(-500));
+    createInterface({ input: proc.stdout }).on("line", (line) => this.onLine(line));
+    proc.stdin.on("error", () => {
+    });
+    const die = (why) => {
+      if (this.proc === proc) this.proc = void 0;
+      this.failPending(proc, why);
+    };
+    proc.on("error", (e) => die(`sidecar failed to start: ${e.message}`));
+    proc.on("close", () => die(`sidecar crashed${stderr.trim() ? `: ${stderr.trim().split("\n").pop()}` : ""}`));
+    return proc;
+  }
+  /** Rejects the calls in flight on `proc`. */
+  failPending(proc, why) {
+    for (const [id, p] of [...this.pending]) {
+      if (p.proc !== proc) continue;
+      this.pending.delete(id);
+      p.reject(new Error(why));
+    }
+  }
+  onLine(line) {
+    let msg;
+    try {
+      msg = JSON.parse(line);
+    } catch {
+      return;
+    }
+    const p = this.pending.get(msg.id);
+    if (!p) return;
+    this.pending.delete(msg.id);
+    if (msg.error) p.reject(new Error(msg.error.message));
+    else p.resolve(msg.result);
+  }
+  /**
+   * Calls a sidecar method (named like the tool).
+   * @param method - method name
+   * @param params - JSON params
+   * @param signal - abort rejects this call with `aborted` and sends the sidecar a cancel: exec tools kill their child, other work finishes and its reply is dropped
+   * @throws `aborted`, `sidecar crashed`, or the sidecar's error message
+   */
+  call(method, params, signal) {
+    if (signal?.aborted) return Promise.reject(new Error("aborted"));
+    return new Promise((resolve2, reject) => {
+      const id = this.nextId++;
+      const onAbort = () => {
+        const p = this.pending.get(id);
+        if (!p || !this.pending.delete(id)) return;
+        p.proc.stdin.write(JSON.stringify({ method: "$cancel", params: { id } }) + "\n");
+        reject(new Error("aborted"));
+      };
+      signal?.addEventListener("abort", onAbort, { once: true });
+      const done = (f) => (v) => {
+        signal?.removeEventListener("abort", onAbort);
+        f(v);
+      };
+      try {
+        const proc = this.start();
+        this.pending.set(id, { proc, resolve: done(resolve2), reject: done(reject) });
+        proc.stdin.write(JSON.stringify({ id, method, params }) + "\n");
+      } catch (e) {
+        this.pending.delete(id);
+        done(reject)(e);
+      }
+    });
+  }
+  /** Gracefully cancel owned work, reap the sidecar, and bound shutdown; later calls may restart it. */
+  async close() {
+    const proc = this.proc;
+    if (proc) {
+      this.proc = void 0;
+      this.failPending(proc, "sidecar crashed");
+      const stopped = new Promise((resolve2, reject) => {
+        const signal = (kind2) => {
+          if (!proc.pid) return;
+          try {
+            if (process.platform === "win32") proc.kill(kind2);
+            else process.kill(-proc.pid, kind2);
+          } catch (error62) {
+            if (error62.code !== "ESRCH") throw error62;
+          }
+        };
+        const timer = setTimeout(() => {
+          try {
+            signal("SIGKILL");
+          } catch (error62) {
+            reject(error62);
+          }
+        }, 2e3);
+        proc.once("close", () => {
+          clearTimeout(timer);
+          resolve2();
+        });
+        proc.once("exit", () => {
+          try {
+            signal("SIGKILL");
+          } catch (error62) {
+            clearTimeout(timer);
+            reject(error62);
+          }
+        });
+        try {
+          signal("SIGTERM");
+        } catch (error62) {
+          clearTimeout(timer);
+          reject(error62);
+        }
+      });
+      this.closing.add(stopped);
+      void stopped.finally(() => this.closing.delete(stopped)).catch(() => {
+      });
+    }
+    await Promise.all(this.closing);
+  }
+};
 function needSidecar(sc) {
   if (!sc) throw new Error("no sidecar");
   return sc;
@@ -11310,7 +11448,7 @@ function checkTools(sc) {
 
 // packages/tools/src/l/external/fixtures.ts
 import { readFileSync as readFileSync2 } from "node:fs";
-var DIR = new URL("../../../fixtures/external/", import.meta.url);
+var DIR = new URL("./fixtures/external/", import.meta.url);
 var cache = /* @__PURE__ */ new Map();
 function load(tool) {
   let f = cache.get(tool);
@@ -12726,7 +12864,7 @@ import { readFile as readFile4 } from "node:fs/promises";
 import { join as join4 } from "node:path";
 
 // packages/tools/src/l/vcs/common.ts
-import { spawn as spawn2 } from "node:child_process";
+import { spawn as spawn3 } from "node:child_process";
 var MAX_DIFF_OUT = 6e3;
 function scope(root2, p) {
   const rel = relPath(root2, resolveInRoot(root2, p ?? "."));
@@ -12737,7 +12875,7 @@ function currentFiles(root2, has) {
 }
 function runGit(ctx, args) {
   return new Promise((resolve2, reject) => {
-    const child = spawn2("git", ["--no-pager", "-c", "core.quotepath=off", ...args], {
+    const child = spawn3("git", ["--no-pager", "-c", "core.quotepath=off", ...args], {
       cwd: ctx.root,
       env: toolEnv(ctx.env ?? process.env),
       stdio: ["ignore", "pipe", "pipe"],
@@ -12957,7 +13095,7 @@ function makeRestore(snapshot) {
 }
 
 // packages/tools/src/s/bash.ts
-import { spawn as spawn3 } from "node:child_process";
+import { spawn as spawn4 } from "node:child_process";
 var DEFAULT_TIMEOUT_MS = 6e4;
 var TIMEOUT_CODE = 124;
 var ABORT_CODE = 130;
@@ -13004,7 +13142,7 @@ var bash = {
     const timeoutMs = args.timeoutMs ?? DEFAULT_TIMEOUT_MS;
     return await new Promise((resolve2, reject) => {
       if (ctx.signal.aborted) return resolve2({ code: ABORT_CODE, out: "[aborted]" });
-      const child = spawn3("bash", ["-lc", args.cmd], {
+      const child = spawn4("bash", ["-lc", args.cmd], {
         cwd: ctx.root,
         env: toolEnv(ctx.env ?? process.env),
         detached: true,
@@ -13267,14 +13405,70 @@ function catalog(tier2, opts) {
   ];
 }
 
+// packages/tools/src/snapshot.ts
+import { spawn as spawn5 } from "node:child_process";
+import { mkdtempSync, rmSync } from "node:fs";
+import { mkdir as mkdir4, readFile as readFile9, stat as stat3 } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join as join6 } from "node:path";
+function runTar(args) {
+  return new Promise((resolve2, reject) => {
+    const child = spawn5("tar", args, { env: toolEnv(), stdio: ["ignore", "ignore", "pipe"] });
+    let err = "";
+    child.stderr.on("data", (d2) => err += d2);
+    child.on("error", reject);
+    child.on("close", (code) => code === 0 || code === 1 ? resolve2() : reject(new Error(`tar failed: ${err.trim()}`)));
+  });
+}
+async function takeSnapshot(root2) {
+  const dir = mkdtempSync(join6(tmpdir(), "aiw-snapshot-"));
+  const onExit = () => rmSync(dir, { recursive: true, force: true });
+  process.once("exit", onExit);
+  try {
+    const archive = join6(dir, "workspace.tar");
+    await runTar(["-C", root2, "--exclude=.git", "--exclude=node_modules", "-cf", archive, "."]);
+    const files = join6(dir, "files");
+    let extracted;
+    const extract = () => extracted ??= mkdir4(files).then(() => runTar(["-C", files, "-xf", archive]));
+    return {
+      archive,
+      async list() {
+        await extract();
+        return [...walk(files)].map((abs) => relPath(files, abs)).sort();
+      },
+      async read(path) {
+        await extract();
+        return await readFile9(resolveInRoot(files, path)).catch((e) => {
+          if (e.code === "ENOENT" || e.code === "EISDIR") return null;
+          throw e;
+        });
+      },
+      async mode(path) {
+        await extract();
+        return await stat3(resolveInRoot(files, path)).then((s) => s.mode & 511, () => null);
+      },
+      dispose() {
+        process.off("exit", onExit);
+        rmSync(dir, { recursive: true, force: true });
+      }
+    };
+  } catch (e) {
+    onExit();
+    process.off("exit", onExit);
+    throw e;
+  }
+}
+
 // packages/server/src/local.ts
 var LocalHost = class {
-  tier;
-  opts;
-  constructor(tier2, opts) {
+  constructor(tier2, opts, ownsResources = false) {
+    this.ownsResources = ownsResources;
     this.tier = tier2;
     this.opts = opts;
   }
+  ownsResources;
+  tier;
+  opts;
   /**
    * Returns the catalog tools for this tier as host tool declarations.
    * @returns host tool declarations in catalog order
@@ -13309,10 +13503,26 @@ var LocalHost = class {
     const args = typeof req.args === "object" && req.args !== null ? req.args : {};
     return def.fn(args, toolCtx);
   }
-  /** No-op: the local catalog has no external connections to close. */
+  /** Release resources created by createLocalHost; injected test/caller resources remain caller-owned. */
   async close() {
+    if (this.ownsResources) {
+      try {
+        await this.opts.sidecar?.close();
+      } finally {
+        this.opts.snapshot?.dispose();
+      }
+    }
   }
 };
+async function createLocalHost(tier2, root2) {
+  if (tier2 === "S") return new LocalHost(tier2, { root: root2 });
+  const snapshot = await takeSnapshot(root2);
+  return new LocalHost(tier2, { root: root2, snapshot, sidecar: new Sidecar({ root: root2 }) }, true);
+}
+
+// packages/server/src/server.ts
+import { createHash as createHash5 } from "node:crypto";
+import { readFileSync as readFileSync4 } from "node:fs";
 
 // node_modules/zod/v4/core/index.js
 var core_exports2 = {};
@@ -37934,6 +38144,9 @@ var EventSchema = external_exports.discriminatedUnion("kind", [
     ...common,
     kind: external_exports.literal("turn"),
     model: external_exports.string(),
+    // Requested identifier, possibly an alias.
+    providerModel: external_exports.string().optional(),
+    providerSystemFingerprint: external_exports.string().optional(),
     role: RoleSchema2,
     usage: UsageSchema,
     costUsd: external_exports.number().optional(),
@@ -38168,7 +38381,13 @@ function wrapLLM(client, reporter, role, opts = {}) {
       const t0 = performance.now();
       const res = await client.complete(req);
       const latencyMs = Math.round(performance.now() - t0);
+      const response = res.response;
+      const observed = {
+        ...typeof response?.model === "string" && response.model ? { providerModel: response.model } : {},
+        ...typeof response?.system_fingerprint === "string" && response.system_fingerprint ? { providerSystemFingerprint: response.system_fingerprint } : {}
+      };
       const turnId = reporter.turn({
+        ...observed,
         model: req.model,
         role,
         usage: res.usage,
@@ -39319,14 +39538,14 @@ function createSelector(opts) {
 }
 
 // packages/core/src/orchestrate/task.ts
-import { readFile as readFile10, stat as stat3 } from "node:fs/promises";
+import { readFile as readFile11, stat as stat4 } from "node:fs/promises";
 import { isAbsolute as isAbsolute2, relative as relative2, resolve as resolvePath } from "node:path";
 
 // packages/core/src/orchestrate/changes.ts
 import { execFile } from "node:child_process";
 import { createHash as createHash4 } from "node:crypto";
-import { lstat, readdir as readdir2, readFile as readFile9 } from "node:fs/promises";
-import { join as join6 } from "node:path";
+import { lstat, readdir as readdir2, readFile as readFile10 } from "node:fs/promises";
+import { join as join7 } from "node:path";
 import { promisify } from "node:util";
 var execFileAsync = promisify(execFile);
 var IGNORED_DIRS = [".git", "node_modules", "__pycache__", ".pytest_cache", ".venv"];
@@ -39354,14 +39573,14 @@ function inIgnoredDir(relPath2) {
 async function walk3(root2) {
   let matcher = (_p, _d) => false;
   try {
-    matcher = gitignoreMatcher(await readFile9(join6(root2, ".gitignore"), "utf8"));
+    matcher = gitignoreMatcher(await readFile10(join7(root2, ".gitignore"), "utf8"));
   } catch {
   }
   const out = [];
   const visit2 = async (rel) => {
     let entries;
     try {
-      entries = await readdir2(join6(root2, rel), { withFileTypes: true });
+      entries = await readdir2(join7(root2, rel), { withFileTypes: true });
     } catch {
       return;
     }
@@ -39399,7 +39618,7 @@ async function gitFiles(root2) {
   return { files: [...new Set(listed.split("\0").filter(Boolean))], dirty };
 }
 async function hashFile(path) {
-  return createHash4("sha1").update(await readFile9(path)).digest("hex");
+  return createHash4("sha1").update(await readFile10(path)).digest("hex");
 }
 async function snapshotWorkspace(root2, prev) {
   const viaGit = await gitFiles(root2);
@@ -39409,7 +39628,7 @@ async function snapshotWorkspace(root2, prev) {
   for (const p of files) {
     let st;
     try {
-      st = await lstat(join6(root2, p));
+      st = await lstat(join7(root2, p));
     } catch {
       continue;
     }
@@ -39426,7 +39645,7 @@ async function snapshotWorkspace(root2, prev) {
     await Promise.all(
       toHash.slice(i, i + 32).map(async (p) => {
         try {
-          snap.get(p).sha1 = await hashFile(join6(root2, p));
+          snap.get(p).sha1 = await hashFile(join7(root2, p));
         } catch {
           snap.delete(p);
         }
@@ -39539,7 +39758,7 @@ function fsCodeReader(root2) {
       const abs = resolvePath(root2, path);
       const rel = relative2(root2, abs);
       if (rel.startsWith("..") || isAbsolute2(rel)) throw new Error(`path outside the workspace: ${path}`);
-      return readFile10(abs, "utf8");
+      return readFile11(abs, "utf8");
     }
   };
 }
@@ -39548,7 +39767,7 @@ function fsPathExists(root2) {
     const abs = resolvePath(root2, path);
     const rel = relative2(root2, abs);
     if (rel.startsWith("..") || isAbsolute2(rel)) return false;
-    return stat3(abs).then(() => true, () => false);
+    return stat4(abs).then(() => true, () => false);
   };
 }
 var Task = class {
@@ -39973,7 +40192,13 @@ async function startServer(opts) {
       instructions: framework.instructions || void 0
     }
   );
+  const actualRuntime = opts.runtime ?? quickJSRuntime;
+  const engine = actualRuntime === isolatedVMRuntime ? "isolated-vm" : actualRuntime === quickJSRuntime ? "quickjs" : "custom-unattested";
+  const digest = (value) => createHash5("sha256").update(value).digest("hex");
+  const prompts = Object.fromEntries(["base", "branch-only", "branch-tool", "do-tool", "executor", "orchestrate", "rerank", "resolve-tool"].map((name) => [name, digest(loadPrompt(name))]));
+  const entryHash = process.argv[1] ? digest(readFileSync4(process.argv[1])) : null;
   mcpServer.setRequestHandler(ListToolsRequestSchema, async () => ({
+    _meta: { "aiw/runtimeProvenance": { version: 1, engine, entryHash, prompts, catalogHash: digest(canonicalJSON(hostDecls)), settings: { kind: opts.kind, variant: opts.variant ?? {}, branchContext: opts.branchContext ?? "trace", secondaryCap: opts.secondaryCap ?? 4, secondaryTemperature: orchestrateOpts?.temperature ?? null }, nodeVersion: process.version, runtimePlatform: { platform: process.platform, arch: process.arch, moduleABI: process.versions.modules } } },
     tools: framework.tools.map((t) => ({
       name: t.name,
       description: t.description,
@@ -40024,6 +40249,14 @@ async function startServer(opts) {
     };
   });
   const transport = new StdioServerTransport();
+  const closeOnEOF = () => {
+    void mcpServer.close();
+  };
+  process.stdin.once("end", closeOnEOF);
+  mcpServer.onclose = () => {
+    process.stdin.off("end", closeOnEOF);
+    void opts.host.close().catch((error62) => console.error("aiw-server: host close failed", error62));
+  };
   await mcpServer.connect(transport);
 }
 
@@ -40077,13 +40310,18 @@ var secondaryCapRaw = typeof values["secondary-cap"] === "string" ? parseInt(val
 var secondaryCap = secondaryCapRaw !== void 0 && !isNaN(secondaryCapRaw) ? secondaryCapRaw : void 0;
 var host;
 if (hostMode === "local") {
-  host = new LocalHost(tier, { root });
+  host = await createLocalHost(tier, root);
 } else if (hostMode === "fallback") {
   console.error("aiw-server: --host fallback is not yet implemented; using local");
-  host = new LocalHost(tier, { root });
+  host = await createLocalHost(tier, root);
 } else {
   console.error(`aiw-server: unknown --host "${hostMode}"; using local`);
-  host = new LocalHost(tier, { root });
+  host = await createLocalHost(tier, root);
+}
+for (const [signal, code] of [["SIGINT", 130], ["SIGTERM", 143]]) {
+  process.once(signal, () => {
+    void host.close().finally(() => process.exit(code));
+  });
 }
 void values.transcript;
 void values.blobs;
@@ -40103,7 +40341,8 @@ startServer({
   orchestrateBaseURL: executorBaseURL,
   orchestrateWorkspaceRoot: root,
   secondaryCap
-}).catch((err) => {
+}).catch(async (err) => {
+  await host.close();
   console.error("aiw-server: fatal error:", err);
   process.exit(1);
 });

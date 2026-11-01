@@ -95,8 +95,8 @@ export function applyDevelopmentAllowances(root, inventory, replacements, allowa
   assert.ok(Array.isArray(allowances.changes) && allowances.changes.length > 0);
   for (const change of allowances.changes) {
     assert.ok(!seen.has(change.path),`Duplicate development allowance: ${change.path}`);seen.add(change.path);
-    // This bounded sign-in PR must not carry benchmark fixture, permission or runtime-plugin changes.
-    assert.match(change.path,/^(packages\/(core|llm|runner|server)\/|package-lock\.json$)/);
+    // Permit only the two explicit image packaging files; benchmark fixtures/permissions remain excluded.
+    assert.match(change.path,/^(packages\/(core|llm|runner|server|telemetry)\/|packages\/tools\/(?:src\/sidecar\.ts|python\/aiw_sidecar\/(?:execution|rpc)\.py)$|package-lock\.json$|experiments\/docker\/aiw-base\/Dockerfile(?:\.dockerignore)?$)/);
     assert.ok(typeof change.rationale === 'string' && change.rationale.trim());
     assert.deepEqual(change.before,expected.get(change.path) ?? null,`Development before-state mismatch: ${change.path}`);
     assert.ok(change.after,'This bounded development scope does not authorize deleting baseline runtime files');
@@ -105,13 +105,17 @@ export function applyDevelopmentAllowances(root, inventory, replacements, allowa
     assert.notDeepEqual(change.before,change.after,`Unnecessary development allowance: ${change.path}`);
     expected.set(change.path,change.after);
   }
-  assert.deepEqual([...allowances.draft_plans].sort(),['plans/2026-11-01-failfast-campaign/PLAN.md','plans/2026-11-01-openai-plan-signin/PLAN.md']);
+  assert.deepEqual([...allowances.draft_plans].sort(),['plans/2026-11-01-failfast-campaign/PLAN.md','plans/2026-11-01-openai-plan-signin/PLAN.md','plans/2026-11-01-provenance-readiness/PLAN.md']);
   for (const file of allowances.draft_plans) {
-    assert.match(file,/^plans\/2026-11-01-(failfast-campaign|openai-plan-signin)\/PLAN\.md$/);
+    assert.match(file,/^plans\/2026-11-01-(failfast-campaign|openai-plan-signin|provenance-readiness)\/PLAN\.md$/);
     const text=fs.readFileSync(path.join(root,file),'utf8');
     const frontmatter = /^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/.exec(text);
     assert.ok(frontmatter,`Missing development plan frontmatter: ${file}`);
     assert.match(frontmatter[1],/^status: draft\r?$/m,`Development plan must remain draft: ${file}`);
+  }
+  if (allowances.hygiene_metadata) {
+    assert.deepEqual(allowances.hygiene_metadata.files.map(e=>e.path).sort(), ['.gitignore','docs/dot-progress/ignore-hygiene.md','scripts/check-gitignore.sh']);
+    verifyWorkingInventory(root, allowances.hygiene_metadata);
   }
   return {...inventory,files:[...expected.values()]};
 }

@@ -7,6 +7,7 @@ import { readFileSync, mkdirSync, writeFileSync, existsSync, readdirSync } from 
 import { join } from "node:path";
 import { isDeepStrictEqual } from "node:util";
 import type { RunJSON, JobJSON } from "./types.ts";
+import { assertCompleteProvenance } from "./provenance.ts";
 import { FORMAT_VERSION } from "./types.ts";
 
 /** Fields that must match across combined runs (data-formats §1.1). */
@@ -23,6 +24,7 @@ export interface CombinedReport {
   name: string;
   runs: string[];
   provenance: RunJSON["provenance"];
+  provenanceStatus: "runtime-observed" | "legacy-unattested";
   frameworks: Record<string, FrameworkStats>;
   paired: PairedComparison[];
   audits: Record<string, { label: "setup" | "framework"; note: string }>;
@@ -138,6 +140,13 @@ function validateProvenance(runs: RunJSON[]): RunJSON["provenance"] {
   const first = runs[0]!;
   const problems: RunJSON["provenance"]["problems"] = Object.create(null);
   for (const run of runs) {
+    if (run.provenance.integrity || first.provenance.integrity) {
+      assertCompleteProvenance(run.provenance, run.config);
+      if (!isDeepStrictEqual(run.provenance.integrity?.runtimePlatform, first.provenance.integrity?.runtimePlatform)) throw new Error(`Run ${run.id} has mismatched runtime platform`);
+      for (const field of ["sourceHash", "bundleHash", "entryHash", "nodeVersion", "wallClockEnforced"] as const) {
+        if (run.provenance.integrity?.[field] !== first.provenance.integrity?.[field]) throw new Error(`Run ${run.id} has mismatched provenance.integrity.${field}`);
+      }
+    }
     if ((run.config.provider ?? "openrouter") !== (first.config.provider ?? "openrouter") ||
         (run.config.usageMode ?? "monetary") !== (first.config.usageMode ?? "monetary") ||
         !isDeepStrictEqual(run.config.subscriptionLimits, first.config.subscriptionLimits) ||
@@ -273,6 +282,7 @@ function computePaired(frameworkJobs: Map<string, JobJSON[]>): PairedComparison[
 function generateMarkdown(report: CombinedReport): string {
   const lines: string[] = [`# Report: ${report.name}`, ""];
   lines.push(`Runs: ${report.runs.join(", ")}`, "");
+  lines.push(report.provenanceStatus === "runtime-observed" ? "Provenance: runtime observed (local metadata, not cryptographic attestation)." : "Provenance: legacy/unattested — not a verified baseline.", "");
   lines.push("## Frameworks", "");
   lines.push("| Framework | Jobs | Pass | Pass Rate | 95% CI | Mean Cost |");
   lines.push("|-----------|------|------|-----------|--------|-----------|");
@@ -340,6 +350,7 @@ export async function combineRuns(runDirs: string[], name: string, repoRoot: str
     name,
     runs: runJSONs.map((r) => r.id),
     provenance,
+    provenanceStatus: provenance.integrity ? "runtime-observed" : "legacy-unattested",
     frameworks,
     paired: computePaired(frameworkJobs),
     audits: {},

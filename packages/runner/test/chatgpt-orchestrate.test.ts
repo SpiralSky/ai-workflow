@@ -41,7 +41,7 @@ test("orchestrate selection and executor complete through host SIWC broker with 
   const bounded = boundSubscriptionClient(provider, { maxCalls: 3, maxTokens: 100, maxDurationMs: 10_000 });
   const client = new Client({ name: "host", version: "1" }, { capabilities: { experimental: { "aiw/llm/complete": {} } } });
   const server = new Server<Request>({ name: "task-container", version: "1" });
-  installHostLLMBroker(client, { secondaryClient: bounded.client, secondaryModel: "selected-secondary" });
+  const admission = installHostLLMBroker(client, { secondaryClient: bounded.client, secondaryModel: "selected-secondary" });
   const [ct, st] = InMemoryTransport.createLinkedPair();
   for (const transport of [ct, st]) {
     const send = transport.send.bind(transport);
@@ -49,6 +49,7 @@ test("orchestrate selection and executor complete through host SIWC broker with 
   }
   try {
     await Promise.all([client.connect(ct), server.connect(st)]);
+    admission.open(); // Mock workflow represents an attested session.
     const declarations: HostToolDecl[] = [{ name: "readFile", description: "Read the contents of a file", inputSchema: { type: "object", properties: { q: { type: "string" } }, required: ["q"] },
       meta: { whenToUse: "read the contents of a file", effect: "read" } }];
     const host: Host = { tools: async () => declarations, call: async (req) => { toolCalls.push(req); return "export const answer = 42;"; }, close: async () => {} };

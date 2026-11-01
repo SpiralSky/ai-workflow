@@ -2,7 +2,7 @@
   "version": 1,
   "kind": "post-migration-development",
   "base_commit": "75ab542c626bc7276d2ee9575956899c79b6d75d",
-  "verified_development_head": "c4a70d06de17b7f924818d9f56662b593e5341a7",
+  "verified_development_head": "eb95315ad698b0b94058408c64b5aaa62cac7f80",
   "authorization_kind": "development requests only; final approval and merge remain human-only",
   "user_requests": [
     "Add sign in to open ai support for ai-workflow workflow runs",
@@ -21,9 +21,34 @@
   },
   "draft_plans": [
     "plans/2026-11-01-failfast-campaign/PLAN.md",
-    "plans/2026-11-01-openai-plan-signin/PLAN.md"
+    "plans/2026-11-01-openai-plan-signin/PLAN.md",
+    "plans/2026-11-01-provenance-readiness/PLAN.md"
   ],
   "changes": [
+    {
+      "path": "experiments/docker/aiw-base/Dockerfile",
+      "before": {
+        "path": "experiments/docker/aiw-base/Dockerfile",
+        "mode": "100644",
+        "sha256": "ab6e46b49f07cca92b03d4309032d8d3daa24ec399d22255f7ac0168dd1c9480"
+      },
+      "after": {
+        "path": "experiments/docker/aiw-base/Dockerfile",
+        "mode": "100644",
+        "sha256": "b9bd0dcba68f85cbb565b151d5a10dc42bcbf1b9da756b25c5a201bff7d0e368"
+      },
+      "rationale": "Required packaged native/tierL runtime resources, cleanup and private minimal Docker build context."
+    },
+    {
+      "path": "experiments/docker/aiw-base/Dockerfile.dockerignore",
+      "before": null,
+      "after": {
+        "path": "experiments/docker/aiw-base/Dockerfile.dockerignore",
+        "mode": "100644",
+        "sha256": "795e71a21cdf49db13c5401810a3947fa827f77a9b7233b80e2b33568c32c1d2"
+      },
+      "rationale": "Required packaged native/tierL runtime resources, cleanup and private minimal Docker build context."
+    },
     {
       "path": "package-lock.json",
       "before": {
@@ -220,9 +245,9 @@
       "after": {
         "path": "packages/runner/src/cli.ts",
         "mode": "100755",
-        "sha256": "3720af342c949c831f19500aea119182bab9e7390d69280cf9d85ea66c05e8fb"
+        "sha256": "6df1afa7bf30c51a2b556cf9a8fc9a1377f97264a320c9a4291db8ae9271c189"
       },
-      "rationale": "OpenAI sign-in, bounded host-brokered workflow usage and security regressions; fail-fast cancellation where shared with runner/core/server."
+      "rationale": "OpenAI sign-in, bounded host-brokered workflow usage and security regressions; fail-fast cancellation where shared with runner/core/server. Follow-up: actual runtime provenance gate and immutable observed-image grading."
     },
     {
       "path": "packages/runner/src/combine.ts",
@@ -234,9 +259,9 @@
       "after": {
         "path": "packages/runner/src/combine.ts",
         "mode": "100644",
-        "sha256": "e821b11c599026aaf654e727ccdaea0985f2f66abeb4360b9df2c2def5855d69"
+        "sha256": "2ba56292cce2bf98d7aa204f1b542cbbce2921758db4aa6f35aae68f22b9a85f"
       },
-      "rationale": "OpenAI sign-in, bounded host-brokered workflow usage and security regressions; fail-fast cancellation where shared with runner/core/server."
+      "rationale": "OpenAI sign-in, bounded host-brokered workflow usage and security regressions; fail-fast cancellation where shared with runner/core/server. Follow-up: actual runtime provenance gate and immutable observed-image grading."
     },
     {
       "path": "packages/runner/src/config.ts",
@@ -248,9 +273,23 @@
       "after": {
         "path": "packages/runner/src/config.ts",
         "mode": "100644",
-        "sha256": "eee9726d9a73953b226904555fa8ff6bae9004ddcf9648e65db763f6ee70e3c0"
+        "sha256": "c5491d8279aac50afe58badcd271a167680564efa62f59164e580d07dd364ed6"
       },
-      "rationale": "OpenAI sign-in, bounded host-brokered workflow usage and security regressions; fail-fast cancellation where shared with runner/core/server."
+      "rationale": "OpenAI sign-in, bounded host-brokered workflow usage and security regressions; fail-fast cancellation where shared with runner/core/server. Follow-up: actual runtime provenance gate and immutable observed-image grading."
+    },
+    {
+      "path": "packages/runner/src/container.ts",
+      "before": {
+        "path": "packages/runner/src/container.ts",
+        "mode": "100644",
+        "sha256": "d450a998ed75fc0058c305b5462beede57f70cdcd9f9c6815a8482cc55cd0d8d"
+      },
+      "after": {
+        "path": "packages/runner/src/container.ts",
+        "mode": "100644",
+        "sha256": "541f8d6b140041d1c9f8eeda35e1c783eb0c887764786478fc45a6a34ec45631"
+      },
+      "rationale": "Selected verified immutable image identity and case-preserving Docker references; no CI wrapper/fixtures imported."
     },
     {
       "path": "packages/runner/src/framework-launch.ts",
@@ -267,6 +306,20 @@
       "rationale": "OpenAI sign-in, bounded host-brokered workflow usage and security regressions; fail-fast cancellation where shared with runner/core/server."
     },
     {
+      "path": "packages/runner/src/grade.ts",
+      "before": {
+        "path": "packages/runner/src/grade.ts",
+        "mode": "100644",
+        "sha256": "d5d757f49d5710b7e8b446c6b0293401e789ae47a5af8251e17121c78def4f72"
+      },
+      "after": {
+        "path": "packages/runner/src/grade.ts",
+        "mode": "100644",
+        "sha256": "2a6d3afe9bb98f2551cd6f300925fb71bf0d34e94d4334960a09aee89694b1b9"
+      },
+      "rationale": "Selected verified immutable image identity and case-preserving Docker references; no CI wrapper/fixtures imported. Follow-up: actual runtime provenance gate and immutable observed-image grading."
+    },
+    {
       "path": "packages/runner/src/job.ts",
       "before": {
         "path": "packages/runner/src/job.ts",
@@ -276,9 +329,9 @@
       "after": {
         "path": "packages/runner/src/job.ts",
         "mode": "100644",
-        "sha256": "c9a639eda852713f283e8d1fac577eda6edfe8ee7d6757033a052ca9e7eb87aa"
+        "sha256": "d86c775b336f0102ca2369f3d2b9817f22b8e6135bcc6b8b74c132304ef132ad"
       },
-      "rationale": "OpenAI sign-in, bounded host-brokered workflow usage and security regressions; fail-fast cancellation where shared with runner/core/server."
+      "rationale": "OpenAI sign-in, bounded host-brokered workflow usage and security regressions; fail-fast cancellation where shared with runner/core/server. Follow-up: actual runtime provenance gate and immutable observed-image grading. Security follow-up: reject reverse inference until provenance is persisted; revoke on cleanup."
     },
     {
       "path": "packages/runner/src/llm-broker.ts",
@@ -286,9 +339,9 @@
       "after": {
         "path": "packages/runner/src/llm-broker.ts",
         "mode": "100644",
-        "sha256": "bd4295ca15f2b0952e0bd74d029be749c9f613cef3ba8cf96e4021479a615926"
+        "sha256": "af7317faee876570a1e2e6bf9ee509946b7677a056d3c8bf5f474be917b94139"
       },
-      "rationale": "OpenAI sign-in, bounded host-brokered workflow usage and security regressions; fail-fast cancellation where shared with runner/core/server."
+      "rationale": "OpenAI sign-in, bounded host-brokered workflow usage and security regressions; fail-fast cancellation where shared with runner/core/server. Security follow-up: reject reverse inference until provenance is persisted; revoke on cleanup."
     },
     {
       "path": "packages/runner/src/loop.ts",
@@ -314,9 +367,9 @@
       "after": {
         "path": "packages/runner/src/mcp.ts",
         "mode": "100644",
-        "sha256": "231908061ad331e1fabdbafc21f8e8061a017f8c264d968fe51eb5255cfc4a45"
+        "sha256": "1ca753eada1b282c98cc1a5296305c7f5d68cbcf2fcb1485b7cb7fc8e3bcbf0b"
       },
-      "rationale": "OpenAI sign-in, bounded host-brokered workflow usage and security regressions; fail-fast cancellation where shared with runner/core/server."
+      "rationale": "OpenAI sign-in, bounded host-brokered workflow usage and security regressions; fail-fast cancellation where shared with runner/core/server. Follow-up: actual runtime provenance gate and immutable observed-image grading. Security follow-up: reject reverse inference until provenance is persisted; revoke on cleanup."
     },
     {
       "path": "packages/runner/src/plan.ts",
@@ -331,6 +384,16 @@
         "sha256": "7ba92ce95241e0126e500a5a6efcc48dabc50a272e78a21eba45b5ba00ca5e17"
       },
       "rationale": "OpenAI sign-in, bounded host-brokered workflow usage and security regressions; fail-fast cancellation where shared with runner/core/server."
+    },
+    {
+      "path": "packages/runner/src/provenance.ts",
+      "before": null,
+      "after": {
+        "path": "packages/runner/src/provenance.ts",
+        "mode": "100644",
+        "sha256": "e342bad249d8ba122e822e0f22581fe295e8feddd33668a4e53f9a30f3dfea7e"
+      },
+      "rationale": "Truthful pre-model provenance gate and provider observations, without fabricated model versions or task completion."
     },
     {
       "path": "packages/runner/src/rundir.ts",
@@ -356,9 +419,9 @@
       "after": {
         "path": "packages/runner/src/scheduler.ts",
         "mode": "100644",
-        "sha256": "a3370c54d73b215df84c99bfb9013dc50e60667f8118ef75729809fa06289411"
+        "sha256": "b23683d1a33a9166d70acfb6a7646222acb9b18a7552f3fdb183f9b78d15fb2f"
       },
-      "rationale": "OpenAI sign-in, bounded host-brokered workflow usage and security regressions; fail-fast cancellation where shared with runner/core/server."
+      "rationale": "OpenAI sign-in, bounded host-brokered workflow usage and security regressions; fail-fast cancellation where shared with runner/core/server. Follow-up: actual runtime provenance gate and immutable observed-image grading."
     },
     {
       "path": "packages/runner/src/subscription.ts",
@@ -380,9 +443,9 @@
       "after": {
         "path": "packages/runner/src/types.ts",
         "mode": "100644",
-        "sha256": "8ff68f860d02b580a3ed582aac9b1b5eb47cb85f83ae41ecb7af5def460ab7f3"
+        "sha256": "7a95dcf0f3533d017f766df204e214d18e41295dbd9085267f66a78ccedc50aa"
       },
-      "rationale": "OpenAI sign-in, bounded host-brokered workflow usage and security regressions; fail-fast cancellation where shared with runner/core/server."
+      "rationale": "OpenAI sign-in, bounded host-brokered workflow usage and security regressions; fail-fast cancellation where shared with runner/core/server. Follow-up: actual runtime provenance gate and immutable observed-image grading."
     },
     {
       "path": "packages/runner/test/accounting.test.ts",
@@ -394,9 +457,9 @@
       "after": {
         "path": "packages/runner/test/accounting.test.ts",
         "mode": "100644",
-        "sha256": "f3ab35242a455f85c3254be7082e73d02102d0ad9e699cecf991baf8635e9bfe"
+        "sha256": "e8227d3740fdad2c629387dc66131daba2477cc92504dadb26ba1e7237a1384c"
       },
-      "rationale": "OpenAI sign-in, bounded host-brokered workflow usage and security regressions; fail-fast cancellation where shared with runner/core/server."
+      "rationale": "OpenAI sign-in, bounded host-brokered workflow usage and security regressions; fail-fast cancellation where shared with runner/core/server. Follow-up: actual runtime provenance gate and immutable observed-image grading."
     },
     {
       "path": "packages/runner/test/cancellation.test.ts",
@@ -414,9 +477,9 @@
       "after": {
         "path": "packages/runner/test/chatgpt-orchestrate.test.ts",
         "mode": "100644",
-        "sha256": "8485d27d901f7dbefd2aace9439c1da18299d1cb73b9e2c3d0e8d5d56f2b2a71"
+        "sha256": "49887acc254c18a07fadd207fa2e8bd62acdd5d0266953650b8442bb4316afbb"
       },
-      "rationale": "OpenAI sign-in, bounded host-brokered workflow usage and security regressions; fail-fast cancellation where shared with runner/core/server."
+      "rationale": "OpenAI sign-in, bounded host-brokered workflow usage and security regressions; fail-fast cancellation where shared with runner/core/server. Security follow-up: reject reverse inference until provenance is persisted; revoke on cleanup."
     },
     {
       "path": "packages/runner/test/chatgpt-workflow.test.ts",
@@ -438,9 +501,9 @@
       "after": {
         "path": "packages/runner/test/combine.test.ts",
         "mode": "100644",
-        "sha256": "97829f8a7b6f5c57c184a7f51648510c08a4f3cd52d1a648b5a921844e300476"
+        "sha256": "97f750d9b6cebc4b0fdb71fb14b7d3fd1ce11d1d1efb4a522c8b1ea849e506d0"
       },
-      "rationale": "OpenAI sign-in, bounded host-brokered workflow usage and security regressions; fail-fast cancellation where shared with runner/core/server."
+      "rationale": "OpenAI sign-in, bounded host-brokered workflow usage and security regressions; fail-fast cancellation where shared with runner/core/server. Follow-up: actual runtime provenance gate and immutable observed-image grading."
     },
     {
       "path": "packages/runner/test/config.test.ts",
@@ -457,14 +520,44 @@
       "rationale": "OpenAI sign-in, bounded host-brokered workflow usage and security regressions; fail-fast cancellation where shared with runner/core/server."
     },
     {
+      "path": "packages/runner/test/container-image.test.ts",
+      "before": null,
+      "after": {
+        "path": "packages/runner/test/container-image.test.ts",
+        "mode": "100644",
+        "sha256": "4a083c6880e53d32dcef05cefcfb4e4688e2a8f412006edc8c698b7f9b01158b"
+      },
+      "rationale": "Selected verified immutable image identity and case-preserving Docker references; no CI wrapper/fixtures imported. Follow-up: actual runtime provenance gate and immutable observed-image grading."
+    },
+    {
       "path": "packages/runner/test/llm-broker.test.ts",
       "before": null,
       "after": {
         "path": "packages/runner/test/llm-broker.test.ts",
         "mode": "100644",
-        "sha256": "7da47aec634155f7edad567478a5a51ea9d7d339733ce0bd2966a4aceeab167f"
+        "sha256": "55cec0408f357bcfecdc1ca5b9e7026bb85149f9109e32ebd8724bf1e617f476"
       },
-      "rationale": "OpenAI sign-in, bounded host-brokered workflow usage and security regressions; fail-fast cancellation where shared with runner/core/server."
+      "rationale": "OpenAI sign-in, bounded host-brokered workflow usage and security regressions; fail-fast cancellation where shared with runner/core/server. Security follow-up: reject reverse inference until provenance is persisted; revoke on cleanup."
+    },
+    {
+      "path": "packages/runner/test/provenance-fixture.ts",
+      "before": null,
+      "after": {
+        "path": "packages/runner/test/provenance-fixture.ts",
+        "mode": "100644",
+        "sha256": "035dcb63b6b2e771e22887ee35f33b04d17915a573f0d08acff45de803c8bfab"
+      },
+      "rationale": "Truthful pre-model provenance gate and provider observations, without fabricated model versions or task completion."
+    },
+    {
+      "path": "packages/runner/test/provenance.test.ts",
+      "before": null,
+      "after": {
+        "path": "packages/runner/test/provenance.test.ts",
+        "mode": "100644",
+        "sha256": "d8a92604e17eff4155c8ef026e9e4c39d47c0797f9c95fb50107e9ec045048c2"
+      },
+      "rationale": "Truthful pre-model provenance gate and provider observations, without fabricated model versions or task completion."
     },
     {
       "path": "packages/runner/test/subscription.test.ts",
@@ -472,9 +565,9 @@
       "after": {
         "path": "packages/runner/test/subscription.test.ts",
         "mode": "100644",
-        "sha256": "3bafc7b948b86a5263b5082563acc0c53803842d9533a2cba0d62d65fbbb2307"
+        "sha256": "06242a03c8a21770eb7c2054dda2c60bb09b7f8a9176977d1f65b9ff5a819423"
       },
-      "rationale": "OpenAI sign-in, bounded host-brokered workflow usage and security regressions; fail-fast cancellation where shared with runner/core/server."
+      "rationale": "OpenAI sign-in, bounded host-brokered workflow usage and security regressions; fail-fast cancellation where shared with runner/core/server. Follow-up: actual runtime provenance gate and immutable observed-image grading."
     },
     {
       "path": "packages/server/build.mjs",
@@ -486,9 +579,9 @@
       "after": {
         "path": "packages/server/build.mjs",
         "mode": "100644",
-        "sha256": "73ad7b81bdb1ef0622dc851570ed83b60721122543f1ce4cb07267ab90253b2d"
+        "sha256": "ebdd428c282cd000128ee6d666a18c388372d890706c6be9b089608d7a4c82c5"
       },
-      "rationale": "Rebuild/verify coherent tracked runtime and honor explicit engine selection without silent fallback."
+      "rationale": "Rebuild/verify coherent tracked runtime and honor explicit engine selection without silent fallback. Follow-up: verified packaged native/tierL resources and lifecycle integration."
     },
     {
       "path": "packages/server/dist/aiw-server.mjs",
@@ -500,9 +593,269 @@
       "after": {
         "path": "packages/server/dist/aiw-server.mjs",
         "mode": "100755",
-        "sha256": "be575a73bc61064016fa48ec5b382e317111fec0b5d3a4b5be84ad0838637de1"
+        "sha256": "e0d5c75ce0f63972b261c9ac336382a6bb3a46db04f08b482aed3a7475a1557b"
       },
-      "rationale": "Rebuild/verify coherent tracked runtime and honor explicit engine selection without silent fallback."
+      "rationale": "Rebuild/verify coherent tracked runtime and honor explicit engine selection without silent fallback. Follow-up: verified packaged native/tierL resources and lifecycle integration. Follow-up: awaited graceful sidecar descendant shutdown. Follow-up: actual runtime provenance gate and immutable observed-image grading."
+    },
+    {
+      "path": "packages/server/dist/fixtures/external/ciStatus.json",
+      "before": null,
+      "after": {
+        "path": "packages/server/dist/fixtures/external/ciStatus.json",
+        "mode": "100644",
+        "sha256": "2337c4e04eddf8696659d5f5e3dd61c36f6f1e4ece25ad387ade661e9f0abfeb"
+      },
+      "rationale": "Required packaged native/tierL runtime resources, cleanup and private minimal Docker build context."
+    },
+    {
+      "path": "packages/server/dist/fixtures/external/containerLogs.json",
+      "before": null,
+      "after": {
+        "path": "packages/server/dist/fixtures/external/containerLogs.json",
+        "mode": "100644",
+        "sha256": "5e249264f6444a07ac05e4c014f049d81156cda784a264558b9c2ffa68c2fd23"
+      },
+      "rationale": "Required packaged native/tierL runtime resources, cleanup and private minimal Docker build context."
+    },
+    {
+      "path": "packages/server/dist/fixtures/external/docsSearch.json",
+      "before": null,
+      "after": {
+        "path": "packages/server/dist/fixtures/external/docsSearch.json",
+        "mode": "100644",
+        "sha256": "03558c575e88da530b3adda04d9d040850bdc06d0a56ad9bf66026b2a33b17fb"
+      },
+      "rationale": "Required packaged native/tierL runtime resources, cleanup and private minimal Docker build context."
+    },
+    {
+      "path": "packages/server/dist/fixtures/external/featureFlags.json",
+      "before": null,
+      "after": {
+        "path": "packages/server/dist/fixtures/external/featureFlags.json",
+        "mode": "100644",
+        "sha256": "d70dce94bf4faaebfa4675ea3685e59800c8bc2b9d9038d7979088547f351da9"
+      },
+      "rationale": "Required packaged native/tierL runtime resources, cleanup and private minimal Docker build context."
+    },
+    {
+      "path": "packages/server/dist/fixtures/external/fetchUrl.json",
+      "before": null,
+      "after": {
+        "path": "packages/server/dist/fixtures/external/fetchUrl.json",
+        "mode": "100644",
+        "sha256": "49680358ebb7316024c7225fd38587b8cd9def4f217c2c1cd26b9e8bc4d372a3"
+      },
+      "rationale": "Required packaged native/tierL runtime resources, cleanup and private minimal Docker build context."
+    },
+    {
+      "path": "packages/server/dist/fixtures/external/httpRequest.json",
+      "before": null,
+      "after": {
+        "path": "packages/server/dist/fixtures/external/httpRequest.json",
+        "mode": "100644",
+        "sha256": "d9cd3674fe3e0bc81deebf22bb49b97ad0d8cdec2fbe620358a50313200b30b2"
+      },
+      "rationale": "Required packaged native/tierL runtime resources, cleanup and private minimal Docker build context."
+    },
+    {
+      "path": "packages/server/dist/fixtures/external/installPackage.json",
+      "before": null,
+      "after": {
+        "path": "packages/server/dist/fixtures/external/installPackage.json",
+        "mode": "100644",
+        "sha256": "8189a69514b807efb763b3e7d3c9b928544ebbdb264c6f02e3d679e201e1a0e0"
+      },
+      "rationale": "Required packaged native/tierL runtime resources, cleanup and private minimal Docker build context."
+    },
+    {
+      "path": "packages/server/dist/fixtures/external/issues.json",
+      "before": null,
+      "after": {
+        "path": "packages/server/dist/fixtures/external/issues.json",
+        "mode": "100644",
+        "sha256": "839aad37d08ac2d99298abd6554e1f367c25919f1c041362b288bec60c06461f"
+      },
+      "rationale": "Required packaged native/tierL runtime resources, cleanup and private minimal Docker build context."
+    },
+    {
+      "path": "packages/server/dist/fixtures/external/metrics.json",
+      "before": null,
+      "after": {
+        "path": "packages/server/dist/fixtures/external/metrics.json",
+        "mode": "100644",
+        "sha256": "654cf4f162f2d29e440128d8233a4a6d8ae2328d9714aa9fdcf20aea1ba309d8"
+      },
+      "rationale": "Required packaged native/tierL runtime resources, cleanup and private minimal Docker build context."
+    },
+    {
+      "path": "packages/server/dist/fixtures/external/notify.json",
+      "before": null,
+      "after": {
+        "path": "packages/server/dist/fixtures/external/notify.json",
+        "mode": "100644",
+        "sha256": "ba6df0f6eba8dedc3d71651183211e23478514eef872959b34572a4275977b72"
+      },
+      "rationale": "Required packaged native/tierL runtime resources, cleanup and private minimal Docker build context."
+    },
+    {
+      "path": "packages/server/dist/fixtures/external/packageInfo.json",
+      "before": null,
+      "after": {
+        "path": "packages/server/dist/fixtures/external/packageInfo.json",
+        "mode": "100644",
+        "sha256": "033e4c66da5a8f910248ce9ef9f4b056bb32357fed59f5cf5ea698a302e093fa"
+      },
+      "rationale": "Required packaged native/tierL runtime resources, cleanup and private minimal Docker build context."
+    },
+    {
+      "path": "packages/server/dist/fixtures/external/pullRequests.json",
+      "before": null,
+      "after": {
+        "path": "packages/server/dist/fixtures/external/pullRequests.json",
+        "mode": "100644",
+        "sha256": "c4ec8842548f3342e32255a2a9f845582d36b5db3b3ec45abbcfde3be476a8bc"
+      },
+      "rationale": "Required packaged native/tierL runtime resources, cleanup and private minimal Docker build context."
+    },
+    {
+      "path": "packages/server/dist/fixtures/external/sqlQuery.json",
+      "before": null,
+      "after": {
+        "path": "packages/server/dist/fixtures/external/sqlQuery.json",
+        "mode": "100644",
+        "sha256": "2b261917c29cfc8f032e567d734c9898e3cfa9db35a2076e93433f9e42e4861c"
+      },
+      "rationale": "Required packaged native/tierL runtime resources, cleanup and private minimal Docker build context."
+    },
+    {
+      "path": "packages/server/dist/fixtures/external/webSearch.json",
+      "before": null,
+      "after": {
+        "path": "packages/server/dist/fixtures/external/webSearch.json",
+        "mode": "100644",
+        "sha256": "7dc7e1489ba93c79e24dc18154f6e113de59f7be9104faad35c90bd59403baa2"
+      },
+      "rationale": "Required packaged native/tierL runtime resources, cleanup and private minimal Docker build context."
+    },
+    {
+      "path": "packages/server/dist/python/aiw_sidecar/__init__.py",
+      "before": null,
+      "after": {
+        "path": "packages/server/dist/python/aiw_sidecar/__init__.py",
+        "mode": "100644",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "rationale": "Required packaged native/tierL runtime resources, cleanup and private minimal Docker build context."
+    },
+    {
+      "path": "packages/server/dist/python/aiw_sidecar/__main__.py",
+      "before": null,
+      "after": {
+        "path": "packages/server/dist/python/aiw_sidecar/__main__.py",
+        "mode": "100644",
+        "sha256": "93d8aae0b5484be0a723504fe9853c450557d8b5dccb73fa8bbb139f09434ef3"
+      },
+      "rationale": "Required packaged native/tierL runtime resources, cleanup and private minimal Docker build context."
+    },
+    {
+      "path": "packages/server/dist/python/aiw_sidecar/check.py",
+      "before": null,
+      "after": {
+        "path": "packages/server/dist/python/aiw_sidecar/check.py",
+        "mode": "100644",
+        "sha256": "f1aec5210f5d13a6da8ae0e306b94f342c65a832fd61dfd2a4f2c315c598a6cb"
+      },
+      "rationale": "Required packaged native/tierL runtime resources, cleanup and private minimal Docker build context."
+    },
+    {
+      "path": "packages/server/dist/python/aiw_sidecar/child.py",
+      "before": null,
+      "after": {
+        "path": "packages/server/dist/python/aiw_sidecar/child.py",
+        "mode": "100644",
+        "sha256": "88793c3fbd6794ec0eb8a4ad2dd5ef639c32656b039628fe7910e4242d5c7be8"
+      },
+      "rationale": "Required packaged native/tierL runtime resources, cleanup and private minimal Docker build context."
+    },
+    {
+      "path": "packages/server/dist/python/aiw_sidecar/common.py",
+      "before": null,
+      "after": {
+        "path": "packages/server/dist/python/aiw_sidecar/common.py",
+        "mode": "100644",
+        "sha256": "4cfb56e105ec18064fe2fb13d3b58cc3c01b58645c52c6479db6dea22cd04c15"
+      },
+      "rationale": "Required packaged native/tierL runtime resources, cleanup and private minimal Docker build context."
+    },
+    {
+      "path": "packages/server/dist/python/aiw_sidecar/execution.py",
+      "before": null,
+      "after": {
+        "path": "packages/server/dist/python/aiw_sidecar/execution.py",
+        "mode": "100644",
+        "sha256": "4624a5592bcaa38641561d3a53ef95a5cded714b6a0bf195221683304f8bb41b"
+      },
+      "rationale": "Required packaged native/tierL runtime resources, cleanup and private minimal Docker build context. Follow-up: awaited graceful sidecar descendant shutdown."
+    },
+    {
+      "path": "packages/server/dist/python/aiw_sidecar/graph.py",
+      "before": null,
+      "after": {
+        "path": "packages/server/dist/python/aiw_sidecar/graph.py",
+        "mode": "100644",
+        "sha256": "eb67753a6b89fa09ca39ffcd75ae5da78057c67ac1c822604085cc08fba0b364"
+      },
+      "rationale": "Required packaged native/tierL runtime resources, cleanup and private minimal Docker build context."
+    },
+    {
+      "path": "packages/server/dist/python/aiw_sidecar/nav.py",
+      "before": null,
+      "after": {
+        "path": "packages/server/dist/python/aiw_sidecar/nav.py",
+        "mode": "100644",
+        "sha256": "43430cb12720add8ca3b6b3c2f3206b055ec5cacc4b0af0de6f06d0c37d96ab2"
+      },
+      "rationale": "Required packaged native/tierL runtime resources, cleanup and private minimal Docker build context."
+    },
+    {
+      "path": "packages/server/dist/python/aiw_sidecar/refactor.py",
+      "before": null,
+      "after": {
+        "path": "packages/server/dist/python/aiw_sidecar/refactor.py",
+        "mode": "100644",
+        "sha256": "0a9a35b3379cec330982491e4f74e408cb6cfc70edfa61b4d6d95e08a9f200cc"
+      },
+      "rationale": "Required packaged native/tierL runtime resources, cleanup and private minimal Docker build context."
+    },
+    {
+      "path": "packages/server/dist/python/aiw_sidecar/rpc.py",
+      "before": null,
+      "after": {
+        "path": "packages/server/dist/python/aiw_sidecar/rpc.py",
+        "mode": "100644",
+        "sha256": "6776d1ef595f68567f4e78a31cf65520d5f3a6d31d8569179cc055811360ccb3"
+      },
+      "rationale": "Required packaged native/tierL runtime resources, cleanup and private minimal Docker build context. Follow-up: awaited graceful sidecar descendant shutdown."
+    },
+    {
+      "path": "packages/server/dist/python/aiw_sidecar/testing.py",
+      "before": null,
+      "after": {
+        "path": "packages/server/dist/python/aiw_sidecar/testing.py",
+        "mode": "100644",
+        "sha256": "a5d25f6c2c1fc2464faca6322e935323772350a01a0a2710d8c340ae936e2723"
+      },
+      "rationale": "Required packaged native/tierL runtime resources, cleanup and private minimal Docker build context."
+    },
+    {
+      "path": "packages/server/dist/python/requirements.txt",
+      "before": null,
+      "after": {
+        "path": "packages/server/dist/python/requirements.txt",
+        "mode": "100644",
+        "sha256": "28155faca9cf3cee12f6c9e65239b842a85ee163ac10d9825f7df24ed9e2b061"
+      },
+      "rationale": "Required packaged native/tierL runtime resources, cleanup and private minimal Docker build context."
     },
     {
       "path": "packages/server/package.json",
@@ -528,9 +881,9 @@
       "after": {
         "path": "packages/server/src/cli.ts",
         "mode": "100755",
-        "sha256": "51de5b7e39b9bea86a4381ed2f121c5dd27b8e03678ddbe2c03c92f249518339"
+        "sha256": "a01d836b4eea4a7ba50ab7c0761383dd9a01117835aa3576bab1bc92b0beafbd"
       },
-      "rationale": "OpenAI sign-in, bounded host-brokered workflow usage and security regressions; fail-fast cancellation where shared with runner/core/server."
+      "rationale": "OpenAI sign-in, bounded host-brokered workflow usage and security regressions; fail-fast cancellation where shared with runner/core/server. Follow-up: verified packaged native/tierL resources and lifecycle integration."
     },
     {
       "path": "packages/server/src/host-client.ts",
@@ -543,6 +896,20 @@
       "rationale": "OpenAI sign-in, bounded host-brokered workflow usage and security regressions; fail-fast cancellation where shared with runner/core/server."
     },
     {
+      "path": "packages/server/src/local.ts",
+      "before": {
+        "path": "packages/server/src/local.ts",
+        "mode": "100644",
+        "sha256": "fb26266a6aacbcee0787f89ca81c1cdeff466eaeae0868318530235824996b18"
+      },
+      "after": {
+        "path": "packages/server/src/local.ts",
+        "mode": "100644",
+        "sha256": "6ff9d835056d741833b803e36949448095a9de4965c7e556b0ac2e2df511591c"
+      },
+      "rationale": "Required packaged native/tierL runtime resources, cleanup and private minimal Docker build context. Follow-up: awaited graceful sidecar descendant shutdown."
+    },
+    {
       "path": "packages/server/src/server.ts",
       "before": {
         "path": "packages/server/src/server.ts",
@@ -552,9 +919,9 @@
       "after": {
         "path": "packages/server/src/server.ts",
         "mode": "100644",
-        "sha256": "6831569c9b068187cd6b6106da353700d8b467d6204e5a1bb498396c32c4b50e"
+        "sha256": "8016c194b5359742da87b3ad9a59fb886b0b83f5cea3e37e4f44f53d9c49639f"
       },
-      "rationale": "OpenAI sign-in, bounded host-brokered workflow usage and security regressions; fail-fast cancellation where shared with runner/core/server."
+      "rationale": "OpenAI sign-in, bounded host-brokered workflow usage and security regressions; fail-fast cancellation where shared with runner/core/server. Follow-up: verified packaged native/tierL resources and lifecycle integration. Follow-up: actual runtime provenance gate and immutable observed-image grading."
     },
     {
       "path": "packages/server/test/bundle.test.ts",
@@ -562,9 +929,29 @@
       "after": {
         "path": "packages/server/test/bundle.test.ts",
         "mode": "100644",
-        "sha256": "4590c1cc7d2c6ea14e28cd86ab7e53a4430537f4a074d70207ef5c65a0657a40"
+        "sha256": "b381b494b8fd0beb79be9c1354158cb47ec48226ed3873d78672810da441b67a"
       },
-      "rationale": "Rebuild/verify coherent tracked runtime and honor explicit engine selection without silent fallback."
+      "rationale": "Rebuild/verify coherent tracked runtime and honor explicit engine selection without silent fallback. Follow-up: verified packaged native/tierL resources and lifecycle integration."
+    },
+    {
+      "path": "packages/server/test/packaged-readiness.test.ts",
+      "before": null,
+      "after": {
+        "path": "packages/server/test/packaged-readiness.test.ts",
+        "mode": "100644",
+        "sha256": "04e39e04da8a9574e5d703c5894b7e3c7144c50359b9b80cc5f018f078ce1282"
+      },
+      "rationale": "Required packaged native/tierL runtime resources, cleanup and private minimal Docker build context."
+    },
+    {
+      "path": "packages/server/test/sidecar-lifecycle.test.ts",
+      "before": null,
+      "after": {
+        "path": "packages/server/test/sidecar-lifecycle.test.ts",
+        "mode": "100644",
+        "sha256": "dc804f029f323146e303e1ce11c9a6787030a3ad0a497f0b18be99e8a274ac63"
+      },
+      "rationale": "Fix independently reviewed graceful CLI/sidecar child lifecycle gap; no auth behavior change."
     },
     {
       "path": "packages/server/test/telemetry-session.test.ts",
@@ -576,9 +963,981 @@
       "after": {
         "path": "packages/server/test/telemetry-session.test.ts",
         "mode": "100644",
-        "sha256": "72512a3f54b10cb120545028251eec02b1fda030367527dcf8d5087418e3fca9"
+        "sha256": "62d409caa6164472bb00ffb5229a194ff8cc2dc360846e85ee5452d6fb801dce"
       },
-      "rationale": "OpenAI sign-in, bounded host-brokered workflow usage and security regressions; fail-fast cancellation where shared with runner/core/server."
+      "rationale": "OpenAI sign-in, bounded host-brokered workflow usage and security regressions; fail-fast cancellation where shared with runner/core/server. Follow-up: actual runtime provenance gate and immutable observed-image grading."
+    },
+    {
+      "path": "packages/telemetry/src/reporter.ts",
+      "before": {
+        "path": "packages/telemetry/src/reporter.ts",
+        "mode": "100644",
+        "sha256": "dd10ec2101ad92b9b682ed58df739ced87560f53b42d4440ff6ad7f75118f8de"
+      },
+      "after": {
+        "path": "packages/telemetry/src/reporter.ts",
+        "mode": "100644",
+        "sha256": "4d73ee6bcd72aef1c7c64bc96d51a9158d6192a188f66c7bac961db1978b9320"
+      },
+      "rationale": "Truthful pre-model provenance gate and provider observations, without fabricated model versions or task completion."
+    },
+    {
+      "path": "packages/telemetry/src/schema.ts",
+      "before": {
+        "path": "packages/telemetry/src/schema.ts",
+        "mode": "100644",
+        "sha256": "38cfdfcedf60aa65dee9d386072aa496922c511228af62d90fac3c93e7423971"
+      },
+      "after": {
+        "path": "packages/telemetry/src/schema.ts",
+        "mode": "100644",
+        "sha256": "ce740c00ac67cce108fc5c2ca4b92df57df9c52ecba9f997568d9ee9e3f70342"
+      },
+      "rationale": "Truthful pre-model provenance gate and provider observations, without fabricated model versions or task completion."
+    },
+    {
+      "path": "packages/telemetry/src/wrap.ts",
+      "before": {
+        "path": "packages/telemetry/src/wrap.ts",
+        "mode": "100644",
+        "sha256": "95d922a317c90485a11caf0a0f2cba201fc9935f33e49c96fcf3b29f553a69cc"
+      },
+      "after": {
+        "path": "packages/telemetry/src/wrap.ts",
+        "mode": "100644",
+        "sha256": "a5d9f74b88ce633e4f66032b6e67fbcf84b62ebcf704f491b5ba2d32952bf511"
+      },
+      "rationale": "Truthful pre-model provenance gate and provider observations, without fabricated model versions or task completion."
+    },
+    {
+      "path": "packages/telemetry/test/telemetry.test.ts",
+      "before": {
+        "path": "packages/telemetry/test/telemetry.test.ts",
+        "mode": "100644",
+        "sha256": "13359e834ad308c90a33aa1b9b065c40769aee5ff147b33e15d4d5501b4c80bf"
+      },
+      "after": {
+        "path": "packages/telemetry/test/telemetry.test.ts",
+        "mode": "100644",
+        "sha256": "769e353958ad6d2d2e0c3c22433aba35e3e5457088924cf1030c9fe08fe806fb"
+      },
+      "rationale": "Truthful pre-model provenance gate and provider observations, without fabricated model versions or task completion."
+    },
+    {
+      "path": "packages/tools/python/aiw_sidecar/execution.py",
+      "before": {
+        "path": "packages/tools/python/aiw_sidecar/execution.py",
+        "mode": "100644",
+        "sha256": "c7ad251c0c5e6c8f77ee689a54eb98bab5674819d07afcadb1efa07e149be062"
+      },
+      "after": {
+        "path": "packages/tools/python/aiw_sidecar/execution.py",
+        "mode": "100644",
+        "sha256": "4624a5592bcaa38641561d3a53ef95a5cded714b6a0bf195221683304f8bb41b"
+      },
+      "rationale": "Fix independently reviewed graceful CLI/sidecar child lifecycle gap; no auth behavior change."
+    },
+    {
+      "path": "packages/tools/python/aiw_sidecar/rpc.py",
+      "before": {
+        "path": "packages/tools/python/aiw_sidecar/rpc.py",
+        "mode": "100644",
+        "sha256": "364d544acd931bacd6c130997742d47ddd378a5966332c737d62f85d7db1e04e"
+      },
+      "after": {
+        "path": "packages/tools/python/aiw_sidecar/rpc.py",
+        "mode": "100644",
+        "sha256": "6776d1ef595f68567f4e78a31cf65520d5f3a6d31d8569179cc055811360ccb3"
+      },
+      "rationale": "Fix independently reviewed graceful CLI/sidecar child lifecycle gap; no auth behavior change."
+    },
+    {
+      "path": "packages/tools/src/sidecar.ts",
+      "before": {
+        "path": "packages/tools/src/sidecar.ts",
+        "mode": "100644",
+        "sha256": "8a907f650835002b7fe43f1a09b4985afca1f924e56d0eb48152ead452ea027b"
+      },
+      "after": {
+        "path": "packages/tools/src/sidecar.ts",
+        "mode": "100644",
+        "sha256": "dcca9457442667f3a607010152bdc4d61e71920681acc482a7b9822668b7b9af"
+      },
+      "rationale": "Fix independently reviewed graceful CLI/sidecar child lifecycle gap; no auth behavior change."
     }
-  ]
+  ],
+  "packaging_followup": {
+    "base_commit": "7caf3294f6c861edd13f49f65d000dd511eee409",
+    "source_commits": [
+      "676fa45413d1ca0194d06163688e6fbe688af18c",
+      "9c7ade28abe19fd26c5d0cb33bcdfe791ba18b2a",
+      "460b76127f073e39cafaed16128d49e53e4d45fe"
+    ],
+    "selected_source": {
+      "commit": "e301baedd1ece152cf22dd56f656e5761fc2c745",
+      "paths": [
+        "packages/runner/src/container.ts",
+        "packages/runner/src/grade.ts",
+        "packages/runner/test/container-image.test.ts"
+      ]
+    },
+    "changes": [
+      {
+        "path": "experiments/docker/aiw-base/Dockerfile",
+        "before": {
+          "path": "experiments/docker/aiw-base/Dockerfile",
+          "mode": "100644",
+          "sha256": "ab6e46b49f07cca92b03d4309032d8d3daa24ec399d22255f7ac0168dd1c9480"
+        },
+        "after": {
+          "path": "experiments/docker/aiw-base/Dockerfile",
+          "mode": "100644",
+          "sha256": "b9bd0dcba68f85cbb565b151d5a10dc42bcbf1b9da756b25c5a201bff7d0e368"
+        }
+      },
+      {
+        "path": "experiments/docker/aiw-base/Dockerfile.dockerignore",
+        "before": null,
+        "after": {
+          "path": "experiments/docker/aiw-base/Dockerfile.dockerignore",
+          "mode": "100644",
+          "sha256": "795e71a21cdf49db13c5401810a3947fa827f77a9b7233b80e2b33568c32c1d2"
+        }
+      },
+      {
+        "path": "packages/runner/src/container.ts",
+        "before": {
+          "path": "packages/runner/src/container.ts",
+          "mode": "100644",
+          "sha256": "d450a998ed75fc0058c305b5462beede57f70cdcd9f9c6815a8482cc55cd0d8d"
+        },
+        "after": {
+          "path": "packages/runner/src/container.ts",
+          "mode": "100644",
+          "sha256": "541f8d6b140041d1c9f8eeda35e1c783eb0c887764786478fc45a6a34ec45631"
+        }
+      },
+      {
+        "path": "packages/runner/src/grade.ts",
+        "before": {
+          "path": "packages/runner/src/grade.ts",
+          "mode": "100644",
+          "sha256": "d5d757f49d5710b7e8b446c6b0293401e789ae47a5af8251e17121c78def4f72"
+        },
+        "after": {
+          "path": "packages/runner/src/grade.ts",
+          "mode": "100644",
+          "sha256": "4c9a16004a6d5eb67336cb19003a213946af4420535b8f651acdd9debeac54f4"
+        }
+      },
+      {
+        "path": "packages/runner/test/container-image.test.ts",
+        "before": null,
+        "after": {
+          "path": "packages/runner/test/container-image.test.ts",
+          "mode": "100644",
+          "sha256": "c490fe53c3655faa12d43b473a5d48b4839524d4f6be3dec70ee965ea2ed195d"
+        }
+      },
+      {
+        "path": "packages/server/build.mjs",
+        "before": {
+          "path": "packages/server/build.mjs",
+          "mode": "100644",
+          "sha256": "73ad7b81bdb1ef0622dc851570ed83b60721122543f1ce4cb07267ab90253b2d"
+        },
+        "after": {
+          "path": "packages/server/build.mjs",
+          "mode": "100644",
+          "sha256": "ebdd428c282cd000128ee6d666a18c388372d890706c6be9b089608d7a4c82c5"
+        }
+      },
+      {
+        "path": "packages/server/dist/aiw-server.mjs",
+        "before": {
+          "path": "packages/server/dist/aiw-server.mjs",
+          "mode": "100755",
+          "sha256": "be575a73bc61064016fa48ec5b382e317111fec0b5d3a4b5be84ad0838637de1"
+        },
+        "after": {
+          "path": "packages/server/dist/aiw-server.mjs",
+          "mode": "100755",
+          "sha256": "3e1f5a983c1e8b83c1cba35afc6a914e9fa04dbc163069a11b685038e83f0754"
+        }
+      },
+      {
+        "path": "packages/server/dist/fixtures/external/ciStatus.json",
+        "before": null,
+        "after": {
+          "path": "packages/server/dist/fixtures/external/ciStatus.json",
+          "mode": "100644",
+          "sha256": "2337c4e04eddf8696659d5f5e3dd61c36f6f1e4ece25ad387ade661e9f0abfeb"
+        }
+      },
+      {
+        "path": "packages/server/dist/fixtures/external/containerLogs.json",
+        "before": null,
+        "after": {
+          "path": "packages/server/dist/fixtures/external/containerLogs.json",
+          "mode": "100644",
+          "sha256": "5e249264f6444a07ac05e4c014f049d81156cda784a264558b9c2ffa68c2fd23"
+        }
+      },
+      {
+        "path": "packages/server/dist/fixtures/external/docsSearch.json",
+        "before": null,
+        "after": {
+          "path": "packages/server/dist/fixtures/external/docsSearch.json",
+          "mode": "100644",
+          "sha256": "03558c575e88da530b3adda04d9d040850bdc06d0a56ad9bf66026b2a33b17fb"
+        }
+      },
+      {
+        "path": "packages/server/dist/fixtures/external/featureFlags.json",
+        "before": null,
+        "after": {
+          "path": "packages/server/dist/fixtures/external/featureFlags.json",
+          "mode": "100644",
+          "sha256": "d70dce94bf4faaebfa4675ea3685e59800c8bc2b9d9038d7979088547f351da9"
+        }
+      },
+      {
+        "path": "packages/server/dist/fixtures/external/fetchUrl.json",
+        "before": null,
+        "after": {
+          "path": "packages/server/dist/fixtures/external/fetchUrl.json",
+          "mode": "100644",
+          "sha256": "49680358ebb7316024c7225fd38587b8cd9def4f217c2c1cd26b9e8bc4d372a3"
+        }
+      },
+      {
+        "path": "packages/server/dist/fixtures/external/httpRequest.json",
+        "before": null,
+        "after": {
+          "path": "packages/server/dist/fixtures/external/httpRequest.json",
+          "mode": "100644",
+          "sha256": "d9cd3674fe3e0bc81deebf22bb49b97ad0d8cdec2fbe620358a50313200b30b2"
+        }
+      },
+      {
+        "path": "packages/server/dist/fixtures/external/installPackage.json",
+        "before": null,
+        "after": {
+          "path": "packages/server/dist/fixtures/external/installPackage.json",
+          "mode": "100644",
+          "sha256": "8189a69514b807efb763b3e7d3c9b928544ebbdb264c6f02e3d679e201e1a0e0"
+        }
+      },
+      {
+        "path": "packages/server/dist/fixtures/external/issues.json",
+        "before": null,
+        "after": {
+          "path": "packages/server/dist/fixtures/external/issues.json",
+          "mode": "100644",
+          "sha256": "839aad37d08ac2d99298abd6554e1f367c25919f1c041362b288bec60c06461f"
+        }
+      },
+      {
+        "path": "packages/server/dist/fixtures/external/metrics.json",
+        "before": null,
+        "after": {
+          "path": "packages/server/dist/fixtures/external/metrics.json",
+          "mode": "100644",
+          "sha256": "654cf4f162f2d29e440128d8233a4a6d8ae2328d9714aa9fdcf20aea1ba309d8"
+        }
+      },
+      {
+        "path": "packages/server/dist/fixtures/external/notify.json",
+        "before": null,
+        "after": {
+          "path": "packages/server/dist/fixtures/external/notify.json",
+          "mode": "100644",
+          "sha256": "ba6df0f6eba8dedc3d71651183211e23478514eef872959b34572a4275977b72"
+        }
+      },
+      {
+        "path": "packages/server/dist/fixtures/external/packageInfo.json",
+        "before": null,
+        "after": {
+          "path": "packages/server/dist/fixtures/external/packageInfo.json",
+          "mode": "100644",
+          "sha256": "033e4c66da5a8f910248ce9ef9f4b056bb32357fed59f5cf5ea698a302e093fa"
+        }
+      },
+      {
+        "path": "packages/server/dist/fixtures/external/pullRequests.json",
+        "before": null,
+        "after": {
+          "path": "packages/server/dist/fixtures/external/pullRequests.json",
+          "mode": "100644",
+          "sha256": "c4ec8842548f3342e32255a2a9f845582d36b5db3b3ec45abbcfde3be476a8bc"
+        }
+      },
+      {
+        "path": "packages/server/dist/fixtures/external/sqlQuery.json",
+        "before": null,
+        "after": {
+          "path": "packages/server/dist/fixtures/external/sqlQuery.json",
+          "mode": "100644",
+          "sha256": "2b261917c29cfc8f032e567d734c9898e3cfa9db35a2076e93433f9e42e4861c"
+        }
+      },
+      {
+        "path": "packages/server/dist/fixtures/external/webSearch.json",
+        "before": null,
+        "after": {
+          "path": "packages/server/dist/fixtures/external/webSearch.json",
+          "mode": "100644",
+          "sha256": "7dc7e1489ba93c79e24dc18154f6e113de59f7be9104faad35c90bd59403baa2"
+        }
+      },
+      {
+        "path": "packages/server/dist/python/aiw_sidecar/__init__.py",
+        "before": null,
+        "after": {
+          "path": "packages/server/dist/python/aiw_sidecar/__init__.py",
+          "mode": "100644",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      },
+      {
+        "path": "packages/server/dist/python/aiw_sidecar/__main__.py",
+        "before": null,
+        "after": {
+          "path": "packages/server/dist/python/aiw_sidecar/__main__.py",
+          "mode": "100644",
+          "sha256": "93d8aae0b5484be0a723504fe9853c450557d8b5dccb73fa8bbb139f09434ef3"
+        }
+      },
+      {
+        "path": "packages/server/dist/python/aiw_sidecar/check.py",
+        "before": null,
+        "after": {
+          "path": "packages/server/dist/python/aiw_sidecar/check.py",
+          "mode": "100644",
+          "sha256": "f1aec5210f5d13a6da8ae0e306b94f342c65a832fd61dfd2a4f2c315c598a6cb"
+        }
+      },
+      {
+        "path": "packages/server/dist/python/aiw_sidecar/child.py",
+        "before": null,
+        "after": {
+          "path": "packages/server/dist/python/aiw_sidecar/child.py",
+          "mode": "100644",
+          "sha256": "88793c3fbd6794ec0eb8a4ad2dd5ef639c32656b039628fe7910e4242d5c7be8"
+        }
+      },
+      {
+        "path": "packages/server/dist/python/aiw_sidecar/common.py",
+        "before": null,
+        "after": {
+          "path": "packages/server/dist/python/aiw_sidecar/common.py",
+          "mode": "100644",
+          "sha256": "4cfb56e105ec18064fe2fb13d3b58cc3c01b58645c52c6479db6dea22cd04c15"
+        }
+      },
+      {
+        "path": "packages/server/dist/python/aiw_sidecar/execution.py",
+        "before": null,
+        "after": {
+          "path": "packages/server/dist/python/aiw_sidecar/execution.py",
+          "mode": "100644",
+          "sha256": "c7ad251c0c5e6c8f77ee689a54eb98bab5674819d07afcadb1efa07e149be062"
+        }
+      },
+      {
+        "path": "packages/server/dist/python/aiw_sidecar/graph.py",
+        "before": null,
+        "after": {
+          "path": "packages/server/dist/python/aiw_sidecar/graph.py",
+          "mode": "100644",
+          "sha256": "eb67753a6b89fa09ca39ffcd75ae5da78057c67ac1c822604085cc08fba0b364"
+        }
+      },
+      {
+        "path": "packages/server/dist/python/aiw_sidecar/nav.py",
+        "before": null,
+        "after": {
+          "path": "packages/server/dist/python/aiw_sidecar/nav.py",
+          "mode": "100644",
+          "sha256": "43430cb12720add8ca3b6b3c2f3206b055ec5cacc4b0af0de6f06d0c37d96ab2"
+        }
+      },
+      {
+        "path": "packages/server/dist/python/aiw_sidecar/refactor.py",
+        "before": null,
+        "after": {
+          "path": "packages/server/dist/python/aiw_sidecar/refactor.py",
+          "mode": "100644",
+          "sha256": "0a9a35b3379cec330982491e4f74e408cb6cfc70edfa61b4d6d95e08a9f200cc"
+        }
+      },
+      {
+        "path": "packages/server/dist/python/aiw_sidecar/rpc.py",
+        "before": null,
+        "after": {
+          "path": "packages/server/dist/python/aiw_sidecar/rpc.py",
+          "mode": "100644",
+          "sha256": "364d544acd931bacd6c130997742d47ddd378a5966332c737d62f85d7db1e04e"
+        }
+      },
+      {
+        "path": "packages/server/dist/python/aiw_sidecar/testing.py",
+        "before": null,
+        "after": {
+          "path": "packages/server/dist/python/aiw_sidecar/testing.py",
+          "mode": "100644",
+          "sha256": "a5d25f6c2c1fc2464faca6322e935323772350a01a0a2710d8c340ae936e2723"
+        }
+      },
+      {
+        "path": "packages/server/dist/python/requirements.txt",
+        "before": null,
+        "after": {
+          "path": "packages/server/dist/python/requirements.txt",
+          "mode": "100644",
+          "sha256": "28155faca9cf3cee12f6c9e65239b842a85ee163ac10d9825f7df24ed9e2b061"
+        }
+      },
+      {
+        "path": "packages/server/src/cli.ts",
+        "before": {
+          "path": "packages/server/src/cli.ts",
+          "mode": "100755",
+          "sha256": "51de5b7e39b9bea86a4381ed2f121c5dd27b8e03678ddbe2c03c92f249518339"
+        },
+        "after": {
+          "path": "packages/server/src/cli.ts",
+          "mode": "100755",
+          "sha256": "a01d836b4eea4a7ba50ab7c0761383dd9a01117835aa3576bab1bc92b0beafbd"
+        }
+      },
+      {
+        "path": "packages/server/src/local.ts",
+        "before": {
+          "path": "packages/server/src/local.ts",
+          "mode": "100644",
+          "sha256": "fb26266a6aacbcee0787f89ca81c1cdeff466eaeae0868318530235824996b18"
+        },
+        "after": {
+          "path": "packages/server/src/local.ts",
+          "mode": "100644",
+          "sha256": "153ff68ed45bb9c8208f11e1ada4366f8bee84a47ffbcd9998a69a0949eb54cb"
+        }
+      },
+      {
+        "path": "packages/server/src/server.ts",
+        "before": {
+          "path": "packages/server/src/server.ts",
+          "mode": "100644",
+          "sha256": "6831569c9b068187cd6b6106da353700d8b467d6204e5a1bb498396c32c4b50e"
+        },
+        "after": {
+          "path": "packages/server/src/server.ts",
+          "mode": "100644",
+          "sha256": "189e00c72d4ae242345144c37dfdc2aaff9431b4424d191f3d9bd63b9c3808a1"
+        }
+      },
+      {
+        "path": "packages/server/test/bundle.test.ts",
+        "before": {
+          "path": "packages/server/test/bundle.test.ts",
+          "mode": "100644",
+          "sha256": "4590c1cc7d2c6ea14e28cd86ab7e53a4430537f4a074d70207ef5c65a0657a40"
+        },
+        "after": {
+          "path": "packages/server/test/bundle.test.ts",
+          "mode": "100644",
+          "sha256": "b381b494b8fd0beb79be9c1354158cb47ec48226ed3873d78672810da441b67a"
+        }
+      },
+      {
+        "path": "packages/server/test/packaged-readiness.test.ts",
+        "before": null,
+        "after": {
+          "path": "packages/server/test/packaged-readiness.test.ts",
+          "mode": "100644",
+          "sha256": "04e39e04da8a9574e5d703c5894b7e3c7144c50359b9b80cc5f018f078ce1282"
+        }
+      }
+    ]
+  },
+  "lifecycle_followup": {
+    "base_commit": "b3e59309b01465b1af52c44a00230143ca3b6ddc",
+    "source_commit": "632f205e60804141254d8e04344a17e282c058be",
+    "changes": [
+      {
+        "path": "packages/server/dist/aiw-server.mjs",
+        "before": {
+          "path": "packages/server/dist/aiw-server.mjs",
+          "mode": "100755",
+          "sha256": "3e1f5a983c1e8b83c1cba35afc6a914e9fa04dbc163069a11b685038e83f0754"
+        },
+        "after": {
+          "path": "packages/server/dist/aiw-server.mjs",
+          "mode": "100755",
+          "sha256": "7b4d8236ef41f1852baf90842c57dd5ce27355ce0d4a4159d0cd055a0a775556"
+        }
+      },
+      {
+        "path": "packages/server/dist/python/aiw_sidecar/execution.py",
+        "before": {
+          "path": "packages/server/dist/python/aiw_sidecar/execution.py",
+          "mode": "100644",
+          "sha256": "c7ad251c0c5e6c8f77ee689a54eb98bab5674819d07afcadb1efa07e149be062"
+        },
+        "after": {
+          "path": "packages/server/dist/python/aiw_sidecar/execution.py",
+          "mode": "100644",
+          "sha256": "4624a5592bcaa38641561d3a53ef95a5cded714b6a0bf195221683304f8bb41b"
+        }
+      },
+      {
+        "path": "packages/server/dist/python/aiw_sidecar/rpc.py",
+        "before": {
+          "path": "packages/server/dist/python/aiw_sidecar/rpc.py",
+          "mode": "100644",
+          "sha256": "364d544acd931bacd6c130997742d47ddd378a5966332c737d62f85d7db1e04e"
+        },
+        "after": {
+          "path": "packages/server/dist/python/aiw_sidecar/rpc.py",
+          "mode": "100644",
+          "sha256": "6776d1ef595f68567f4e78a31cf65520d5f3a6d31d8569179cc055811360ccb3"
+        }
+      },
+      {
+        "path": "packages/server/src/local.ts",
+        "before": {
+          "path": "packages/server/src/local.ts",
+          "mode": "100644",
+          "sha256": "153ff68ed45bb9c8208f11e1ada4366f8bee84a47ffbcd9998a69a0949eb54cb"
+        },
+        "after": {
+          "path": "packages/server/src/local.ts",
+          "mode": "100644",
+          "sha256": "6ff9d835056d741833b803e36949448095a9de4965c7e556b0ac2e2df511591c"
+        }
+      },
+      {
+        "path": "packages/server/test/sidecar-lifecycle.test.ts",
+        "before": null,
+        "after": {
+          "path": "packages/server/test/sidecar-lifecycle.test.ts",
+          "mode": "100644",
+          "sha256": "dc804f029f323146e303e1ce11c9a6787030a3ad0a497f0b18be99e8a274ac63"
+        }
+      },
+      {
+        "path": "packages/tools/python/aiw_sidecar/execution.py",
+        "before": {
+          "path": "packages/tools/python/aiw_sidecar/execution.py",
+          "mode": "100644",
+          "sha256": "c7ad251c0c5e6c8f77ee689a54eb98bab5674819d07afcadb1efa07e149be062"
+        },
+        "after": {
+          "path": "packages/tools/python/aiw_sidecar/execution.py",
+          "mode": "100644",
+          "sha256": "4624a5592bcaa38641561d3a53ef95a5cded714b6a0bf195221683304f8bb41b"
+        }
+      },
+      {
+        "path": "packages/tools/python/aiw_sidecar/rpc.py",
+        "before": {
+          "path": "packages/tools/python/aiw_sidecar/rpc.py",
+          "mode": "100644",
+          "sha256": "364d544acd931bacd6c130997742d47ddd378a5966332c737d62f85d7db1e04e"
+        },
+        "after": {
+          "path": "packages/tools/python/aiw_sidecar/rpc.py",
+          "mode": "100644",
+          "sha256": "6776d1ef595f68567f4e78a31cf65520d5f3a6d31d8569179cc055811360ccb3"
+        }
+      },
+      {
+        "path": "packages/tools/src/sidecar.ts",
+        "before": {
+          "path": "packages/tools/src/sidecar.ts",
+          "mode": "100644",
+          "sha256": "8a907f650835002b7fe43f1a09b4985afca1f924e56d0eb48152ead452ea027b"
+        },
+        "after": {
+          "path": "packages/tools/src/sidecar.ts",
+          "mode": "100644",
+          "sha256": "dcca9457442667f3a607010152bdc4d61e71920681acc482a7b9822668b7b9af"
+        }
+      }
+    ]
+  },
+  "provenance_followup": {
+    "base_commit": "e390676afddf74fb7ef7ca39f4be9c9f7fe1aefd",
+    "source_commit": "b40c341094812b7a10f3b933da5886cbc9efd357",
+    "changes": [
+      {
+        "path": "packages/runner/src/cli.ts",
+        "before": {
+          "path": "packages/runner/src/cli.ts",
+          "mode": "100755",
+          "sha256": "3720af342c949c831f19500aea119182bab9e7390d69280cf9d85ea66c05e8fb"
+        },
+        "after": {
+          "path": "packages/runner/src/cli.ts",
+          "mode": "100755",
+          "sha256": "6df1afa7bf30c51a2b556cf9a8fc9a1377f97264a320c9a4291db8ae9271c189"
+        }
+      },
+      {
+        "path": "packages/runner/src/combine.ts",
+        "before": {
+          "path": "packages/runner/src/combine.ts",
+          "mode": "100644",
+          "sha256": "e821b11c599026aaf654e727ccdaea0985f2f66abeb4360b9df2c2def5855d69"
+        },
+        "after": {
+          "path": "packages/runner/src/combine.ts",
+          "mode": "100644",
+          "sha256": "2ba56292cce2bf98d7aa204f1b542cbbce2921758db4aa6f35aae68f22b9a85f"
+        }
+      },
+      {
+        "path": "packages/runner/src/config.ts",
+        "before": {
+          "path": "packages/runner/src/config.ts",
+          "mode": "100644",
+          "sha256": "eee9726d9a73953b226904555fa8ff6bae9004ddcf9648e65db763f6ee70e3c0"
+        },
+        "after": {
+          "path": "packages/runner/src/config.ts",
+          "mode": "100644",
+          "sha256": "c5491d8279aac50afe58badcd271a167680564efa62f59164e580d07dd364ed6"
+        }
+      },
+      {
+        "path": "packages/runner/src/grade.ts",
+        "before": {
+          "path": "packages/runner/src/grade.ts",
+          "mode": "100644",
+          "sha256": "4c9a16004a6d5eb67336cb19003a213946af4420535b8f651acdd9debeac54f4"
+        },
+        "after": {
+          "path": "packages/runner/src/grade.ts",
+          "mode": "100644",
+          "sha256": "2a6d3afe9bb98f2551cd6f300925fb71bf0d34e94d4334960a09aee89694b1b9"
+        }
+      },
+      {
+        "path": "packages/runner/src/job.ts",
+        "before": {
+          "path": "packages/runner/src/job.ts",
+          "mode": "100644",
+          "sha256": "c9a639eda852713f283e8d1fac577eda6edfe8ee7d6757033a052ca9e7eb87aa"
+        },
+        "after": {
+          "path": "packages/runner/src/job.ts",
+          "mode": "100644",
+          "sha256": "bccee167fd99bce8795b1220eacc2bc5ca754ca3ee8a7fba8a7421b6c11561cc"
+        }
+      },
+      {
+        "path": "packages/runner/src/mcp.ts",
+        "before": {
+          "path": "packages/runner/src/mcp.ts",
+          "mode": "100644",
+          "sha256": "231908061ad331e1fabdbafc21f8e8061a017f8c264d968fe51eb5255cfc4a45"
+        },
+        "after": {
+          "path": "packages/runner/src/mcp.ts",
+          "mode": "100644",
+          "sha256": "cd16fcde97e43e1564ffa1330a83a931e1018f086706fd6b823c405cfdc45727"
+        }
+      },
+      {
+        "path": "packages/runner/src/provenance.ts",
+        "before": null,
+        "after": {
+          "path": "packages/runner/src/provenance.ts",
+          "mode": "100644",
+          "sha256": "e342bad249d8ba122e822e0f22581fe295e8feddd33668a4e53f9a30f3dfea7e"
+        }
+      },
+      {
+        "path": "packages/runner/src/scheduler.ts",
+        "before": {
+          "path": "packages/runner/src/scheduler.ts",
+          "mode": "100644",
+          "sha256": "a3370c54d73b215df84c99bfb9013dc50e60667f8118ef75729809fa06289411"
+        },
+        "after": {
+          "path": "packages/runner/src/scheduler.ts",
+          "mode": "100644",
+          "sha256": "b23683d1a33a9166d70acfb6a7646222acb9b18a7552f3fdb183f9b78d15fb2f"
+        }
+      },
+      {
+        "path": "packages/runner/src/types.ts",
+        "before": {
+          "path": "packages/runner/src/types.ts",
+          "mode": "100644",
+          "sha256": "8ff68f860d02b580a3ed582aac9b1b5eb47cb85f83ae41ecb7af5def460ab7f3"
+        },
+        "after": {
+          "path": "packages/runner/src/types.ts",
+          "mode": "100644",
+          "sha256": "7a95dcf0f3533d017f766df204e214d18e41295dbd9085267f66a78ccedc50aa"
+        }
+      },
+      {
+        "path": "packages/runner/test/accounting.test.ts",
+        "before": {
+          "path": "packages/runner/test/accounting.test.ts",
+          "mode": "100644",
+          "sha256": "f3ab35242a455f85c3254be7082e73d02102d0ad9e699cecf991baf8635e9bfe"
+        },
+        "after": {
+          "path": "packages/runner/test/accounting.test.ts",
+          "mode": "100644",
+          "sha256": "e8227d3740fdad2c629387dc66131daba2477cc92504dadb26ba1e7237a1384c"
+        }
+      },
+      {
+        "path": "packages/runner/test/combine.test.ts",
+        "before": {
+          "path": "packages/runner/test/combine.test.ts",
+          "mode": "100644",
+          "sha256": "97829f8a7b6f5c57c184a7f51648510c08a4f3cd52d1a648b5a921844e300476"
+        },
+        "after": {
+          "path": "packages/runner/test/combine.test.ts",
+          "mode": "100644",
+          "sha256": "97f750d9b6cebc4b0fdb71fb14b7d3fd1ce11d1d1efb4a522c8b1ea849e506d0"
+        }
+      },
+      {
+        "path": "packages/runner/test/container-image.test.ts",
+        "before": {
+          "path": "packages/runner/test/container-image.test.ts",
+          "mode": "100644",
+          "sha256": "c490fe53c3655faa12d43b473a5d48b4839524d4f6be3dec70ee965ea2ed195d"
+        },
+        "after": {
+          "path": "packages/runner/test/container-image.test.ts",
+          "mode": "100644",
+          "sha256": "4a083c6880e53d32dcef05cefcfb4e4688e2a8f412006edc8c698b7f9b01158b"
+        }
+      },
+      {
+        "path": "packages/runner/test/provenance-fixture.ts",
+        "before": null,
+        "after": {
+          "path": "packages/runner/test/provenance-fixture.ts",
+          "mode": "100644",
+          "sha256": "035dcb63b6b2e771e22887ee35f33b04d17915a573f0d08acff45de803c8bfab"
+        }
+      },
+      {
+        "path": "packages/runner/test/provenance.test.ts",
+        "before": null,
+        "after": {
+          "path": "packages/runner/test/provenance.test.ts",
+          "mode": "100644",
+          "sha256": "d8a92604e17eff4155c8ef026e9e4c39d47c0797f9c95fb50107e9ec045048c2"
+        }
+      },
+      {
+        "path": "packages/runner/test/subscription.test.ts",
+        "before": {
+          "path": "packages/runner/test/subscription.test.ts",
+          "mode": "100644",
+          "sha256": "3bafc7b948b86a5263b5082563acc0c53803842d9533a2cba0d62d65fbbb2307"
+        },
+        "after": {
+          "path": "packages/runner/test/subscription.test.ts",
+          "mode": "100644",
+          "sha256": "06242a03c8a21770eb7c2054dda2c60bb09b7f8a9176977d1f65b9ff5a819423"
+        }
+      },
+      {
+        "path": "packages/server/dist/aiw-server.mjs",
+        "before": {
+          "path": "packages/server/dist/aiw-server.mjs",
+          "mode": "100755",
+          "sha256": "7b4d8236ef41f1852baf90842c57dd5ce27355ce0d4a4159d0cd055a0a775556"
+        },
+        "after": {
+          "path": "packages/server/dist/aiw-server.mjs",
+          "mode": "100755",
+          "sha256": "e0d5c75ce0f63972b261c9ac336382a6bb3a46db04f08b482aed3a7475a1557b"
+        }
+      },
+      {
+        "path": "packages/server/src/server.ts",
+        "before": {
+          "path": "packages/server/src/server.ts",
+          "mode": "100644",
+          "sha256": "189e00c72d4ae242345144c37dfdc2aaff9431b4424d191f3d9bd63b9c3808a1"
+        },
+        "after": {
+          "path": "packages/server/src/server.ts",
+          "mode": "100644",
+          "sha256": "8016c194b5359742da87b3ad9a59fb886b0b83f5cea3e37e4f44f53d9c49639f"
+        }
+      },
+      {
+        "path": "packages/server/test/telemetry-session.test.ts",
+        "before": {
+          "path": "packages/server/test/telemetry-session.test.ts",
+          "mode": "100644",
+          "sha256": "72512a3f54b10cb120545028251eec02b1fda030367527dcf8d5087418e3fca9"
+        },
+        "after": {
+          "path": "packages/server/test/telemetry-session.test.ts",
+          "mode": "100644",
+          "sha256": "62d409caa6164472bb00ffb5229a194ff8cc2dc360846e85ee5452d6fb801dce"
+        }
+      },
+      {
+        "path": "packages/telemetry/src/reporter.ts",
+        "before": {
+          "path": "packages/telemetry/src/reporter.ts",
+          "mode": "100644",
+          "sha256": "dd10ec2101ad92b9b682ed58df739ced87560f53b42d4440ff6ad7f75118f8de"
+        },
+        "after": {
+          "path": "packages/telemetry/src/reporter.ts",
+          "mode": "100644",
+          "sha256": "4d73ee6bcd72aef1c7c64bc96d51a9158d6192a188f66c7bac961db1978b9320"
+        }
+      },
+      {
+        "path": "packages/telemetry/src/schema.ts",
+        "before": {
+          "path": "packages/telemetry/src/schema.ts",
+          "mode": "100644",
+          "sha256": "38cfdfcedf60aa65dee9d386072aa496922c511228af62d90fac3c93e7423971"
+        },
+        "after": {
+          "path": "packages/telemetry/src/schema.ts",
+          "mode": "100644",
+          "sha256": "ce740c00ac67cce108fc5c2ca4b92df57df9c52ecba9f997568d9ee9e3f70342"
+        }
+      },
+      {
+        "path": "packages/telemetry/src/wrap.ts",
+        "before": {
+          "path": "packages/telemetry/src/wrap.ts",
+          "mode": "100644",
+          "sha256": "95d922a317c90485a11caf0a0f2cba201fc9935f33e49c96fcf3b29f553a69cc"
+        },
+        "after": {
+          "path": "packages/telemetry/src/wrap.ts",
+          "mode": "100644",
+          "sha256": "a5d9f74b88ce633e4f66032b6e67fbcf84b62ebcf704f491b5ba2d32952bf511"
+        }
+      },
+      {
+        "path": "packages/telemetry/test/telemetry.test.ts",
+        "before": {
+          "path": "packages/telemetry/test/telemetry.test.ts",
+          "mode": "100644",
+          "sha256": "13359e834ad308c90a33aa1b9b065c40769aee5ff147b33e15d4d5501b4c80bf"
+        },
+        "after": {
+          "path": "packages/telemetry/test/telemetry.test.ts",
+          "mode": "100644",
+          "sha256": "769e353958ad6d2d2e0c3c22433aba35e3e5457088924cf1030c9fe08fe806fb"
+        }
+      }
+    ]
+  },
+  "hygiene_metadata": {
+    "version": 1,
+    "source_ref": "f54d21e569104bae236e16575b1bca608dbb479a",
+    "files": [
+      {
+        "path": ".gitignore",
+        "mode": "100644",
+        "sha256": "614982cbb43a12e00288f5d58e7a5e216244c278b1dc76ae8082f3ab8649ce02"
+      },
+      {
+        "path": "docs/dot-progress/ignore-hygiene.md",
+        "mode": "100644",
+        "sha256": "3a16b3e93466cf8b7f238717f0d15505ecab431d369d1874686de255b66ffff1"
+      },
+      {
+        "path": "scripts/check-gitignore.sh",
+        "mode": "100644",
+        "sha256": "277fc3f01d320e8fb5e784de9578a5750d8e55ac1ada73af2a46cc01ccb6a1d2"
+      }
+    ]
+  },
+  "broker_admission_followup": {
+    "base_commit": "d8f460014144d8b2fec514e566c4dec68e17f26e",
+    "source_commit": "8ef70b782fc8e1ae5f2706e5d150d2b5ef6a0e3d",
+    "changes": [
+      {
+        "path": "packages/runner/src/job.ts",
+        "before": {
+          "path": "packages/runner/src/job.ts",
+          "mode": "100644",
+          "sha256": "bccee167fd99bce8795b1220eacc2bc5ca754ca3ee8a7fba8a7421b6c11561cc"
+        },
+        "after": {
+          "path": "packages/runner/src/job.ts",
+          "mode": "100644",
+          "sha256": "d86c775b336f0102ca2369f3d2b9817f22b8e6135bcc6b8b74c132304ef132ad"
+        }
+      },
+      {
+        "path": "packages/runner/src/llm-broker.ts",
+        "before": {
+          "path": "packages/runner/src/llm-broker.ts",
+          "mode": "100644",
+          "sha256": "bd4295ca15f2b0952e0bd74d029be749c9f613cef3ba8cf96e4021479a615926"
+        },
+        "after": {
+          "path": "packages/runner/src/llm-broker.ts",
+          "mode": "100644",
+          "sha256": "af7317faee876570a1e2e6bf9ee509946b7677a056d3c8bf5f474be917b94139"
+        }
+      },
+      {
+        "path": "packages/runner/src/mcp.ts",
+        "before": {
+          "path": "packages/runner/src/mcp.ts",
+          "mode": "100644",
+          "sha256": "cd16fcde97e43e1564ffa1330a83a931e1018f086706fd6b823c405cfdc45727"
+        },
+        "after": {
+          "path": "packages/runner/src/mcp.ts",
+          "mode": "100644",
+          "sha256": "1ca753eada1b282c98cc1a5296305c7f5d68cbcf2fcb1485b7cb7fc8e3bcbf0b"
+        }
+      },
+      {
+        "path": "packages/runner/test/chatgpt-orchestrate.test.ts",
+        "before": {
+          "path": "packages/runner/test/chatgpt-orchestrate.test.ts",
+          "mode": "100644",
+          "sha256": "8485d27d901f7dbefd2aace9439c1da18299d1cb73b9e2c3d0e8d5d56f2b2a71"
+        },
+        "after": {
+          "path": "packages/runner/test/chatgpt-orchestrate.test.ts",
+          "mode": "100644",
+          "sha256": "49887acc254c18a07fadd207fa2e8bd62acdd5d0266953650b8442bb4316afbb"
+        }
+      },
+      {
+        "path": "packages/runner/test/llm-broker.test.ts",
+        "before": {
+          "path": "packages/runner/test/llm-broker.test.ts",
+          "mode": "100644",
+          "sha256": "7da47aec634155f7edad567478a5a51ea9d7d339733ce0bd2966a4aceeab167f"
+        },
+        "after": {
+          "path": "packages/runner/test/llm-broker.test.ts",
+          "mode": "100644",
+          "sha256": "55cec0408f357bcfecdc1ca5b9e7026bb85149f9109e32ebd8724bf1e617f476"
+        }
+      }
+    ]
+  }
 }

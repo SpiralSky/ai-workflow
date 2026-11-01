@@ -153,13 +153,7 @@ function sha256(text: string): string {
 function basePromptHash(): string {
   // Resolve relative to this package's location
   const dir = fileURLToPath(new URL("../../core/prompts/base.md", import.meta.url));
-  let text: string;
-  try {
-    text = readFileSync(dir, "utf8");
-  } catch {
-    return sha256("(missing)");
-  }
-  return sha256(text);
+  return sha256(readFileSync(dir, "utf8"));
 }
 
 /**
@@ -167,16 +161,10 @@ function basePromptHash(): string {
  * @param cwd - working directory for git commands
  */
 export function gitProvenance(cwd: string): { commit: string; dirty: boolean } {
-  let commit = "(unknown)";
-  let dirty = false;
-  try {
-    commit = execSync("git rev-parse HEAD", { cwd, encoding: "utf8" }).trim();
-    const status = execSync("git status --porcelain", { cwd, encoding: "utf8" }).trim();
-    dirty = status.length > 0;
-  } catch {
-    // Not a git repo or git unavailable
-  }
-  return { commit, dirty };
+  const commit = execSync("git rev-parse HEAD", { cwd, encoding: "utf8" }).trim();
+  const status = execSync("git status --porcelain", { cwd, encoding: "utf8" }).trim();
+  if (!/^[a-f0-9]{40,64}$/.test(commit)) throw new Error("git did not report a valid commit");
+  return { commit, dirty: status.length > 0 };
 }
 
 /**
@@ -190,7 +178,7 @@ export function buildProvenance(cwd: string): Omit<Provenance, "frameworks" | "i
     commit: git.commit,
     dirty: git.dirty,
     runnerVersion: runnerVersion(),
-    engine: "isolated-vm",
+    engine: "pending",
     basePrompt: basePromptHash(),
   };
 }

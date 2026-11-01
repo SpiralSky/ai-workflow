@@ -25,6 +25,7 @@ export class Sidecar {
   private proc: ChildProcess | undefined;
   private pending = new Map<number, Pending>();
   private nextId = 1;
+  private readonly closing = new Set<Promise<void>>();
   private readonly opts: SidecarOpts;
 
   constructor(opts: SidecarOpts) {
@@ -42,7 +43,7 @@ export class Sidecar {
     const base = this.opts.env ?? process.env;
     const venv = base.AIW_VENV || "/opt/aiw/venv";
     const env = { ...toolEnv(base), PYTHONPATH: PYTHON_DIR, PYTHONUNBUFFERED: "1", PYTHONDONTWRITEBYTECODE: "1" };
-    const proc = spawn(`${venv}/bin/python`, ["-m", "aiw_sidecar", this.opts.root], { cwd: this.opts.root, env, stdio: ["pipe", "pipe", "pipe"] });
+    const proc = spawn(`${venv}/bin/python`, ["-m", "aiw_sidecar", this.opts.root], { cwd: this.opts.root, env, detached: process.platform !== "win32", stdio: ["pipe", "pipe", "pipe"] });
     this.proc = proc;
     let stderr = "";
     proc.stderr!.on("data", (d) => (stderr = (stderr + d).slice(-500)));
@@ -110,13 +111,38 @@ export class Sidecar {
     });
   }
 
-  /** Stops the process; in-flight calls reject with `sidecar crashed`. A later call restarts it. */
-  close(): void {
+  /** Gracefully cancel owned work, reap the sidecar, and bound shutdown; later calls may restart it. */
+  async close(): Promise<void> {
     const proc = this.proc;
-    if (!proc) return;
-    this.proc = undefined;
-    proc.kill("SIGKILL");
-    this.failPending(proc, "sidecar crashed");
+    if (proc) {
+      this.proc = undefined;
+      this.failPending(proc, "sidecar crashed");
+      const stopped = new Promise<void>((resolve, reject) => {
+        /** Signal only this spawned sidecar's dedicated process group (or its process on Windows). */
+        const signal = (kind: NodeJS.Signals) => {
+          if (!proc.pid) return;
+          try {
+            if (process.platform === "win32") proc.kill(kind);
+            else process.kill(-proc.pid, kind);
+          } catch (error) {
+            if ((error as NodeJS.ErrnoException).code !== "ESRCH") throw error;
+          }
+        };
+        const timer = setTimeout(() => {
+          try { signal("SIGKILL"); } catch (error) { reject(error); }
+        }, 2_000);
+        proc.once("close", () => { clearTimeout(timer); resolve(); });
+        // Python handles TERM cooperatively, cancelling/reaping its separately grouped exec children.
+        // Its own group also contains checker processes; reap any remaining group members on exit.
+        proc.once("exit", () => {
+          try { signal("SIGKILL"); } catch (error) { clearTimeout(timer); reject(error); }
+        });
+        try { signal("SIGTERM"); } catch (error) { clearTimeout(timer); reject(error); }
+      });
+      this.closing.add(stopped);
+      void stopped.finally(() => this.closing.delete(stopped)).catch(() => {});
+    }
+    await Promise.all(this.closing);
   }
 }
 

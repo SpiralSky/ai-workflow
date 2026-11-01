@@ -1,3 +1,4 @@
+import { mockProvenance } from "./provenance-fixture.ts";
 import test from "node:test";
 import assert from "node:assert/strict";
 import { mkdtempSync, rmSync } from "node:fs";
@@ -82,7 +83,7 @@ test("scheduler completes full mock matrix with unknown dollars only in explicit
   const config = resolveConfig(flags, registry);
   const subscription = boundSubscriptionClient({ complete: async () => result }, limits);
   const run: RunJSON = { format: 1, id: "fixture", status: "in-progress", config,
-    provenance: { commit: "fixture", dirty: false, runnerVersion: "fixture", engine: "fixture", basePrompt: "fixture", frameworks: {}, images: {}, problems: {} },
+    provenance: mockProvenance(config),
     totals: { jobs: 0, attempts: 0, costUsd: 0, pass: 0, fail: 0 }, startedAt: "fixture" };
   const invalid = await runScheduler({ config, subscription, jobs: config.frameworks.map(framework => ({ problem: "p", framework, rep: 0 })),
     runPath: root, repoRoot: root, apiKey: "", baseURL: "", problemsDir: root, turnLimits: {},
@@ -107,7 +108,7 @@ for (const scenario of ["quota", "telemetry", "failure"] as const) {
     const config = resolveConfig({ ...flags, subscriptionLimits: { ...limits, maxCalls: 1 } }, registry);
     const subscription = boundSubscriptionClient({ complete: async () => result }, config.subscriptionLimits!);
     const run: RunJSON = { format: 1, id: "fixture", status: "in-progress", config,
-      provenance: { commit: "fixture", dirty: false, runnerVersion: "fixture", engine: "fixture", basePrompt: "fixture", frameworks: {}, images: {}, problems: {} },
+      provenance: mockProvenance(config),
       totals: { jobs: 0, attempts: 0, costUsd: null, pass: 0, fail: 0 }, startedAt: "fixture" };
     let attempts = 0;
     const invalid = await runScheduler({ config, subscription, jobs: config.frameworks.map(framework => ({ problem: "p", framework, rep: 0 })),

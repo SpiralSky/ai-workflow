@@ -9,9 +9,15 @@ import { cp, mkdtemp, rm, stat, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 
-import type { Container } from "./container.ts";
+import { problemImageRef, type Container } from "./container.ts";
 
 const execFile = promisify(_execFile);
+
+/** Build the offline grading container command using the shared case-preserving image reference. */
+export function gradingContainerArgs(problem: string, imageId?: string): string[] {
+  if (imageId !== undefined && !/^sha256:[a-f0-9]{64}$/.test(imageId)) throw new Error("grading requires an immutable observed image ID");
+  return ["run", "-d", "--network", "none", imageId ?? problemImageRef(problem), "sleep", "infinity"];
+}
 
 /** Grading result. */
 export interface GradeResult {
@@ -35,7 +41,9 @@ export async function gradeJob(
   ctr: Container,
   problemDir: string,
   jobDir: string,
+  imageId?: string,
 ): Promise<GradeResult> {
+  if (imageId !== undefined && !/^sha256:[a-f0-9]{64}$/.test(imageId)) throw new Error("grading image must be an immutable sha256 ID");
   const tmp = await mkdtemp(join(tmpdir(), "aiw-grade-"));
   const afterDir = join(tmp, "after");
   let gradeId: string | undefined;
@@ -91,16 +99,7 @@ export async function gradeJob(
     await writeFile(diffPatchPath, diffOutput);
 
     // 3. Start fresh grading container (network none, same image)
-    const tag = `aiw-problem-${ctr.problem}`;
-    const { stdout: runOut } = await execFile("docker", [
-      "run",
-      "-d",
-      "--network",
-      "none",
-      tag,
-      "sleep",
-      "infinity",
-    ]);
+    const { stdout: runOut } = await execFile("docker", gradingContainerArgs(ctr.problem, imageId));
     gradeId = runOut.trim();
 
     // 4. Copy diff.patch and checks/ into the fresh container

@@ -4,7 +4,7 @@
  */
 
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
-import { installHostLLMBroker, type HostLLMBrokerOptions } from "./llm-broker.ts";
+import { installHostLLMBroker, type HostLLMBrokerOptions, type HostLLMAdmission } from "./llm-broker.ts";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 
 /** An MCP tool schema entry from tools/list. */
@@ -17,6 +17,10 @@ export interface MCPTool {
 /** MCP session handle with the underlying client for tool calls and teardown. */
 export interface MCPSession {
   tools: MCPTool[];
+  /** Closed until the job has verified and persisted runtime provenance. */
+  inferenceAdmission?: HostLLMAdmission;
+  /** Unauthenticated local server observation; validated against mounted artifacts before model work. */
+  runtimeProvenance?: { version: number; engine: string; entryHash: string | null; prompts: Record<string, string>; catalogHash: string; settings: { kind: string; variant: Record<string, unknown>; branchContext: string; secondaryCap: number; secondaryTemperature?: number | null }; nodeVersion?: string; runtimePlatform?: { platform: string; arch: string; moduleABI: string } };
   /** Framework instructions from the server's initialize response, used as the system prompt supplement. */
   instructions?: string;
   /** @internal */
@@ -43,18 +47,24 @@ export async function openMCPSession(serverDescriptor: {
 
   const client = new Client({ name: "aiw-runner", version: "1.0.0" }, broker
     ? { capabilities: { experimental: { "aiw/llm/complete": {} } } } : undefined);
-  if (broker) installHostLLMBroker(client, broker);
-  await client.connect(transport);
+  const inferenceAdmission = broker ? installHostLLMBroker(client, broker) : undefined;
+  try {
+    await client.connect(transport);
 
-  const result = await client.listTools();
-  const tools: MCPTool[] = result.tools.map((t) => ({
-    name: t.name,
-    description: t.description,
-    inputSchema: t.inputSchema as Record<string, unknown>,
-  }));
+    const result = await client.listTools();
+    const tools: MCPTool[] = result.tools.map((t) => ({
+      name: t.name,
+      description: t.description,
+      inputSchema: t.inputSchema as Record<string, unknown>,
+    }));
 
-  const instructions = client.getInstructions() ?? undefined;
-  return { tools, instructions, _client: client };
+    const instructions = client.getInstructions() ?? undefined;
+    return { tools, instructions, inferenceAdmission, runtimeProvenance: result._meta?.["aiw/runtimeProvenance"] as MCPSession["runtimeProvenance"], _client: client };
+  } catch (error) {
+    inferenceAdmission?.close();
+    await client.close().catch(() => {});
+    throw error;
+  }
 }
 
 /** Result of a tool call. */
@@ -108,5 +118,6 @@ export async function callTool(
  * @param session - MCP session to close
  */
 export async function closeMCPSession(session: MCPSession): Promise<void> {
+  session.inferenceAdmission?.close();
   await session._client.close();
 }

@@ -27,15 +27,37 @@ export async function buildServer(outDir, copyDependencies = true) {
     logLevel: "warning",
   });
   const bundle = readFileSync(bundlePath, "utf8");
-  const patched = bundle.replaceAll('"../../prompts/"', '"./prompts/"');
-  if (patched === bundle) throw new Error("Prompt path not found in bundle — check prompts.ts");
+  let patched = bundle;
+  for (const [source, destination] of [
+    ['"../../prompts/"', '"./prompts/"'],
+    ['"../python"', '"./python"'],
+    ['"../../../fixtures/external/"', '"./fixtures/external/"'],
+  ]) {
+    if (!patched.includes(source)) throw new Error(`Resource path not found in bundle: ${source}`);
+    patched = patched.replaceAll(source, destination);
+  }
   writeFileSync(bundlePath, patched);
   cpSync(resolve(root, "packages/core/prompts"), resolve(outDir, "prompts"), { recursive: true });
+  cpSync(resolve(root, "packages/tools/python"), resolve(outDir, "python"), {
+    recursive: true, filter: source => !source.endsWith("__pycache__") && !source.endsWith(".pyc"),
+  });
+  cpSync(resolve(root, "packages/tools/fixtures/external"), resolve(outDir, "fixtures/external"), { recursive: true });
   if (copyDependencies) {
     mkdirSync(resolve(outDir, "node_modules"), { recursive: true });
-    for (const pkg of ["isolated-vm", "typescript-api"]) {
-      cpSync(resolve(root, "node_modules", pkg), resolve(outDir, "node_modules", pkg), { recursive: true });
+    const copied = new Set();
+    /** Copy the installed, lockfile-resolved runtime dependency closure, never install packages here. */
+    function copyPackage(pkg) {
+      if (copied.has(pkg)) return;
+      copied.add(pkg);
+      const source = resolve(root, "node_modules", pkg);
+      const manifest = JSON.parse(readFileSync(resolve(source, "package.json"), "utf8"));
+      // Prefer ABI-tagged package prebuilds, never a foreign host's build/Release addon.
+      cpSync(source, resolve(outDir, "node_modules", pkg), {
+        recursive: true, filter: path => pkg !== "isolated-vm" || path !== resolve(source, "build"),
+      });
+      for (const dependency of Object.keys(manifest.dependencies ?? {})) copyPackage(dependency);
     }
+    for (const pkg of ["isolated-vm", "typescript-api"]) copyPackage(pkg);
   }
 }
 
@@ -70,9 +92,9 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
   if (process.argv.length > 3 || (process.argv[2] && process.argv[2] !== "--check")) throw new Error("Usage: node build.mjs [--check]");
   if (process.argv[2] === "--check") {
     await checkServerBundle();
-    console.log("Server bundle and prompts match source.");
+    console.log("Server bundle and portable resources match source.");
   } else {
     await buildServer(dist);
-    console.log("Built: dist/aiw-server.mjs + dist/prompts/ + dist/node_modules/{isolated-vm,typescript-api}");
+    console.log("Built: dist/aiw-server.mjs + dist/prompts/ + dist/python/ + dist/fixtures/ + native dependency closure");
   }
 }

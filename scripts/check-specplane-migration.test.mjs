@@ -91,3 +91,17 @@ test('development plans cannot become ready through the integration',t=>{
   const root=snapshot(t);const file=path.join(root,'plans/2026-11-01-openai-plan-signin/PLAN.md');fs.writeFileSync(file,fs.readFileSync(file,'utf8').replace('status: draft','status: ready'));
   assert.throws(()=>verifyPreservation(root),/must remain draft/);
 });
+
+test('packaged sidecar bytes cannot drift from the recorded runtime after state',t=>{
+  const root=snapshot(t);fs.appendFileSync(path.join(root,'packages/server/dist/python/aiw_sidecar/rpc.py'),'\n# unauthorized\n');
+  assert.throws(()=>verifyPreservation(root),/Preserved content changed/);
+});
+test('minimal Docker build context whitelist cannot silently expand',t=>{
+  const root=snapshot(t);fs.appendFileSync(path.join(root,'experiments/docker/aiw-base/Dockerfile.dockerignore'),'\n!.env\n');
+  assert.throws(()=>verifyPreservation(root),/Preserved content changed/);
+});
+
+test('reviewed ignore hygiene cannot be silently weakened',t=>{
+  const root=snapshot(t);fs.appendFileSync(path.join(root,'.gitignore'),'\n!.env\n');
+  assert.throws(()=>verifyPreservation(root),/Preserved content changed/);
+});

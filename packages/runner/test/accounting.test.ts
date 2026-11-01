@@ -1,3 +1,4 @@
+import { mockProvenance } from "./provenance-fixture.ts";
 import test from "node:test";
 import assert from "node:assert/strict";
 import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync } from "node:fs";
@@ -235,6 +236,7 @@ test("failure cancels concurrent work but waits for its unknown charges and reta
 
 test("all passing cells still execute and retain full success criterion", async (t) => {
   const root = temp(t), run = runFixture();
+  run.provenance = mockProvenance(run.config);
   const reason = await runScheduler({ jobs: [0, 1, 2].map((rep) => ({ problem: "p", framework: "orchestrate", rep })), config: run.config,
     runPath: root, repoRoot: root, apiKey: "fixture", baseURL: "https://example.invalid", turnLimits: {}, problemsDir: root,
     runAttempt: async () => result(1) }, run);

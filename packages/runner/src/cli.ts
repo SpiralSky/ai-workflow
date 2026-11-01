@@ -5,6 +5,7 @@
  * Runner architecture §2.
  */
 
+import { collectStaticProvenance } from "./provenance.ts";
 import { parseArgs } from "node:util";
 import { join } from "node:path";
 import { existsSync } from "node:fs";
@@ -17,7 +18,6 @@ import { buildProblems, checkProblems } from "./problems/index.ts";
 import { createChatGPTAuth, createChatGPTClient, listChatGPTModels } from "@aiw/llm";
 import { boundSubscriptionClient } from "./subscription.ts";
 import { authCommand } from "./auth-cli.ts";
-import type { Provenance } from "./types.ts";
 
 /** Repo root: find upward from this file. */
 function repoRoot(): string {
@@ -146,6 +146,12 @@ async function evalCommand(argv: string[]): Promise<void> {
     process.exit(1);
   }
 
+  const provenance = collectStaticProvenance(root, config, {
+    ...buildProvenance(root),
+    inference: { provider: config.provider!, usageMode: config.usageMode!, mainModel: config.models.main, secondaryModel: config.models.secondary,
+      temperature: useChatGPT ? null : config.temperature, ...(useChatGPT ? { stream: true as const, store: false as const } : {}) },
+  });
+
   let subscription: ReturnType<typeof boundSubscriptionClient> | undefined;
   if (useChatGPT) {
     const auth = createChatGPTAuth();
@@ -159,15 +165,6 @@ async function evalCommand(argv: string[]): Promise<void> {
   }
 
   const runId = generateRunId();
-  const provBase = buildProvenance(root);
-  const provenance: Provenance = {
-    ...provBase,
-    inference: { provider: config.provider!, usageMode: config.usageMode!, mainModel: config.models.main, secondaryModel: config.models.secondary,
-      temperature: useChatGPT ? null : config.temperature, ...(useChatGPT ? { stream: true as const, store: false as const } : {}) },
-    frameworks: {},
-    images: {},
-    problems: {},
-  };
 
   const runDir = createRunDir(root, runId, config, provenance);
   console.log(`Run: ${runId} (${plan.jobs.length} jobs)`);

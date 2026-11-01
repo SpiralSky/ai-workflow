@@ -261,3 +261,16 @@ test("two writers appending to one file stay parseable", () => {
   assert.equal(r.errors.length, 0);
   assert.equal(new Set(r.events.map((e) => e.id)).size, 400);
 });
+
+test("requested aliases remain distinct from opaque provider-reported model observations", async () => {
+  const sink = new MemSink(), reporter = createReporter({ sink, writer: "r" });
+  const client = wrapLLM({ complete: async () => ({ response: { model: "provider-model-snapshot", system_fingerprint: "opaque-fingerprint" }, usage }) }, reporter, "main");
+  await client.complete({ model: "requested-alias", system: "", tools: [], messages: [] });
+  assert.equal(sink.lines[0].model, "requested-alias");
+  assert.equal(sink.lines[0].providerModel, "provider-model-snapshot");
+  assert.equal(sink.lines[0].providerSystemFingerprint, "opaque-fingerprint");
+  const unknown = wrapLLM({ complete: async () => ({ response: {}, usage }) }, reporter, "secondary");
+  await unknown.complete({ model: "requested-alias", system: "", tools: [], messages: [] });
+  assert.equal(sink.lines[1].providerModel, undefined);
+  assert.equal(sink.lines[1].providerSystemFingerprint, undefined);
+});

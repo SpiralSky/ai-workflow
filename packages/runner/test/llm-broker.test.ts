@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
-import { ResultSchema, type Request } from "@modelcontextprotocol/sdk/types.js";
+import { ResultSchema, InitializeRequestSchema, ListToolsRequestSchema, type Request } from "@modelcontextprotocol/sdk/types.js";
 import type { LLMClient } from "@aiw/telemetry";
 import { installHostLLMBroker, type HostLLMBrokerOptions } from "../src/llm-broker.ts";
 import { createHostLLMClient } from "../../server/src/host-client.ts";
@@ -13,10 +13,11 @@ import { createHostLLMClient } from "../../server/src/host-client.ts";
 async function fixture(opts: Omit<HostLLMBrokerOptions, "secondaryModel">) {
   const client = new Client({ name: "test", version: "1" }, { capabilities: { experimental: { "aiw/llm/complete": {} } } });
   const server = new Server<Request>({ name: "test-server", version: "1" });
-  installHostLLMBroker(client, { ...opts, secondaryModel: "configured-model" });
+  const admission = installHostLLMBroker(client, { ...opts, secondaryModel: "configured-model" });
   const [ct, st] = InMemoryTransport.createLinkedPair();
   await Promise.all([client.connect(ct), server.connect(st)]);
-  return { client, server, executor: createHostLLMClient(() => server), close: async () => { await client.close(); await server.close(); } };
+  admission.open(); // Mock fixture explicitly represents successful persisted attestation.
+  return { client, server, admission, executor: createHostLLMClient(() => server), close: async () => { await client.close(); await server.close(); } };
 }
 const request = { model: "untrusted-model", system: "system", tools: [], messages: [{ role: "user", content: "task" }] };
 const completion = { response: { choices: [{ message: { content: "done" } }] }, usage: { input: 3, output: 1 } };
@@ -174,4 +175,53 @@ test("main and reverse-MCP secondary share one serialized call budget", async ()
     assert.equal(bounded.snapshot().inputTokens, 6);
     assert.equal(bounded.snapshot().outputTokens, 2);
   } finally { releaseSecond(); await f.close(); }
+});
+
+test("adversarial initialize and tools/list reverse requests reject before admission without consuming allowance", async () => {
+  const { boundSubscriptionClient } = await import("../src/subscription.ts");
+  let calls = 0;
+  const bounded = boundSubscriptionClient({ complete: async () => { calls++; return completion; } },
+    { maxCalls: 5, maxTokens: 100, maxDurationMs: 10000 });
+  const client = new Client({ name: "test", version: "1" }, { capabilities: { experimental: { "aiw/llm/complete": {} } } });
+  const server = new Server<Request>({ name: "adversarial-fixture", version: "1" }, { capabilities: { tools: {} } });
+  const admission = installHostLLMBroker(client, { secondaryClient: bounded.client, secondaryModel: "fixture" });
+  const reverse = () => server.request({ method: "aiw/llm/complete", params: { requestId: randomUUID(), system: "fixture", messages: [], tools: [] } }, ResultSchema);
+  let denied = 0;
+  server.setRequestHandler(InitializeRequestSchema, async req => {
+    await assert.rejects(reverse(), /admission is closed/); denied++;
+    return { protocolVersion: req.params.protocolVersion, capabilities: { tools: {} }, serverInfo: { name: "fixture", version: "1" } };
+  });
+  server.setRequestHandler(ListToolsRequestSchema, async () => {
+    await assert.rejects(reverse(), /admission is closed/); denied++;
+    return { tools: [] };
+  });
+  const [ct, st] = InMemoryTransport.createLinkedPair();
+  try {
+    await Promise.all([client.connect(ct), server.connect(st)]);
+    await client.listTools();
+    assert.equal(denied, 2); assert.equal(calls, 0); assert.equal(bounded.snapshot().calls, 0);
+    // Handshake completion alone must not open admission.
+    await assert.rejects(reverse(), /admission is closed/);
+    assert.equal(calls, 0);
+    admission.open(); // Represents verification and persistence succeeding, not an approval.
+    await Promise.resolve();
+    assert.equal(calls, 0, "rejected startup requests must never be queued for later execution");
+    await reverse();
+    assert.equal(calls, 1); assert.equal(bounded.snapshot().calls, 1);
+    admission.close();
+    await assert.rejects(reverse(), /admission is closed/);
+    assert.throws(() => admission.open());
+    assert.equal(calls, 1);
+  } finally { await client.close(); await server.close(); }
+});
+
+test("campaign cancellation permanently revokes admission even before it opens", async () => {
+  const campaign = new AbortController();
+  const client = new Client({ name: "fixture", version: "1" });
+  let calls = 0;
+  const admission = installHostLLMBroker(client, { signal: campaign.signal, secondaryModel: "fixture",
+    secondaryClient: { complete: async () => { calls++; return completion; } } });
+  campaign.abort();
+  assert.throws(() => admission.open());
+  assert.equal(calls, 0);
 });

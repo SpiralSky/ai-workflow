@@ -42,12 +42,15 @@ export interface RunConfig {
 
 /** Provenance recorded in run.json (runner §9). */
 export interface Provenance {
+  /** Static byte snapshots plus observations from actual runtime sessions, never requested placeholders. */
+  integrity?: { version: 1; sourceHash: string; bundleHash: string; entryHash: string; promptHashes: Record<string, string>; configHash: string;
+    runtime: "pending" | "observed"; nodeVersion?: string; runtimePlatform?: { platform: string; arch: string; moduleABI: string }; wallClockEnforced: false };
   commit: string;
   dirty: boolean;
   runnerVersion: string;
   engine: string;
   basePrompt: string;
-  frameworks: Record<string, { prompt: string; tools: string; extra?: Record<string, string> }>;
+  frameworks: Record<string, { prompt: string; tools: string; extra?: Record<string, string>; observedSettings?: Record<string, unknown> }>;
   images: Record<string, string>;
   inference?: { provider: string; usageMode: string; mainModel: string; secondaryModel: string; temperature: number | null; store?: false; stream?: true };
   problems: Record<string, { taskHash: string; turnLimit: number; wallClockMs: number }>;

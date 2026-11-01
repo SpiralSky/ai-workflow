@@ -59,7 +59,7 @@ test("server forwards its explicit runtime into branch execution instead of usin
   const { StdioClientTransport } = await import("@modelcontextprotocol/sdk/client/stdio.js");
   const serverURL = new URL("../src/server.ts", import.meta.url).href;
   const code = `import { startServer } from ${JSON.stringify(serverURL)};
-    await startServer({kind:"branch-only",host:{async tools(){return []},async call(){throw Error("unexpected host call")}},
+    await startServer({kind:"branch-only",host:{async tools(){return []},async call(){throw Error("unexpected host call")},async close(){}},
       runtime:{async create(){throw Error("explicit-runtime-fixture")}}});`;
   const client = new Client({ name: "runtime-injection-fixture", version: "1" });
   const transport = new StdioClientTransport({ command: process.execPath,

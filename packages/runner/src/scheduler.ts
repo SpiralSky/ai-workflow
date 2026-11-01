@@ -1,5 +1,6 @@
 /** Job scheduler: all attempts count; unknown spend invalidates monetary-budget runs. */
 import type { Job, JobJSON, AttemptRecord, RunConfig, RunJSON } from "./types.ts";
+import { assertCompleteProvenance } from "./provenance.ts";
 import { FORMAT_VERSION } from "./types.ts";
 import { writeJobJSON, writeRunJSON, createAttemptDir, createJobDir } from "./rundir.ts";
 import { runJobAttempt } from "./job.ts";
@@ -59,7 +60,7 @@ export async function runScheduler(opts: SchedulerOptions, runJSON: RunJSON): Pr
       let failed = false;
       let cost: CostSummary;
       try {
-        result = await attempt({ ...opts, job, attempt: n, signal: controller.signal,
+        result = await attempt({ ...opts, job, provenance: runJSON.provenance, onProvenance: () => writeRunJSON(opts.runPath, runJSON), attempt: n, signal: controller.signal,
           onFailure: () => stop(`job-failed:${job.problem}.${job.framework}.${job.rep}`) });
         cost = { costUsd: result.costUsd, knownCostUsd: result.knownCostUsd ?? result.costUsd ?? 0,
           costIncompleteReasons: [...(result.costIncompleteReasons ?? [])] };
@@ -129,5 +130,10 @@ export async function runScheduler(opts: SchedulerOptions, runJSON: RunJSON): Pr
   }
   await Promise.all(Array.from({ length: Math.max(1, opts.config.concurrency) }, () => worker()));
   if (fatalErrors.length) throw new AggregateError(fatalErrors, "campaign stopped after scheduler error; inspect preserved attempt evidence");
+  // No successful completion, including injected attempts, may bypass the evidence gate.
+  if (!invalidReason) {
+    try { assertCompleteProvenance(runJSON.provenance, opts.config); }
+    catch { stop("provenance-incomplete"); flush(); }
+  }
   return invalidReason;
 }

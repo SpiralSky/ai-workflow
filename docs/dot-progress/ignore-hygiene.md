@@ -2,14 +2,7 @@
 
 ## Scope and decision
 
-Hygiene-only publication branches, with identical three-file changes:
-- `dot/migration-ignore-publication-20261101`, based on published migration source
-  `75ab542c626bc7276d2ee9575956899c79b6d75d`.
-- `dot/signin-ignore-publication-20261101`, based on published sign-in source
-  `7caf3294f6c861edd13f49f65d000dd511eee409`.
-
-The original stronger check remains on the latest runtime development branch.
-This publication contains no unreviewed runtime/provenance changes.
+Branch `dot/ignore-hygiene-20261101`, based on `e390676afddf74fb7ef7ca39f4be9c9f7fe1aefd`.
 User requested a pre-push audit. These are autonomous, reversible hygiene decisions,
 not plan/spec approval or permission to merge. No files were removed or untracked;
 no history was rewritten and no credentials were accessed or generated.
@@ -27,7 +20,7 @@ intentional distribution assets must remain reviewable.
 - No tracked credential-named files, `.env` files, private key files, SQLite/database
   files, logs, bytecode, or local virtual environments were found by filename screening.
 - Local reachable Git history scan (`git rev-list --objects --all`, read each blob)
-  examined 1,240 unique blobs in the initial 2026-11-01 audit (before this patch). Recognizers
+  examined 1,240 unique blobs in this repository before this commit. Recognizers
   covered PEM/OpenSSH private-key headers, GitHub/OpenAI/AWS key formats, JWT-shaped
   strings, and quoted literal credential assignments; output included paths/types only.
 - Three literal-assignment hits were deliberate anti-leak/mock values in
@@ -43,11 +36,8 @@ intentional distribution assets must remain reviewable.
   A root-local `.config/ai-workflow/chatgpt/` is also ignored defensively if HOME is
   deliberately pointed at the checkout. Actual auth defaults to HOME outside the repo;
   arbitrary overridden credential locations still need separate safety review.
-- `packages/server/dist/aiw-server.mjs` and prompts are intentional tracked distribution
-  assets. Canonical Python sidecar and external fixtures under `packages/tools/` remain
-  tracked and trackable. Newer runtime branches package copies under server `dist/`;
-  these future paths stay trackable here, without falsely asserting they already exist
-  in the older public snapshots. Their presence is checked by newer artifact tests.
+- `packages/server/dist/aiw-server.mjs`, prompts, Python sidecar and external fixtures
+  are intentional portable distribution assets; all remain tracked and trackable.
   Machine-specific `dist/node_modules/` stays ignored. Synthetic benchmark workspaces,
   patches and checks remain tracked; they are not experiment output.
 - Intentional `.ci` transfer/reconstruction branches are separate from feature PRs.
@@ -60,9 +50,7 @@ intentional distribution assets must remain reviewable.
 
 Run `sh scripts/check-gitignore.sh`. It uses `git check-ignore --no-index` on
 representative sensitive/cache paths and reviewable templates/assets, `git ls-files`
-to assert required existing assets remain tracked, and rejects any tracked/ignored
-  overlap. Canonical resources and primary bundle/prompts must exist; future packaged
-  resources must remain trackable. This does not replace runtime artifact tests.
+to assert required assets remain tracked, and rejects any tracked/ignored overlap.
 It creates no sample secrets or artifacts. Result: PASS; `git diff --check`: PASS.
 No package code changed, so package suites were not rerun for this ignore-only patch.
 

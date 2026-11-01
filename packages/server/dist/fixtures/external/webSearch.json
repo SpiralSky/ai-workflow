@@ -1,0 +1,42 @@
+{
+  "cases": [
+    {
+      "match": {
+        "query": "python"
+      },
+      "result": {
+        "results": [
+          {
+            "title": "Python Release Python 3.12",
+            "url": "https://www.python.org/downloads/release/python-3120/",
+            "snippet": "Python 3.12.0 is the newest major release of the Python programming language."
+          },
+          {
+            "title": "What's New In Python 3.12",
+            "url": "https://docs.python.org/3.12/whatsnew/3.12.html",
+            "snippet": "This article explains the new features in Python 3.12, compared to 3.11."
+          },
+          {
+            "title": "PEP 695 - Type Parameter Syntax",
+            "url": "https://peps.python.org/pep-0695/",
+            "snippet": "This PEP specifies an improved syntax for specifying type parameters."
+          }
+        ]
+      }
+    }
+  ],
+  "default": {
+    "results": [
+      {
+        "title": "Search results for {{query}}",
+        "url": "https://example.com/search?q={{query}}",
+        "snippet": "Overview and reference material related to {{query}}."
+      },
+      {
+        "title": "{{query}} - Wikipedia",
+        "url": "https://en.wikipedia.org/wiki/Special:Search?search={{query}}",
+        "snippet": "Encyclopedia entry for {{query}}."
+      }
+    ]
+  }
+}

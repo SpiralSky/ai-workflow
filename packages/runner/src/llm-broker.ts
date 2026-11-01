@@ -21,15 +21,33 @@ const BrokerRequestSchema = RequestSchema.extend({
   }).strict(),
 });
 
-/** Installs a session-local broker; no endpoint, model, credential or retry controls are accepted. */
-export function installHostLLMBroker(client: Client, opts: HostLLMBrokerOptions): void {
+/** Session-local inference admission: starts closed and cannot reopen after revocation. */
+export interface HostLLMAdmission { open(): void; close(): void; }
+
+/** Installs a CLOSED broker; only persisted runtime attestation may open inference admission. */
+export function installHostLLMBroker(client: Client, opts: HostLLMBrokerOptions): HostLLMAdmission {
   const maxBytes = opts.maxRequestBytes ?? 8 * 1024 * 1024;
   if (!Number.isSafeInteger(maxBytes) || maxBytes < 1) throw new Error("invalid broker request limit");
   const active = new Map<string, AbortController>();
   const seen = new Set<string>();
   const session = new AbortController();
+  let admitted = false;
+  const admission: HostLLMAdmission = {
+    open() {
+      session.signal.throwIfAborted();
+      opts.signal?.throwIfAborted();
+      admitted = true;
+    },
+    close() {
+      admitted = false;
+      session.abort();
+      opts.signal?.removeEventListener("abort", admission.close);
+    },
+  };
+  opts.signal?.addEventListener("abort", admission.close, { once: true });
+  if (opts.signal?.aborted) admission.close();
   const onclose = client.onclose;
-  client.onclose = () => { session.abort(); onclose?.(); };
+  client.onclose = () => { admission.close(); onclose?.(); };
   // SDK versions may mishandle numeric MCP request ID 0. This explicit cancellation
   // uses an opaque per-call ID and is independent of the transport request counter.
   client.setNotificationHandler(NotificationSchema.extend({ method: z.literal("aiw/llm/cancel"),
@@ -37,6 +55,10 @@ export function installHostLLMBroker(client: Client, opts: HostLLMBrokerOptions)
     active.get(notification.params.requestId)?.abort();
   });
   client.setRequestHandler(BrokerRequestSchema, async (request, extra) => {
+    // Reject immediately, never queue startup requests for replay after admission opens.
+    if (!admitted || session.signal.aborted || opts.signal?.aborted) {
+      throw new McpError(ErrorCode.InvalidRequest, "Host LLM admission is closed");
+    }
     const requestId = request.params.requestId;
     if (seen.has(requestId) || seen.size >= 10000) {
       throw new McpError(ErrorCode.InvalidParams, "LLM broker request ID reused or session limit reached");
@@ -67,4 +89,5 @@ export function installHostLLMBroker(client: Client, opts: HostLLMBrokerOptions)
       throw new McpError(ErrorCode.InternalError, signal.aborted ? "Host LLM request cancelled" : "Host LLM request failed");
     } finally { active.delete(requestId); }
   });
+  return admission;
 }

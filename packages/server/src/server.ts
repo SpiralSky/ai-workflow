@@ -1,8 +1,10 @@
+import { createHash } from "node:crypto";
+import { readFileSync } from "node:fs";
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { CallToolRequestSchema, ListToolsRequestSchema, type Request, type Notification } from "@modelcontextprotocol/sdk/types.js";
-import { buildFramework, buildRegistry, type Host } from "@aiw/core";
-import { createReporter, NoopSink, FileSink, fromMeta } from "@aiw/telemetry";
+import { buildFramework, buildRegistry, isolatedVMRuntime, quickJSRuntime, loadPrompt, type Host } from "@aiw/core";
+import { canonicalJSON, createReporter, NoopSink, FileSink, fromMeta } from "@aiw/telemetry";
 import { createChatClient } from "@aiw/llm";
 import { createHostLLMClient } from "./host-client.ts";
 import type { FrameworkKind } from "@aiw/core";
@@ -93,8 +95,17 @@ export async function startServer(opts: ServerOptions): Promise<void> {
     },
   );
 
+  // Derive this observation from the selected runtime object and executed entrypoint, not CLI strings.
+  const actualRuntime = opts.runtime ?? quickJSRuntime;
+  const engine = actualRuntime === isolatedVMRuntime ? "isolated-vm" : actualRuntime === quickJSRuntime ? "quickjs" : "custom-unattested";
+  const digest = (value: string | Buffer) => createHash("sha256").update(value).digest("hex");
+  const prompts = Object.fromEntries(["base", "branch-only", "branch-tool", "do-tool", "executor", "orchestrate", "rerank", "resolve-tool"]
+    .map((name) => [name, digest(loadPrompt(name))]));
+  const entryHash = process.argv[1] ? digest(readFileSync(process.argv[1])) : null;
+
   // 4. Advertise framework tools via tools/list.
   mcpServer.setRequestHandler(ListToolsRequestSchema, async () => ({
+    _meta: { "aiw/runtimeProvenance": { version: 1, engine, entryHash, prompts, catalogHash: digest(canonicalJSON(hostDecls)), settings: { kind: opts.kind, variant: opts.variant ?? {}, branchContext: opts.branchContext ?? "trace", secondaryCap: opts.secondaryCap ?? 4, secondaryTemperature: orchestrateOpts?.temperature ?? null }, nodeVersion: process.version, runtimePlatform: { platform: process.platform, arch: process.arch, moduleABI: process.versions.modules } } },
     tools: framework.tools.map((t) => ({
       name: t.name,
       description: t.description,
@@ -159,5 +170,12 @@ export async function startServer(opts: ServerOptions): Promise<void> {
 
   // 6. Connect via stdio transport.
   const transport = new StdioServerTransport();
+  // The SDK transport does not close itself on stdin EOF. Release long-lived sidecars explicitly.
+  const closeOnEOF = () => { void mcpServer.close(); };
+  process.stdin.once("end", closeOnEOF);
+  mcpServer.onclose = () => {
+    process.stdin.off("end", closeOnEOF);
+    void opts.host.close().catch(error => console.error("aiw-server: host close failed", error));
+  };
   await mcpServer.connect(transport);
 }
