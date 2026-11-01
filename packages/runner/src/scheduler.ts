@@ -6,39 +6,44 @@ import { runJobAttempt } from "./job.ts";
 import { join } from "node:path";
 import { readAttemptCost, AttemptFailure, type CostSummary } from "./accounting.ts";
 
-const MAX_RETRIES = 2;
-const RETRY_BACKOFF_MS = [10_000, 60_000] as const;
 export type OnJobDone = (job: Job, result: JobJSON) => void;
 export interface SchedulerOptions {
   jobs: Job[]; config: RunConfig; runPath: string; repoRoot: string; apiKey: string; baseURL: string;
   turnLimits: Record<string, number>; problemsDir: string; onJobDone?: OnJobDone;
   /** Deterministic execution seam; defaults to the real attempt implementation. */
   runAttempt?: typeof runJobAttempt;
-  /** Deterministic backoff seam; defaults to real timers. */
-  wait?: (ms: number) => Promise<void>;
+  /** Host-only bounded provider; never serialized into run configuration. */
+  subscription?: ReturnType<typeof import("./subscription.ts").boundSubscriptionClient>;
 }
 
 /** Schedules bounded concurrent jobs and records each attempt's complete cost or lower bound. */
 export async function runScheduler(opts: SchedulerOptions, runJSON: RunJSON): Promise<string | undefined> {
+  if (!Number.isSafeInteger(opts.config.concurrency) || opts.config.concurrency < 1) throw new Error("concurrency must be a positive integer");
+  const subscriptionMode = opts.config.provider === "chatgpt" && opts.config.usageMode === "subscription";
+  if ((opts.config.provider === "chatgpt" || opts.config.usageMode === "subscription") && !subscriptionMode) throw new Error("Invalid provider/usage mode pairing");
+  if (subscriptionMode && (!opts.subscription || !opts.config.subscriptionLimits || opts.config.concurrency !== 1)) throw new Error("Subscription campaigns require a bounded host client and serial execution");
+  if (!subscriptionMode && (opts.config.budgetUsd === null || !Number.isFinite(opts.config.budgetUsd) || opts.config.budgetUsd <= 0)) throw new Error("Monetary campaigns require a positive finite dollar budget");
   const attempt = opts.runAttempt ?? runJobAttempt;
-  const wait = opts.wait ?? ((ms) => new Promise<void>((resolve) => setTimeout(resolve, ms)));
   const controller = new AbortController();
   let knownCostUsd = 0;
   let incomplete = false;
   let pass = 0, fail = 0, attempts = 0;
   let invalidReason: string | undefined;
   let next = 0;
+  const fatalErrors: unknown[] = [];
   /** Preserves the first causal stop reason; all already-dispatched attempts still settle/account. */
   function stop(reason: string): void {
     invalidReason ??= reason;
+    runJSON.status = { invalid: invalidReason };
     controller.abort();
   }
   /** Writes counters after attempts and terminal jobs, including exhausted failures. */
   function flush(): void {
-    runJSON.totals = { jobs: pass + fail, attempts, costUsd: incomplete ? null : knownCostUsd, knownCostUsd, pass, fail };
+    runJSON.totals = { jobs: pass + fail, attempts, costUsd: subscriptionMode || incomplete ? null : knownCostUsd, knownCostUsd, pass, fail };
+    if (subscriptionMode) runJSON.subscriptionUsage = opts.subscription!.snapshot();
     writeRunJSON(opts.runPath, runJSON);
   }
-  /** Executes one job and preserves raw retry artifacts before the next attempt. */
+  /** Executes one attempt only; diagnosis and another paid run require an explicit new campaign. */
   async function runOne(original: Job): Promise<void> {
     const job = { ...original, dir: original.dir ?? createJobDir(opts.runPath, original) };
     const records: AttemptRecord[] = [];
@@ -46,18 +51,16 @@ export async function runScheduler(opts: SchedulerOptions, runJSON: RunJSON): Pr
     const reasons = new Set<string>();
     let durationMs = 0;
     let result: Awaited<ReturnType<typeof runJobAttempt>> | undefined;
-    for (let n = 0; n <= MAX_RETRIES; n++) {
-      if (n > 0) {
-        await wait(RETRY_BACKOFF_MS[n - 1] ?? 60_000);
-        if (controller.signal.aborted) break;
-      }
+    {
+      const n = 0;
       createAttemptDir(job.dir, n);
       attempts++;
       let error: unknown;
       let failed = false;
       let cost: CostSummary;
       try {
-        result = await attempt({ ...opts, job, attempt: n, signal: controller.signal });
+        result = await attempt({ ...opts, job, attempt: n, signal: controller.signal,
+          onFailure: () => stop(`job-failed:${job.problem}.${job.framework}.${job.rep}`) });
         cost = { costUsd: result.costUsd, knownCostUsd: result.knownCostUsd ?? result.costUsd ?? 0,
           costIncompleteReasons: [...(result.costIncompleteReasons ?? [])] };
         durationMs += result.durationMs;
@@ -83,11 +86,19 @@ export async function runScheduler(opts: SchedulerOptions, runJSON: RunJSON): Pr
       records.push({ n, costUsd: cost.costUsd, knownCostUsd: cost.knownCostUsd,
         ...(cost.costIncompleteReasons.length ? { costIncompleteReasons: [...new Set(cost.costIncompleteReasons)] } : {}),
         ...(failed ? { infraError: error instanceof Error ? error.message : String(error) } : { final: true as const }) });
-      if (cost.costUsd === null) stop("cost-incomplete");
-      else if (knownCostUsd >= opts.config.budgetUsd) stop("budget");
+      if (!subscriptionMode) {
+        if (cost.costUsd === null) stop("cost-incomplete");
+        else if (knownCostUsd >= opts.config.budgetUsd!) stop("budget");
+      } else {
+        // Only absent per-request USD is expected for subscription usage. Corrupt/missing
+        // telemetry and unobserved lifecycle work still invalidate the campaign.
+        if (opts.subscription!.snapshot().incomplete || cost.knownCostUsd !== 0 ||
+            cost.costIncompleteReasons.some(reason => !["missing-or-invalid-turn-cost", "incomplete-attempt-cost"].includes(reason))) {
+          stop("subscription-usage-incomplete");
+        }
+      }
+      if (failed || result?.outcome !== "pass") stop(`job-failed:${job.problem}.${job.framework}.${job.rep}`);
       flush();
-      if (!failed || controller.signal.aborted) break;
-      if (n === MAX_RETRIES) stop(`job-failed:${job.problem}.${job.framework}.${job.rep}`);
     }
     const outcome = result?.outcome ?? "fail";
     if (outcome === "pass") pass++; else fail++;
@@ -105,10 +116,18 @@ export async function runScheduler(opts: SchedulerOptions, runJSON: RunJSON): Pr
   /** Workers claim indices synchronously before awaiting, so no job is dispatched twice. */
   async function worker(): Promise<void> {
     while (!controller.signal.aborted && next < opts.jobs.length) {
+      if (subscriptionMode && opts.subscription!.stopReason()) { stop(opts.subscription!.stopReason()!); break; }
       const job = opts.jobs[next++]!;
-      await runOne(job);
+      try { await runOne(job); }
+      catch (error) {
+        // Artifact/observer failures also stop spend; drain siblings before reporting the error.
+        fatalErrors.push(error);
+        stop(`scheduler-error:${job.problem}.${job.framework}.${job.rep}`);
+        try { flush(); } catch (writeError) { fatalErrors.push(writeError); }
+      }
     }
   }
   await Promise.all(Array.from({ length: Math.max(1, opts.config.concurrency) }, () => worker()));
+  if (fatalErrors.length) throw new AggregateError(fatalErrors, "campaign stopped after scheduler error; inspect preserved attempt evidence");
   return invalidReason;
 }

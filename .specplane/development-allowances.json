@@ -1,0 +1,584 @@
+{
+  "version": 1,
+  "kind": "post-migration-development",
+  "base_commit": "75ab542c626bc7276d2ee9575956899c79b6d75d",
+  "verified_development_head": "c4a70d06de17b7f924818d9f56662b593e5341a7",
+  "authorization_kind": "development requests only; final approval and merge remain human-only",
+  "user_requests": [
+    "Add sign in to open ai support for ai-workflow workflow runs",
+    "Additionally, try to approach testing in the future with saving money in mind, for example once hitting an error, stop all other runs and try to fix the error first."
+  ],
+  "source_commits": [
+    "1e133031b939d91d50b4502f8f624f506a15ef21",
+    "1540999c8d47de8184c68267e415f9a9c69d8189",
+    "c60442c4dc459a830c84833ed7e17cfa3626b3ac",
+    "cb39285c3974f85794bb96fe08883c5c2df13f3b",
+    "036443f193aa9fa9a9deccf568746d4cc5ee0670"
+  ],
+  "original_inventory_sha256": {
+    ".specplane/migration-runtime-inventory.json": "146f410af1aff2ef0957d3129d1afebca021960e7e6761b8970479c3c03c09d1",
+    ".specplane/migration-source-inventory.json": "adaa67f9f48596ea3cb6b63ff6a124a1276936e2f70997bde296d108dd967648"
+  },
+  "draft_plans": [
+    "plans/2026-11-01-failfast-campaign/PLAN.md",
+    "plans/2026-11-01-openai-plan-signin/PLAN.md"
+  ],
+  "changes": [
+    {
+      "path": "package-lock.json",
+      "before": {
+        "path": "package-lock.json",
+        "mode": "100644",
+        "sha256": "b2be20c6adb0468009faca1331b1131faa09730d6b6549f6675d7074b6d5ca26"
+      },
+      "after": {
+        "path": "package-lock.json",
+        "mode": "100644",
+        "sha256": "3e48f12d41270ec56b0ecaf87d485a5401a35856701038bfadb501db518b767b"
+      },
+      "rationale": "OpenAI sign-in, bounded host-brokered workflow usage and security regressions; fail-fast cancellation where shared with runner/core/server."
+    },
+    {
+      "path": "packages/core/src/orchestrate/executor.ts",
+      "before": {
+        "path": "packages/core/src/orchestrate/executor.ts",
+        "mode": "100644",
+        "sha256": "711a2f78c201e03be21e5a8501ef65d1b09912e803fc632bfde54bd4dd5f7b6c"
+      },
+      "after": {
+        "path": "packages/core/src/orchestrate/executor.ts",
+        "mode": "100644",
+        "sha256": "ed1fb7ff4d12600aa8c4e0f85173d2c84ad93b1bb50ddc31788bdbfaa45c2238"
+      },
+      "rationale": "Stop concurrent work and propagate cancellation after terminal failures, preserving task success requirements."
+    },
+    {
+      "path": "packages/core/src/orchestrate/planner-tools.ts",
+      "before": {
+        "path": "packages/core/src/orchestrate/planner-tools.ts",
+        "mode": "100644",
+        "sha256": "2988535ea323b701c7deb070885e40b1bd00061e1e82dab500a4eac6862fc4cd"
+      },
+      "after": {
+        "path": "packages/core/src/orchestrate/planner-tools.ts",
+        "mode": "100644",
+        "sha256": "5dec000457c21d8a33c0fae6caca093b7172ac39a8d2a55be6e9596e14406d83"
+      },
+      "rationale": "Stop concurrent work and propagate cancellation after terminal failures, preserving task success requirements."
+    },
+    {
+      "path": "packages/core/src/orchestrate/selection/index.ts",
+      "before": {
+        "path": "packages/core/src/orchestrate/selection/index.ts",
+        "mode": "100644",
+        "sha256": "900fe932f3a2cb179e125a63528ba2cd97f6af8e150466de30ce7690454b1f6c"
+      },
+      "after": {
+        "path": "packages/core/src/orchestrate/selection/index.ts",
+        "mode": "100644",
+        "sha256": "5a18769d32386c945fd64a03201597f23c99b01e36bd72de217404c7d5ca903b"
+      },
+      "rationale": "Stop concurrent work and propagate cancellation after terminal failures, preserving task success requirements."
+    },
+    {
+      "path": "packages/core/src/orchestrate/selection/rerank.ts",
+      "before": {
+        "path": "packages/core/src/orchestrate/selection/rerank.ts",
+        "mode": "100644",
+        "sha256": "1e868729e3f9b5b1f0140ac6b3c81be16c88d4b9139afdd20f70546c46d626ca"
+      },
+      "after": {
+        "path": "packages/core/src/orchestrate/selection/rerank.ts",
+        "mode": "100644",
+        "sha256": "893a4ae61ad070b2191dcda5a43f8ca040fed8b4b33a5db17b86d65de6b5db0a"
+      },
+      "rationale": "Stop concurrent work and propagate cancellation after terminal failures, preserving task success requirements."
+    },
+    {
+      "path": "packages/core/test/selection.test.ts",
+      "before": {
+        "path": "packages/core/test/selection.test.ts",
+        "mode": "100644",
+        "sha256": "3fa2f3e0e723a2d6cacaa0ee0cd701ae323704bcb47d960e4c0d6c54eff6145d"
+      },
+      "after": {
+        "path": "packages/core/test/selection.test.ts",
+        "mode": "100644",
+        "sha256": "a333f2561d620b69c699a3bd8b0f7ac72473ed11e2b16f7c29dd15521e358280"
+      },
+      "rationale": "Stop concurrent work and propagate cancellation after terminal failures, preserving task success requirements."
+    },
+    {
+      "path": "packages/llm/package.json",
+      "before": {
+        "path": "packages/llm/package.json",
+        "mode": "100644",
+        "sha256": "12a1a6e48cf2bc6e739b49f7195e8991e7174a5dd53cff932fa18663a101e9e6"
+      },
+      "after": {
+        "path": "packages/llm/package.json",
+        "mode": "100644",
+        "sha256": "6dbc1f9588b6940b3bd6daea4e4836115c8d5dcc0a3a4d81a3187e415b2cbfaa"
+      },
+      "rationale": "OpenAI sign-in, bounded host-brokered workflow usage and security regressions; fail-fast cancellation where shared with runner/core/server."
+    },
+    {
+      "path": "packages/llm/src/chatgpt-auth.ts",
+      "before": null,
+      "after": {
+        "path": "packages/llm/src/chatgpt-auth.ts",
+        "mode": "100644",
+        "sha256": "f1850389aacbd8995b609d60955b5bc17db9fdf4e6a55b454c2f38473e6e8560"
+      },
+      "rationale": "OpenAI sign-in, bounded host-brokered workflow usage and security regressions; fail-fast cancellation where shared with runner/core/server."
+    },
+    {
+      "path": "packages/llm/src/chatgpt-client.ts",
+      "before": null,
+      "after": {
+        "path": "packages/llm/src/chatgpt-client.ts",
+        "mode": "100644",
+        "sha256": "c781643d53243ffac824df2870b579e752c70db015758308f19478e3ef4717d3"
+      },
+      "rationale": "OpenAI sign-in, bounded host-brokered workflow usage and security regressions; fail-fast cancellation where shared with runner/core/server."
+    },
+    {
+      "path": "packages/llm/src/index.ts",
+      "before": {
+        "path": "packages/llm/src/index.ts",
+        "mode": "100644",
+        "sha256": "71a943f7138b2afc842183823ba0366de994985d4bc9d5678371f0bdba9b98e7"
+      },
+      "after": {
+        "path": "packages/llm/src/index.ts",
+        "mode": "100644",
+        "sha256": "4f284cb11581d143a07edd5f1f81b679c444a964a4ac3ca9e7cac8dd2b758844"
+      },
+      "rationale": "OpenAI sign-in, bounded host-brokered workflow usage and security regressions; fail-fast cancellation where shared with runner/core/server."
+    },
+    {
+      "path": "packages/llm/test/chatgpt-auth.test.ts",
+      "before": null,
+      "after": {
+        "path": "packages/llm/test/chatgpt-auth.test.ts",
+        "mode": "100644",
+        "sha256": "92a36a3a9af5d651a08cab01c247a04652d0943beada6a0ea33203f1b073a5c8"
+      },
+      "rationale": "OpenAI sign-in, bounded host-brokered workflow usage and security regressions; fail-fast cancellation where shared with runner/core/server."
+    },
+    {
+      "path": "packages/llm/test/chatgpt-client.test.ts",
+      "before": null,
+      "after": {
+        "path": "packages/llm/test/chatgpt-client.test.ts",
+        "mode": "100644",
+        "sha256": "010eaf84c0bc7c7366d2b53fe7458e12287b2df9bdd7c285727ee63259e96ea2"
+      },
+      "rationale": "OpenAI sign-in, bounded host-brokered workflow usage and security regressions; fail-fast cancellation where shared with runner/core/server."
+    },
+    {
+      "path": "packages/runner/package.json",
+      "before": {
+        "path": "packages/runner/package.json",
+        "mode": "100644",
+        "sha256": "eda68eb97794e63c3a45a0f3b07a7d7e9eb948c30a713fe1a3291a378fce50a3"
+      },
+      "after": {
+        "path": "packages/runner/package.json",
+        "mode": "100644",
+        "sha256": "0d4727bb178404e26190903a293e35dc01baa2f1edcd95d65508a0c52dae5284"
+      },
+      "rationale": "OpenAI sign-in, bounded host-brokered workflow usage and security regressions; fail-fast cancellation where shared with runner/core/server."
+    },
+    {
+      "path": "packages/runner/src/auth-cli.ts",
+      "before": null,
+      "after": {
+        "path": "packages/runner/src/auth-cli.ts",
+        "mode": "100644",
+        "sha256": "86ad03fdedc2efb761a7a4967b8509dde05d0210adad9e6f83751f2c618a9293"
+      },
+      "rationale": "OpenAI sign-in, bounded host-brokered workflow usage and security regressions; fail-fast cancellation where shared with runner/core/server."
+    },
+    {
+      "path": "packages/runner/src/cancellation.ts",
+      "before": null,
+      "after": {
+        "path": "packages/runner/src/cancellation.ts",
+        "mode": "100644",
+        "sha256": "5e69663371a8a772183596e65656d65a3e22c8af3d8647ce080eeaa6cae01dc3"
+      },
+      "rationale": "Stop concurrent work and propagate cancellation after terminal failures, preserving task success requirements."
+    },
+    {
+      "path": "packages/runner/src/cli.ts",
+      "before": {
+        "path": "packages/runner/src/cli.ts",
+        "mode": "100755",
+        "sha256": "7706badc85ee41abb5fba425fa89e4078ca90f749b73e59648ac3cb57f648276"
+      },
+      "after": {
+        "path": "packages/runner/src/cli.ts",
+        "mode": "100755",
+        "sha256": "3720af342c949c831f19500aea119182bab9e7390d69280cf9d85ea66c05e8fb"
+      },
+      "rationale": "OpenAI sign-in, bounded host-brokered workflow usage and security regressions; fail-fast cancellation where shared with runner/core/server."
+    },
+    {
+      "path": "packages/runner/src/combine.ts",
+      "before": {
+        "path": "packages/runner/src/combine.ts",
+        "mode": "100644",
+        "sha256": "0ced3cb7776918434091a700fc2ea83325d3f7c7c82e38004b25503eb2d04a58"
+      },
+      "after": {
+        "path": "packages/runner/src/combine.ts",
+        "mode": "100644",
+        "sha256": "e821b11c599026aaf654e727ccdaea0985f2f66abeb4360b9df2c2def5855d69"
+      },
+      "rationale": "OpenAI sign-in, bounded host-brokered workflow usage and security regressions; fail-fast cancellation where shared with runner/core/server."
+    },
+    {
+      "path": "packages/runner/src/config.ts",
+      "before": {
+        "path": "packages/runner/src/config.ts",
+        "mode": "100644",
+        "sha256": "838db80b50c1ae65c3029306a58fb2314c0a196721e26606f49c14fb2b4e4eac"
+      },
+      "after": {
+        "path": "packages/runner/src/config.ts",
+        "mode": "100644",
+        "sha256": "eee9726d9a73953b226904555fa8ff6bae9004ddcf9648e65db763f6ee70e3c0"
+      },
+      "rationale": "OpenAI sign-in, bounded host-brokered workflow usage and security regressions; fail-fast cancellation where shared with runner/core/server."
+    },
+    {
+      "path": "packages/runner/src/framework-launch.ts",
+      "before": {
+        "path": "packages/runner/src/framework-launch.ts",
+        "mode": "100644",
+        "sha256": "d7daf3885578e4784585b7f83f6f78358a830f1a4a9850e7f3089552bce2915b"
+      },
+      "after": {
+        "path": "packages/runner/src/framework-launch.ts",
+        "mode": "100644",
+        "sha256": "a10544e5002228d77d17920197726ad607d9ee319b2d083eab7e69e11220a183"
+      },
+      "rationale": "OpenAI sign-in, bounded host-brokered workflow usage and security regressions; fail-fast cancellation where shared with runner/core/server."
+    },
+    {
+      "path": "packages/runner/src/job.ts",
+      "before": {
+        "path": "packages/runner/src/job.ts",
+        "mode": "100644",
+        "sha256": "3f84bbfc495f3cae1b78a22c23aa6f76e6cfc75074b1bc009bc23dfefad57a94"
+      },
+      "after": {
+        "path": "packages/runner/src/job.ts",
+        "mode": "100644",
+        "sha256": "c9a639eda852713f283e8d1fac577eda6edfe8ee7d6757033a052ca9e7eb87aa"
+      },
+      "rationale": "OpenAI sign-in, bounded host-brokered workflow usage and security regressions; fail-fast cancellation where shared with runner/core/server."
+    },
+    {
+      "path": "packages/runner/src/llm-broker.ts",
+      "before": null,
+      "after": {
+        "path": "packages/runner/src/llm-broker.ts",
+        "mode": "100644",
+        "sha256": "bd4295ca15f2b0952e0bd74d029be749c9f613cef3ba8cf96e4021479a615926"
+      },
+      "rationale": "OpenAI sign-in, bounded host-brokered workflow usage and security regressions; fail-fast cancellation where shared with runner/core/server."
+    },
+    {
+      "path": "packages/runner/src/loop.ts",
+      "before": {
+        "path": "packages/runner/src/loop.ts",
+        "mode": "100644",
+        "sha256": "48faebf9a43d2293ed25fd6f72282eea442b427a81a7d1a36d67f1b219523fa0"
+      },
+      "after": {
+        "path": "packages/runner/src/loop.ts",
+        "mode": "100644",
+        "sha256": "a024dcc7b0c924be5035a3ad4d79e74bb943a5617b150964df7b88d205aaf4aa"
+      },
+      "rationale": "OpenAI sign-in, bounded host-brokered workflow usage and security regressions; fail-fast cancellation where shared with runner/core/server."
+    },
+    {
+      "path": "packages/runner/src/mcp.ts",
+      "before": {
+        "path": "packages/runner/src/mcp.ts",
+        "mode": "100644",
+        "sha256": "324e98efc5986274ab75907c9685fce242b87e2817f199c04c774d3b81a2d0aa"
+      },
+      "after": {
+        "path": "packages/runner/src/mcp.ts",
+        "mode": "100644",
+        "sha256": "231908061ad331e1fabdbafc21f8e8061a017f8c264d968fe51eb5255cfc4a45"
+      },
+      "rationale": "OpenAI sign-in, bounded host-brokered workflow usage and security regressions; fail-fast cancellation where shared with runner/core/server."
+    },
+    {
+      "path": "packages/runner/src/plan.ts",
+      "before": {
+        "path": "packages/runner/src/plan.ts",
+        "mode": "100644",
+        "sha256": "74300ae7b8090dadff237a33259e46572edefc69f552205def8b5fee14daed05"
+      },
+      "after": {
+        "path": "packages/runner/src/plan.ts",
+        "mode": "100644",
+        "sha256": "7ba92ce95241e0126e500a5a6efcc48dabc50a272e78a21eba45b5ba00ca5e17"
+      },
+      "rationale": "OpenAI sign-in, bounded host-brokered workflow usage and security regressions; fail-fast cancellation where shared with runner/core/server."
+    },
+    {
+      "path": "packages/runner/src/rundir.ts",
+      "before": {
+        "path": "packages/runner/src/rundir.ts",
+        "mode": "100644",
+        "sha256": "866ba51c1a47f53596dc1969b03d4e1d909b9b77416b704dba322fe2ca83cb97"
+      },
+      "after": {
+        "path": "packages/runner/src/rundir.ts",
+        "mode": "100644",
+        "sha256": "72f68872aa3b86466b051239696d17af2fa5eb82138753edf7306d1472bd679c"
+      },
+      "rationale": "OpenAI sign-in, bounded host-brokered workflow usage and security regressions; fail-fast cancellation where shared with runner/core/server."
+    },
+    {
+      "path": "packages/runner/src/scheduler.ts",
+      "before": {
+        "path": "packages/runner/src/scheduler.ts",
+        "mode": "100644",
+        "sha256": "9728ba9e078fc1b3bf22ef6168b358a8374885d03b8dfdf19c4a079ff34d34f1"
+      },
+      "after": {
+        "path": "packages/runner/src/scheduler.ts",
+        "mode": "100644",
+        "sha256": "a3370c54d73b215df84c99bfb9013dc50e60667f8118ef75729809fa06289411"
+      },
+      "rationale": "OpenAI sign-in, bounded host-brokered workflow usage and security regressions; fail-fast cancellation where shared with runner/core/server."
+    },
+    {
+      "path": "packages/runner/src/subscription.ts",
+      "before": null,
+      "after": {
+        "path": "packages/runner/src/subscription.ts",
+        "mode": "100644",
+        "sha256": "bb53b37ed25d4612ce32fc8ab6e3b3f32063a759181049a681807e6ecacc97b9"
+      },
+      "rationale": "OpenAI sign-in, bounded host-brokered workflow usage and security regressions; fail-fast cancellation where shared with runner/core/server."
+    },
+    {
+      "path": "packages/runner/src/types.ts",
+      "before": {
+        "path": "packages/runner/src/types.ts",
+        "mode": "100644",
+        "sha256": "7aca7c2ed734a34b32596b82329a23e9d7c7d0fd822ca13927bc90286892261d"
+      },
+      "after": {
+        "path": "packages/runner/src/types.ts",
+        "mode": "100644",
+        "sha256": "8ff68f860d02b580a3ed582aac9b1b5eb47cb85f83ae41ecb7af5def460ab7f3"
+      },
+      "rationale": "OpenAI sign-in, bounded host-brokered workflow usage and security regressions; fail-fast cancellation where shared with runner/core/server."
+    },
+    {
+      "path": "packages/runner/test/accounting.test.ts",
+      "before": {
+        "path": "packages/runner/test/accounting.test.ts",
+        "mode": "100644",
+        "sha256": "e301cdafb384fd069eb6975464e74b0903e279b8ec03c5c0d86ea83c55612aa6"
+      },
+      "after": {
+        "path": "packages/runner/test/accounting.test.ts",
+        "mode": "100644",
+        "sha256": "f3ab35242a455f85c3254be7082e73d02102d0ad9e699cecf991baf8635e9bfe"
+      },
+      "rationale": "OpenAI sign-in, bounded host-brokered workflow usage and security regressions; fail-fast cancellation where shared with runner/core/server."
+    },
+    {
+      "path": "packages/runner/test/cancellation.test.ts",
+      "before": null,
+      "after": {
+        "path": "packages/runner/test/cancellation.test.ts",
+        "mode": "100644",
+        "sha256": "a6afa1b241392e97ecbdee84c5c8e739801c6e2bd6dd7c092bef8d9ef8ce056a"
+      },
+      "rationale": "Stop concurrent work and propagate cancellation after terminal failures, preserving task success requirements."
+    },
+    {
+      "path": "packages/runner/test/chatgpt-orchestrate.test.ts",
+      "before": null,
+      "after": {
+        "path": "packages/runner/test/chatgpt-orchestrate.test.ts",
+        "mode": "100644",
+        "sha256": "8485d27d901f7dbefd2aace9439c1da18299d1cb73b9e2c3d0e8d5d56f2b2a71"
+      },
+      "rationale": "OpenAI sign-in, bounded host-brokered workflow usage and security regressions; fail-fast cancellation where shared with runner/core/server."
+    },
+    {
+      "path": "packages/runner/test/chatgpt-workflow.test.ts",
+      "before": null,
+      "after": {
+        "path": "packages/runner/test/chatgpt-workflow.test.ts",
+        "mode": "100644",
+        "sha256": "43acdeab8e103e086e27c97fb4682de7b803ce69f6d1c71aa27d0f9b56104982"
+      },
+      "rationale": "OpenAI sign-in, bounded host-brokered workflow usage and security regressions; fail-fast cancellation where shared with runner/core/server."
+    },
+    {
+      "path": "packages/runner/test/combine.test.ts",
+      "before": {
+        "path": "packages/runner/test/combine.test.ts",
+        "mode": "100644",
+        "sha256": "d33aae6f212d725d501897e6f514be1cd93f855394d7e07dfbf7176349cfcfee"
+      },
+      "after": {
+        "path": "packages/runner/test/combine.test.ts",
+        "mode": "100644",
+        "sha256": "97829f8a7b6f5c57c184a7f51648510c08a4f3cd52d1a648b5a921844e300476"
+      },
+      "rationale": "OpenAI sign-in, bounded host-brokered workflow usage and security regressions; fail-fast cancellation where shared with runner/core/server."
+    },
+    {
+      "path": "packages/runner/test/config.test.ts",
+      "before": {
+        "path": "packages/runner/test/config.test.ts",
+        "mode": "100644",
+        "sha256": "20f78754c4c3b322f9f600a7cf24f5cb9acff2a768084e733837f57915bfb576"
+      },
+      "after": {
+        "path": "packages/runner/test/config.test.ts",
+        "mode": "100644",
+        "sha256": "e03c55a2fa68a93d9fa7ca9b1a6837954cc3467d9f27e48c657f1e931d9d60cc"
+      },
+      "rationale": "OpenAI sign-in, bounded host-brokered workflow usage and security regressions; fail-fast cancellation where shared with runner/core/server."
+    },
+    {
+      "path": "packages/runner/test/llm-broker.test.ts",
+      "before": null,
+      "after": {
+        "path": "packages/runner/test/llm-broker.test.ts",
+        "mode": "100644",
+        "sha256": "7da47aec634155f7edad567478a5a51ea9d7d339733ce0bd2966a4aceeab167f"
+      },
+      "rationale": "OpenAI sign-in, bounded host-brokered workflow usage and security regressions; fail-fast cancellation where shared with runner/core/server."
+    },
+    {
+      "path": "packages/runner/test/subscription.test.ts",
+      "before": null,
+      "after": {
+        "path": "packages/runner/test/subscription.test.ts",
+        "mode": "100644",
+        "sha256": "3bafc7b948b86a5263b5082563acc0c53803842d9533a2cba0d62d65fbbb2307"
+      },
+      "rationale": "OpenAI sign-in, bounded host-brokered workflow usage and security regressions; fail-fast cancellation where shared with runner/core/server."
+    },
+    {
+      "path": "packages/server/build.mjs",
+      "before": {
+        "path": "packages/server/build.mjs",
+        "mode": "100644",
+        "sha256": "8fc3bf5a81c852b0aaa03ba5fcaa952674fbbe25c483778d66b6c2c92e8a0823"
+      },
+      "after": {
+        "path": "packages/server/build.mjs",
+        "mode": "100644",
+        "sha256": "73ad7b81bdb1ef0622dc851570ed83b60721122543f1ce4cb07267ab90253b2d"
+      },
+      "rationale": "Rebuild/verify coherent tracked runtime and honor explicit engine selection without silent fallback."
+    },
+    {
+      "path": "packages/server/dist/aiw-server.mjs",
+      "before": {
+        "path": "packages/server/dist/aiw-server.mjs",
+        "mode": "100755",
+        "sha256": "8c22450ec0249dd085bb39242c30e98ab4171b8f89cab21a0e62851980e4d96c"
+      },
+      "after": {
+        "path": "packages/server/dist/aiw-server.mjs",
+        "mode": "100755",
+        "sha256": "be575a73bc61064016fa48ec5b382e317111fec0b5d3a4b5be84ad0838637de1"
+      },
+      "rationale": "Rebuild/verify coherent tracked runtime and honor explicit engine selection without silent fallback."
+    },
+    {
+      "path": "packages/server/package.json",
+      "before": {
+        "path": "packages/server/package.json",
+        "mode": "100644",
+        "sha256": "ac88ddc0147697fdf03ba686a0c99b6225b0b77ba600e9c38196a902be00f5d3"
+      },
+      "after": {
+        "path": "packages/server/package.json",
+        "mode": "100644",
+        "sha256": "bc3503270027a2d7ad0a943a1eb29952f3b1b7c063430eb71d3aa2d52128266c"
+      },
+      "rationale": "OpenAI sign-in, bounded host-brokered workflow usage and security regressions; fail-fast cancellation where shared with runner/core/server."
+    },
+    {
+      "path": "packages/server/src/cli.ts",
+      "before": {
+        "path": "packages/server/src/cli.ts",
+        "mode": "100755",
+        "sha256": "e756e5a49ce3e6b3705a3caf46b2c7807252e10ae06e129426172fad8a864b13"
+      },
+      "after": {
+        "path": "packages/server/src/cli.ts",
+        "mode": "100755",
+        "sha256": "51de5b7e39b9bea86a4381ed2f121c5dd27b8e03678ddbe2c03c92f249518339"
+      },
+      "rationale": "OpenAI sign-in, bounded host-brokered workflow usage and security regressions; fail-fast cancellation where shared with runner/core/server."
+    },
+    {
+      "path": "packages/server/src/host-client.ts",
+      "before": null,
+      "after": {
+        "path": "packages/server/src/host-client.ts",
+        "mode": "100644",
+        "sha256": "ea3e7554f63f3d783330ecce8d61563e49736d399815fba26dfe52591d6fd419"
+      },
+      "rationale": "OpenAI sign-in, bounded host-brokered workflow usage and security regressions; fail-fast cancellation where shared with runner/core/server."
+    },
+    {
+      "path": "packages/server/src/server.ts",
+      "before": {
+        "path": "packages/server/src/server.ts",
+        "mode": "100644",
+        "sha256": "706dd38fe5b81001e6d470e064966e10cf9995dd4d629733c407a518bf745c92"
+      },
+      "after": {
+        "path": "packages/server/src/server.ts",
+        "mode": "100644",
+        "sha256": "6831569c9b068187cd6b6106da353700d8b467d6204e5a1bb498396c32c4b50e"
+      },
+      "rationale": "OpenAI sign-in, bounded host-brokered workflow usage and security regressions; fail-fast cancellation where shared with runner/core/server."
+    },
+    {
+      "path": "packages/server/test/bundle.test.ts",
+      "before": null,
+      "after": {
+        "path": "packages/server/test/bundle.test.ts",
+        "mode": "100644",
+        "sha256": "4590c1cc7d2c6ea14e28cd86ab7e53a4430537f4a074d70207ef5c65a0657a40"
+      },
+      "rationale": "Rebuild/verify coherent tracked runtime and honor explicit engine selection without silent fallback."
+    },
+    {
+      "path": "packages/server/test/telemetry-session.test.ts",
+      "before": {
+        "path": "packages/server/test/telemetry-session.test.ts",
+        "mode": "100644",
+        "sha256": "b9aec64519f75fb9a0cf60396fe4473e29783269a2579603a82cc396897fa7c4"
+      },
+      "after": {
+        "path": "packages/server/test/telemetry-session.test.ts",
+        "mode": "100644",
+        "sha256": "72512a3f54b10cb120545028251eec02b1fda030367527dcf8d5087418e3fca9"
+      },
+      "rationale": "OpenAI sign-in, bounded host-brokered workflow usage and security regressions; fail-fast cancellation where shared with runner/core/server."
+    }
+  ]
+}

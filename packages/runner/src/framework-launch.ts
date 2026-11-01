@@ -15,8 +15,10 @@ export function frameworkLaunch(framework: string, config: RunConfig, credential
     id: parsed.id, needsExecutor,
     executorArgs: needsExecutor ? [
       "--executor-model", config.models.secondary,
-      "--executor-api-key", credentials.apiKey,
-      "--executor-base-url", credentials.baseURL,
+      ...(config.provider === "chatgpt" ? ["--executor-provider", "host"] : [
+        "--executor-api-key", credentials.apiKey,
+        "--executor-base-url", credentials.baseURL,
+      ]),
       "--secondary-cap", String(parsed.variant.secondary ?? config.secondaryCap),
     ] : [],
   };

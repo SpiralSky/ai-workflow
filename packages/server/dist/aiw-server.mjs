@@ -14177,17 +14177,17 @@ function partial(Class2, schema, mask, name = "partial") {
   if (hasChecks) {
     throw new Error(`.${name}() cannot be used on object schemas containing refinements`);
   }
-  const selected = mask ? new Set(maskedKeys(schema, mask)) : void 0;
+  const selected2 = mask ? new Set(maskedKeys(schema, mask)) : void 0;
   const newShape = {};
-  mirrorShape(newShape, schema, Reflect.ownKeys(sourceShape(schema)), Class2 && ((value, key) => selected && !selected.has(key) ? value : new Class2({ type: "optional", innerType: value })));
+  mirrorShape(newShape, schema, Reflect.ownKeys(sourceShape(schema)), Class2 && ((value, key) => selected2 && !selected2.has(key) ? value : new Class2({ type: "optional", innerType: value })));
   return clone(schema, mergeDefs(schema._zod.def, { shape: newShape, checks: [] }));
 }
 function required(Class2, schema, mask) {
-  const selected = mask ? new Set(maskedKeys(schema, mask)) : void 0;
+  const selected2 = mask ? new Set(maskedKeys(schema, mask)) : void 0;
   const newShape = {};
   mirrorShape(newShape, schema, Reflect.ownKeys(sourceShape(schema)), (value, key) => (
     // overwrite with non-optional
-    selected && !selected.has(key) ? value : new Class2({ type: "nonoptional", innerType: value })
+    selected2 && !selected2.has(key) ? value : new Class2({ type: "nonoptional", innerType: value })
   ));
   return clone(schema, mergeDefs(schema._zod.def, { shape: newShape }));
 }
@@ -37447,6 +37447,75 @@ function renderTrace(result, opts) {
   return lines2.join("\n");
 }
 
+// packages/core/src/branch/engines/isolated-vm.ts
+var ivmModule;
+function loadIsolatedVM() {
+  ivmModule ??= import("isolated-vm").then((m) => m.default ?? m);
+  return ivmModule;
+}
+var isolatedVMRuntime = {
+  async create({ memoryMb }) {
+    const ivm = await loadIsolatedVM();
+    const isolate = new ivm.Isolate({ memoryLimit: memoryMb });
+    const context = isolate.createContextSync();
+    return {
+      load(js, filename) {
+        isolate.compileScriptSync(js, { filename }).runSync(context);
+      },
+      bridge(fns) {
+        context.global.setSync("__callRef", new ivm.Reference((s) => fns.call(s)));
+        context.global.setSync("__flushRef", new ivm.Reference((s) => fns.flush(s)));
+        isolate.compileScriptSync(
+          `(function (callRef, flushRef) {
+              globalThis.__host = {
+                call: (s) => callRef.apply(undefined, [s], { result: { promise: true } }),
+                flush: (s) => flushRef.applySync(undefined, [s]),
+              };
+            })(__callRef, __flushRef);
+            delete globalThis.__callRef; delete globalThis.__flushRef;`,
+          { filename: "bridge.js" }
+        ).runSync(context);
+      },
+      run: (expr) => context.eval(expr, { promise: true, copy: true, filename: "run.js" }),
+      dispose() {
+        if (!isolate.isDisposed) isolate.dispose();
+      },
+      get disposed() {
+        return isolate.isDisposed;
+      }
+    };
+  }
+};
+
+// packages/core/src/branch/engines/index.ts
+function hasNoNodeSnapshot() {
+  return process.execArgv.includes("--no-node-snapshot") || /(^|\s)--no-node-snapshot(\s|$)/.test(process.env.NODE_OPTIONS ?? "");
+}
+async function selectRuntime(pref) {
+  if (pref === "quickjs") return { runtime: quickJSRuntime, engine: "quickjs" };
+  let failure2;
+  if (!hasNoNodeSnapshot()) failure2 = "Node was not started with --no-node-snapshot";
+  else {
+    try {
+      await loadIsolatedVM();
+    } catch (e) {
+      failure2 = `isolated-vm could not be loaded (${e?.message ?? e})`;
+    }
+  }
+  if (pref === "isolated-vm") {
+    if (failure2) throw new Error(`engine "isolated-vm" is unavailable: ${failure2}. Install isolated-vm for this platform (Node 22 or 24) and start Node with --no-node-snapshot.`);
+    return { runtime: isolatedVMRuntime, engine: "isolated-vm" };
+  }
+  if (failure2) {
+    return {
+      runtime: quickJSRuntime,
+      engine: "quickjs",
+      note: `using the QuickJS engine (${failure2}); for the faster isolated-vm engine install isolated-vm for this platform (Node 22 or 24) and start Node with --no-node-snapshot`
+    };
+  }
+  return { runtime: isolatedVMRuntime, engine: "isolated-vm" };
+}
+
 // packages/core/src/registry/normalize.ts
 var dropInvalid = (s) => s.replace(/[^A-Za-z0-9_$]/g, "");
 function camel(s) {
@@ -38084,6 +38153,14 @@ function wrapTools(tools, reporter) {
     };
   }
   return out;
+}
+function fromMeta(meta3, root2) {
+  const parent = meta3?.["aiw/parent"];
+  const harnessId = meta3?.["aiw/harnessId"];
+  return root2.scopedTo(
+    typeof parent === "string" ? parent : null,
+    typeof harnessId === "string" ? harnessId : void 0
+  );
 }
 function wrapLLM(client, reporter, role, opts = {}) {
   return {
@@ -38851,7 +38928,7 @@ ${h.code}
     async findTools(args) {
       const need = typeof args.need === "string" ? args.need.trim() : "";
       if (!need) throw new Error("findTools: `need` must be a non-empty string");
-      const sel = await input2.selector.select({ instruction: need, exclude: [...present.keys()], reporter: currentReporter() ?? reporter }, registry2.decls);
+      const sel = await input2.selector.select({ instruction: need, exclude: [...present.keys()], reporter: currentReporter() ?? reporter, signal: input2.signal }, registry2.decls);
       const added = sel.tools.filter((d2) => !present.has(d2.name)).slice(0, escalationLimit);
       escalations.push({ kind: "escalation", need, tools: added.map((d2) => d2.name) });
       if (!added.length) return "No other tools match that need.";
@@ -38921,6 +38998,7 @@ ${notes.join("\n")}` : text;
   let exhausted = false;
   const request = async () => {
     used++;
+    input2.signal?.throwIfAborted();
     const body = { model: input2.model, system, tools: [branchToolDef()], messages: [...messages], signal: input2.signal };
     if (input2.temperature !== void 0) body.temperature = input2.temperature;
     const res = await llm.complete(body);
@@ -39008,6 +39086,7 @@ function doTool(input2) {
       additionalProperties: false
     },
     async handle(args, call) {
+      call.signal?.throwIfAborted();
       const instruction = args.instruction;
       if (typeof instruction !== "string" || !instruction.trim()) return fail("do: `instruction` must be a non-empty string");
       let override;
@@ -39022,8 +39101,9 @@ function doTool(input2) {
       const step = task.startStep({ instruction, executor: input2.model });
       let lease;
       try {
-        const selection = await input2.selector.select({ instruction, override, reporter: call.reporter }, registry2.decls);
+        const selection = await input2.selector.select({ instruction, override, reporter: call.reporter, signal: call.signal }, registry2.decls);
         lease = await task.acquire(selection.tools.every((d2) => d2.meta.effect === "read") ? "shared" : "exclusive");
+        call.signal?.throwIfAborted();
         const held = lease;
         const result = await runExecutor({
           instruction,
@@ -39174,6 +39254,7 @@ function parseNames(text) {
 function llmReranker(client, opts) {
   return {
     async rerank(instruction, candidates, ctx = {}) {
+      ctx.signal?.throwIfAborted();
       if (candidates.length === 0) return [];
       const reporter = ctx.reporter ?? opts.reporter;
       if (!reporter) throw new Error("llmReranker needs a reporter (option or ctx) to report the selection turn");
@@ -39184,6 +39265,7 @@ function llmReranker(client, opts) {
       }).join("\n");
       const res = await wrapLLM(client, reporter, "selection").complete({
         model: opts.model,
+        signal: ctx.signal,
         system: loadPrompt("rerank"),
         tools: [],
         messages: [{ role: "user", content: `Task:
@@ -39212,6 +39294,7 @@ function createSelector(opts) {
   const n = opts.n ?? DEFAULT_N;
   return {
     async select(q, catalog2) {
+      q.signal?.throwIfAborted();
       const exclude = new Set(q.exclude ?? []);
       const byName = new Map(catalog2.map((d2) => [d2.name, d2]));
       if (q.override) {
@@ -39221,7 +39304,7 @@ function createSelector(opts) {
         return { tools: tools2, stages: { retrieved: [], final: tools2.map((d2) => d2.name), override: true } };
       }
       const retrieved = retrieve(q.instruction, catalog2, { k, exclude });
-      const ctx = { reporter: q.reporter, fallback: false };
+      const ctx = { reporter: q.reporter, signal: q.signal, fallback: false };
       const reranked = await opts.reranker.rerank(q.instruction, retrieved.map((r) => r.tool), ctx);
       const tools = complete(reranked.slice(0, n), catalog2).filter((d2) => !exclude.has(d2.name));
       const stages = {
@@ -39636,7 +39719,7 @@ function buildFramework(kind2, realRegistry, opts) {
     if (opts.variant?.hotPaths) throw new Error("hot paths not built yet");
     if (opts.variant?.executor === "calls") throw new Error("executor variant `calls` is not built yet");
     task = o.task ?? new Task({ workspaceRoot: o.workspaceRoot });
-    const reranker = (o.rerank ?? "llm") === "none" ? noneReranker : llmReranker(o.client, { model: o.rerankModel ?? o.model });
+    const reranker = (opts.variant?.rerank ?? o.rerank ?? "llm") === "none" ? noneReranker : llmReranker(o.client, { model: o.rerankModel ?? o.model });
     const planner = {
       task,
       registry: registry2,
@@ -39650,7 +39733,7 @@ function buildFramework(kind2, realRegistry, opts) {
       pathExists: o.pathExists ?? fsPathExists(o.workspaceRoot),
       runtime: opts.runtime,
       limits: {
-        turns: o.turns,
+        turns: opts.variant?.secondary ?? o.turns,
         reportMaxChars: o.reportMaxChars,
         outputCap: opts.outputCap,
         timeoutMs: opts.timeoutMs,
@@ -39666,6 +39749,38 @@ function buildFramework(kind2, realRegistry, opts) {
   }
   const toolsHash = sha256(canonicalJSON(tools.map((t) => ({ name: t.name, description: t.description, inputSchema: t.inputSchema }))));
   return { kind: kind2, instructions, tools, fingerprint: { promptHash: sha256(instructions), toolsHash }, state, ...task ? { task } : {} };
+}
+
+// packages/core/src/framework/variant.ts
+function parseFrameworkVariant(raw) {
+  const match = /^(baseline|branch-only|orchestrate)(?:\[([^\[\]]*)\])?$/.exec(raw.trim());
+  if (!match) throw new Error(`Invalid framework variant: ${raw}`);
+  const kind2 = match[1];
+  const variant3 = {};
+  const pairs = /* @__PURE__ */ new Map();
+  const content = match[2]?.trim();
+  for (const rawPart of content ? content.split(",") : []) {
+    const part = rawPart.trim();
+    const [key, value, extra] = part.split("=").map((s) => s.trim());
+    if (!key || extra !== void 0 || pairs.has(key)) throw new Error(`Malformed or duplicate variant key: ${part}`);
+    const positiveInt = () => {
+      if (!value || !/^[1-9][0-9]*$/.test(value) || !Number.isSafeInteger(Number(value))) {
+        throw new Error(`${key} must be a positive safe integer`);
+      }
+      return Number(value);
+    };
+    if (key === "catalog") variant3.catalog = positiveInt();
+    else if (key === "toolSearch" && kind2 === "branch-only" && value === void 0) variant3.toolSearch = true;
+    else if (key === "rerank" && kind2 === "orchestrate" && (value === "llm" || value === "none")) variant3.rerank = value;
+    else if (key === "secondary" && kind2 === "orchestrate") variant3.secondary = positiveInt();
+    else if (key === "executor" && kind2 === "orchestrate" && value === "branch") variant3.executor = value;
+    else if (key === "hotPaths" || key === "executor" && value === "calls") {
+      throw new Error(`Framework treatment is not implemented: ${part}`);
+    } else throw new Error(`Unsupported variant for ${kind2}: ${part}`);
+    pairs.set(key, value === void 0 ? key : `${key}=${value}`);
+  }
+  const suffix = [...pairs.keys()].sort().map((key) => pairs.get(key)).join(",");
+  return { kind: kind2, variant: variant3, id: suffix ? `${kind2}[${suffix}]` : kind2 };
 }
 
 // packages/llm/src/usage.ts
@@ -39760,15 +39875,77 @@ function createChatClient(opts) {
 }
 var numericCode = (c) => typeof c === "number" ? c : void 0;
 
+// packages/llm/src/chatgpt-auth.ts
+var ISSUER = "https://auth.openai.com";
+var AUTHORIZE = `${ISSUER}/api/accounts/authorize`;
+var TOKEN = `${ISSUER}/api/accounts/oauth/token`;
+var JWKS = `${ISSUER}/.well-known/jwks.json`;
+var DISCOVERY = `${ISSUER}/.well-known/openid-configuration`;
+
+// packages/llm/src/chatgpt-client.ts
+var MAX_EVENT_BYTES = 16 * 1024 * 1024;
+
+// packages/server/src/host-client.ts
+import { randomUUID } from "node:crypto";
+var HostCompletionSchema = ResultSchema.extend({
+  response: external_exports.unknown(),
+  usage: external_exports.object({
+    input: external_exports.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER),
+    output: external_exports.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER),
+    cachedRead: external_exports.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER).optional(),
+    cacheWrite: external_exports.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER).optional()
+  }).refine((usage) => (usage.cachedRead ?? 0) <= usage.input),
+  costUsd: external_exports.number().finite().nonnegative().optional(),
+  cacheHit: external_exports.boolean().optional()
+});
+function createHostLLMClient(server, opts = {}) {
+  const timeoutMs = opts.timeoutMs ?? 3e5;
+  if (!Number.isSafeInteger(timeoutMs) || timeoutMs < 1) throw new Error("Invalid host LLM timeout");
+  return {
+    async complete(req) {
+      const callerSignal = req.signal instanceof AbortSignal ? req.signal : void 0;
+      const timeout = AbortSignal.timeout(timeoutMs);
+      const signal = callerSignal ? AbortSignal.any([callerSignal, timeout]) : timeout;
+      signal.throwIfAborted();
+      const endpoint = server();
+      if (!endpoint.getClientCapabilities()?.experimental?.["aiw/llm/complete"]) {
+        throw new LLMError("infra", "Host LLM broker is not available");
+      }
+      const requestId = randomUUID();
+      const cancel = () => {
+        void endpoint.notification({ method: "aiw/llm/cancel", params: { requestId } }).catch(() => {
+        });
+      };
+      signal?.addEventListener("abort", cancel, { once: true });
+      try {
+        const result = await endpoint.request({ method: "aiw/llm/complete", params: {
+          requestId,
+          system: req.system,
+          messages: req.messages,
+          tools: req.tools
+        } }, HostCompletionSchema, { signal, timeout: timeoutMs });
+        return { response: result.response, usage: result.usage, costUsd: result.costUsd, cacheHit: result.cacheHit };
+      } catch (error62) {
+        cancel();
+        if (callerSignal?.aborted) throw error62;
+        throw new LLMError("infra", "Host LLM request failed");
+      } finally {
+        signal?.removeEventListener("abort", cancel);
+      }
+    }
+  };
+}
+
 // packages/server/src/server.ts
 async function startServer(opts) {
   const hostDecls = await opts.host.tools();
   const registry2 = buildRegistry(hostDecls);
+  let mcpServer;
   let orchestrateOpts;
   if (opts.kind === "orchestrate") {
     if (!opts.orchestrateModel) throw new Error("orchestrate requires --executor-model");
-    if (!opts.orchestrateApiKey) throw new Error("orchestrate requires an executor API key (--executor-api-key or OPENROUTER_API_KEY)");
-    const client = createChatClient({
+    if (opts.orchestrateProvider !== "host" && !opts.orchestrateApiKey) throw new Error("orchestrate requires an executor API key (--executor-api-key or OPENROUTER_API_KEY)");
+    const client = opts.orchestrateProvider === "host" ? createHostLLMClient(() => mcpServer) : createChatClient({
       baseURL: opts.orchestrateBaseURL ?? "https://openrouter.ai/api/v1",
       apiKey: opts.orchestrateApiKey,
       timeoutMs: 3e5
@@ -39781,6 +39958,7 @@ async function startServer(opts) {
     };
   }
   const framework = buildFramework(opts.kind, registry2, {
+    runtime: opts.runtime,
     host: opts.host,
     variant: opts.variant,
     branchContext: opts.branchContext,
@@ -39788,7 +39966,7 @@ async function startServer(opts) {
     priority: opts.priority,
     orchestrate: orchestrateOpts
   });
-  const mcpServer = new Server(
+  mcpServer = new Server(
     { name: "aiw-server", version: "1.0.0" },
     {
       capabilities: { tools: {} },
@@ -39802,6 +39980,8 @@ async function startServer(opts) {
       inputSchema: t.inputSchema
     }))
   }));
+  const eventSink = opts.eventsPath ? new FileSink(opts.eventsPath) : new NoopSink();
+  const eventRoot = createReporter({ sink: eventSink, writer: "s" });
   mcpServer.setRequestHandler(CallToolRequestSchema, async (req, extra) => {
     const start = Date.now();
     const toolDef = framework.tools.find((t) => t.name === req.params.name);
@@ -39812,21 +39992,15 @@ async function startServer(opts) {
         _meta: { "aiw/durationMs": Date.now() - start }
       };
     }
-    const sink = opts.eventsPath ? new FileSink(opts.eventsPath) : new NoopSink();
-    const reporter = createReporter({ sink, writer: "s" });
     const meta3 = req.params._meta;
-    const harnessId = typeof meta3?.["aiw/harnessId"] === "string" ? meta3["aiw/harnessId"] : void 0;
-    const parentId = typeof meta3?.["aiw/parent"] === "string" ? meta3["aiw/parent"] : void 0;
-    void parentId;
-    void harnessId;
-    const ac = new AbortController();
+    const reporter = fromMeta(meta3, eventRoot);
     const progressToken = meta3?.progressToken;
     let lastNotifyMs = 0;
     const THROTTLE_MS = 500;
     const args = req.params.arguments ?? {};
     const result = await toolDef.handle(args, {
       reporter,
-      signal: ac.signal,
+      signal: extra.signal,
       onEvent: progressToken !== void 0 ? (e) => {
         const now = Date.now();
         if (now - lastNotifyMs < THROTTLE_MS) return;
@@ -39856,6 +40030,7 @@ async function startServer(opts) {
 // packages/server/src/cli.ts
 var { values } = parseArgs({
   options: {
+    engine: { type: "string", default: "quickjs" },
     framework: { type: "string", default: "branch-only" },
     host: { type: "string", default: "local" },
     tier: { type: "string", default: "S" },
@@ -39866,6 +40041,7 @@ var { values } = parseArgs({
     "read-only": { type: "boolean", default: false },
     "max-chars": { type: "string" },
     priority: { type: "string" },
+    "executor-provider": { type: "string", default: "openrouter" },
     "executor-model": { type: "string" },
     "executor-api-key": { type: "string" },
     "executor-base-url": { type: "string" },
@@ -39874,19 +40050,13 @@ var { values } = parseArgs({
   },
   strict: false
 });
-function parseFramework(raw) {
-  const bracket = raw.indexOf("[");
-  const base = bracket === -1 ? raw : raw.slice(0, bracket);
-  const keyStr = bracket === -1 ? "" : raw.slice(bracket + 1).replace(/]$/, "");
-  const kind2 = base;
-  const variant3 = {};
-  for (const part of keyStr.split(",").filter(Boolean)) {
-    if (part === "toolSearch") variant3.toolSearch = true;
-    else if (part.startsWith("catalog=")) variant3.catalog = parseInt(part.slice(8), 10);
-  }
-  return { kind: kind2, variant: variant3 };
+var { kind, variant: variant2 } = parseFrameworkVariant(String(values.framework ?? "branch-only"));
+var enginePreference = values.engine;
+if (enginePreference !== "quickjs" && enginePreference !== "isolated-vm" && enginePreference !== "auto") {
+  throw new Error(`Unsupported engine: ${String(enginePreference)}; expected quickjs, isolated-vm, or auto`);
 }
-var { kind, variant: variant2 } = parseFramework(String(values.framework ?? "branch-only"));
+var selected = await selectRuntime(enginePreference);
+console.error(`aiw-server: engine=${selected.engine}${selected.note ? ` (${selected.note})` : ""}`);
 var tier = String(values.tier ?? "S") === "L" ? "L" : "S";
 var root = String(values.root ?? process.cwd());
 var hostMode = String(values.host ?? "local");
@@ -39898,6 +40068,8 @@ var priorityStr = typeof values.priority === "string" ? values.priority : void 0
 var priority = priorityStr ? priorityStr.split(",").filter(Boolean) : void 0;
 var branchContextRaw = typeof values["branch-context"] === "string" ? values["branch-context"] : void 0;
 var branchContext = branchContextRaw === "trace" || branchContextRaw === "annotated" || branchContextRaw === "full" ? branchContextRaw : void 0;
+var executorProvider = String(values["executor-provider"] ?? "openrouter");
+if (executorProvider !== "openrouter" && executorProvider !== "host") throw new Error("Unknown executor provider");
 var executorModel = typeof values["executor-model"] === "string" ? values["executor-model"] : void 0;
 var executorApiKey = typeof values["executor-api-key"] === "string" ? values["executor-api-key"] : process.env["OPENROUTER_API_KEY"] ?? process.env["OPENAI_API_KEY"];
 var executorBaseURL = typeof values["executor-base-url"] === "string" ? values["executor-base-url"] : process.env["OPENAI_BASE_URL"];
@@ -39916,6 +40088,7 @@ if (hostMode === "local") {
 void values.transcript;
 void values.blobs;
 startServer({
+  runtime: selected.runtime,
   kind,
   variant: variant2,
   host,
@@ -39925,6 +40098,7 @@ startServer({
   priority,
   readOnly,
   orchestrateModel: executorModel,
+  orchestrateProvider: executorProvider,
   orchestrateApiKey: executorApiKey,
   orchestrateBaseURL: executorBaseURL,
   orchestrateWorkspaceRoot: root,

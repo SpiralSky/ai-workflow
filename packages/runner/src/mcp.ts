@@ -4,6 +4,7 @@
  */
 
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
+import { installHostLLMBroker, type HostLLMBrokerOptions } from "./llm-broker.ts";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 
 /** An MCP tool schema entry from tools/list. */
@@ -32,7 +33,7 @@ export async function openMCPSession(serverDescriptor: {
   command: string;
   args: string[];
   env?: Record<string, string>;
-}): Promise<MCPSession> {
+}, broker?: HostLLMBrokerOptions): Promise<MCPSession> {
   const transport = new StdioClientTransport({
     command: serverDescriptor.command,
     args: serverDescriptor.args,
@@ -40,7 +41,9 @@ export async function openMCPSession(serverDescriptor: {
     stderr: "pipe",
   });
 
-  const client = new Client({ name: "aiw-runner", version: "1.0.0" });
+  const client = new Client({ name: "aiw-runner", version: "1.0.0" }, broker
+    ? { capabilities: { experimental: { "aiw/llm/complete": {} } } } : undefined);
+  if (broker) installHostLLMBroker(client, broker);
   await client.connect(transport);
 
   const result = await client.listTools();
@@ -78,11 +81,13 @@ export async function callTool(
   name: string,
   args: Record<string, unknown>,
   meta: { "aiw/parent": string; "aiw/harnessId": string },
+  signal?: AbortSignal,
 ): Promise<MCPCallResult> {
+  signal?.throwIfAborted();
   const result = await session._client.callTool(
     { name, arguments: args, _meta: meta },
     undefined,
-    { timeout: 300_000 },
+    { timeout: 300_000, signal },
   );
 
   // Extract aiw metadata from the response _meta if present

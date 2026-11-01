@@ -29,3 +29,41 @@ test("server shares telemetry counter and parent correlation across successive r
   assert.ok(events.some((e) => e.parent === "r:1"));
   assert.ok(events.some((e) => e.parent === "r:2"));
 });
+
+test("MCP cancellation reaches the actual server host request", { timeout: 10_000 }, async (t) => {
+  const { existsSync } = await import("node:fs");
+  const { setTimeout: delay } = await import("node:timers/promises");
+  const root = mkdtempSync(join(tmpdir(), "aiw-server-cancel-"));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  const started = join(root, "started"), cancelled = join(root, "cancelled");
+  const source = `
+    import { startServer } from ${JSON.stringify(new URL("../src/server.ts", import.meta.url).href)};
+    import { writeFileSync } from 'node:fs';
+    await startServer({ kind: 'baseline', host: {
+      tools: async () => [{ name: 'wait', description: 'Fixture only', inputSchema: {}, meta: { effect: 'read', whenToUse: 'wait' } }],
+      call: async (_req, ctx) => {
+        writeFileSync(${JSON.stringify(started)}, 'started');
+        return new Promise((_resolve, reject) => {
+          const abort = () => { writeFileSync(${JSON.stringify(cancelled)}, 'cancelled'); reject(new Error('cancelled')); };
+          ctx.signal.addEventListener('abort', abort, { once: true });
+          if (ctx.signal.aborted) abort();
+        });
+      }, close: async () => {}
+    } });`;
+  const client = new Client({ name: "fixture", version: "1" });
+  const transport = new StdioClientTransport({ command: process.execPath,
+    args: ["--import", "tsx", "--input-type=module", "-e", source], stderr: "pipe" });
+  const controller = new AbortController();
+  try {
+    await client.connect(transport);
+    const request = client.callTool({ name: "wait", arguments: {} }, undefined, { signal: controller.signal });
+    const rejected = assert.rejects(request, /campaign stopped/);
+    const until = Date.now() + 5000;
+    while (!existsSync(started) && Date.now() < until) await delay(10);
+    assert.ok(existsSync(started), "host received request before cancellation");
+    controller.abort(new Error("campaign stopped"));
+    await rejected;
+    while (!existsSync(cancelled) && Date.now() < until) await delay(10);
+    assert.equal(readFileSync(cancelled, "utf8"), "cancelled");
+  } finally { controller.abort(); await client.close(); }
+});

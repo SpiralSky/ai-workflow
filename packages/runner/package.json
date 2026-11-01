@@ -2,13 +2,18 @@
   "name": "@aiw/runner",
   "private": true,
   "type": "module",
-  "exports": { ".": "./src/index.ts" },
-  "bin": { "aiw": "./src/cli.ts" },
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "bin": {
+    "aiw": "./src/cli.ts"
+  },
   "dependencies": {
     "@aiw/core": "*",
     "@aiw/llm": "*",
     "@aiw/telemetry": "*",
-    "@modelcontextprotocol/sdk": "^1.15.1"
+    "@modelcontextprotocol/sdk": "^1.15.1",
+    "zod": "^4.6.7"
   },
   "scripts": {
     "test": "tsx --test test/*.test.ts"

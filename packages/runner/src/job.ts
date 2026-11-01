@@ -17,6 +17,7 @@ import { runLoop } from "./loop.ts";
 import { createJobDir } from "./rundir.ts";
 import { readAttemptCost, AttemptFailure } from "./accounting.ts";
 import { frameworkLaunch } from "./framework-launch.ts";
+import { onCancellation } from "./cancellation.ts";
 
 /** Options for running a single job attempt. */
 export interface JobOptions {
@@ -30,8 +31,12 @@ export interface JobOptions {
   apiKey: string;
   /** LLM base URL. */
   baseURL: string;
-  /** AbortSignal for budget cancellation. */
+  /** AbortSignal for budget and fail-fast cancellation. */
   signal?: AbortSignal;
+  /** Host-only shared subscription gate; absent for the unchanged paid API client. */
+  subscription?: ReturnType<typeof import("./subscription.ts").boundSubscriptionClient>;
+  /** Notify the campaign before terminal failure cleanup, so siblings stop promptly. */
+  onFailure?: () => void;
   /** Per-problem turn limits override (task.json is the authoritative source; this is for overrides). */
   turnLimits: Record<string, number>;
   /** Path to the problem directories. */
@@ -70,6 +75,9 @@ function buildSystemPrompt(frameworkInstructions: string): string {
 export async function runJobAttempt(opts: JobOptions): Promise<JobResult> {
   const { job, config, runPath, repoRoot, apiKey, baseURL, signal, turnLimits, problemsDir } = opts;
 
+  if (config.provider === "chatgpt" && (!opts.subscription || config.usageMode !== "subscription")) throw new Error("ChatGPT requires bounded subscription runtime");
+  const client = opts.subscription?.client ?? createChatClient({ baseURL, apiKey, timeoutMs: 300_000 });
+
   // Validate treatment before creating artifacts or starting any container.
   const launch = frameworkLaunch(job.framework, config, { apiKey, baseURL });
   const jobDir = job.dir ?? createJobDir(runPath, job);
@@ -96,13 +104,20 @@ export async function runJobAttempt(opts: JobOptions): Promise<JobResult> {
   const problemDir = join(problemsDir, job.problem);
 
   try {
-    // Build image and start container (stubs in this implementation)
+    signal?.throwIfAborted();
     await buildImage(problemDir, job.problem);
+    signal?.throwIfAborted();
     // orchestrate executor makes LLM calls from inside the container; bridge gives outbound internet access
-    const ctr = await startContainer(job.problem, jobDir, join(repoRoot, "packages", "server", "dist"), launch.needsExecutor ? "bridge" : undefined);
+    const ctr = await startContainer(job.problem, jobDir, join(repoRoot, "packages", "server", "dist"), launch.needsExecutor && config.provider !== "chatgpt" ? "bridge" : undefined);
 
+    const settleCancellation = onCancellation(signal, async () => {
+      if (modelLoopStarted) costReasons.push("cancelled-container-lifecycle");
+      try { await killContainer(ctr); }
+      catch { costReasons.push("container-cancel-failed"); }
+    });
     let session: Awaited<ReturnType<typeof openMCPSession>> | undefined;
     try {
+      signal?.throwIfAborted();
       const serverArgs = [
         "--engine", "isolated-vm",
         "--framework", launch.id,
@@ -115,12 +130,13 @@ export async function runJobAttempt(opts: JobOptions): Promise<JobResult> {
         ...launch.executorArgs,
       ];
       const serverDescriptor = await startServer(ctr, serverArgs);
-      session = await openMCPSession(serverDescriptor);
+      session = await openMCPSession(serverDescriptor, config.provider === "chatgpt" && launch.needsExecutor
+        ? { secondaryClient: client, secondaryModel: config.models.secondary, signal } : undefined);
 
+      signal?.throwIfAborted();
       const taskText = readTaskText(problemsDir, job.problem);
       const systemPrompt = buildSystemPrompt(session.instructions ?? "");
 
-      const client = createChatClient({ baseURL, apiKey, timeoutMs: 300_000 });
       // Read turnLimit from task.json; turnLimits map allows overrides, fallback to 20.
       const taskJsonPath = join(problemsDir, job.problem, "task.json");
       const taskJson = existsSync(taskJsonPath)
@@ -128,6 +144,7 @@ export async function runJobAttempt(opts: JobOptions): Promise<JobResult> {
         : {};
       const turnLimit = turnLimits[job.problem] ?? taskJson.turnLimit ?? 20;
 
+      signal?.throwIfAborted();
       modelLoopStarted = true;
       const loopResult = await runLoop({
         client,
@@ -140,6 +157,7 @@ export async function runJobAttempt(opts: JobOptions): Promise<JobResult> {
         turnLimit,
         framework: job.framework,
         signal,
+        onInfraError: opts.onFailure,
       });
 
       modelLoopStarted = false;
@@ -157,7 +175,9 @@ export async function runJobAttempt(opts: JobOptions): Promise<JobResult> {
         // Model finished; grade the result
         await closeMCPSession(session);
         session = undefined;
+        signal?.throwIfAborted();
         const gradeResult = await gradeJob(ctr, problemDir, jobDir);
+        signal?.throwIfAborted();
         if (gradeResult.pass) {
           outcome = "pass";
           reason = null;
@@ -165,14 +185,20 @@ export async function runJobAttempt(opts: JobOptions): Promise<JobResult> {
           reason = gradeResult.reason ?? "checks";
         }
       }
+      if (outcome !== "pass") opts.onFailure?.();
+    } catch (error) {
+      opts.onFailure?.();
+      throw error;
     } finally {
       if (session) {
         try { await closeMCPSession(session); }
         catch { costReasons.push("server-close-failed"); }
       }
+      await settleCancellation();
       await removeContainer(ctr).catch(() => { costReasons.push("container-stop-failed"); });
     }
   } catch (e) {
+    opts.onFailure?.();
     failure = e;
     failed = true;
     if (modelLoopStarted) costReasons.push("unobserved-failed-model-request");

@@ -1,9 +1,10 @@
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import { CallToolRequestSchema, ListToolsRequestSchema } from "@modelcontextprotocol/sdk/types.js";
+import { CallToolRequestSchema, ListToolsRequestSchema, type Request, type Notification } from "@modelcontextprotocol/sdk/types.js";
 import { buildFramework, buildRegistry, type Host } from "@aiw/core";
 import { createReporter, NoopSink, FileSink, fromMeta } from "@aiw/telemetry";
 import { createChatClient } from "@aiw/llm";
+import { createHostLLMClient } from "./host-client.ts";
 import type { FrameworkKind } from "@aiw/core";
 
 /** Parsed variant keys shared with runner/core. */
@@ -11,6 +12,8 @@ export type VariantKeys = import("@aiw/core").FrameworkVariantKeys;
 
 /** Options for `startServer`. */
 export interface ServerOptions {
+  /** Selected isolate runtime; omitted preserves the core QuickJS default. */
+  runtime?: import("@aiw/core").IsolateRuntime;
   /** Framework kind (baseline | branch-only | orchestrate). */
   kind: FrameworkKind;
   /** Parsed variant keys. */
@@ -29,6 +32,8 @@ export interface ServerOptions {
   readOnly?: boolean;
   /** Orchestrate executor: model id (framework-server §5). */
   orchestrateModel?: string;
+  /** Host broker leaves all provider credentials outside the task container. */
+  orchestrateProvider?: "openrouter" | "host";
   /** Orchestrate executor: API key. */
   orchestrateApiKey?: string;
   /** Orchestrate executor: base URL (default: https://openrouter.ai/api/v1). */
@@ -49,14 +54,15 @@ export async function startServer(opts: ServerOptions): Promise<void> {
   const hostDecls = await opts.host.tools();
   const registry = buildRegistry(hostDecls);
 
+  let mcpServer: Server<Request, Notification>;
   // 2. Build orchestrate options if needed.
   let orchestrateOpts: import("@aiw/core").OrchestrateOptions | undefined;
   if (opts.kind === "orchestrate") {
     if (!opts.orchestrateModel) throw new Error("orchestrate requires --executor-model");
-    if (!opts.orchestrateApiKey) throw new Error("orchestrate requires an executor API key (--executor-api-key or OPENROUTER_API_KEY)");
-    const client = createChatClient({
+    if (opts.orchestrateProvider !== "host" && !opts.orchestrateApiKey) throw new Error("orchestrate requires an executor API key (--executor-api-key or OPENROUTER_API_KEY)");
+    const client = opts.orchestrateProvider === "host" ? createHostLLMClient(() => mcpServer) : createChatClient({
       baseURL: opts.orchestrateBaseURL ?? "https://openrouter.ai/api/v1",
-      apiKey: opts.orchestrateApiKey,
+      apiKey: opts.orchestrateApiKey!,
       timeoutMs: 300_000,
     });
     orchestrateOpts = {
@@ -69,6 +75,7 @@ export async function startServer(opts: ServerOptions): Promise<void> {
 
   // 3. Assemble the framework.
   const framework = buildFramework(opts.kind, registry, {
+    runtime: opts.runtime,
     host: opts.host,
     variant: opts.variant,
     branchContext: opts.branchContext,
@@ -78,7 +85,7 @@ export async function startServer(opts: ServerOptions): Promise<void> {
   });
 
   // 3. Create MCP Server with instructions set.
-  const mcpServer = new Server(
+  mcpServer = new Server<Request, Notification>(
     { name: "aiw-server", version: "1.0.0" },
     {
       capabilities: { tools: {} },
@@ -114,8 +121,7 @@ export async function startServer(opts: ServerOptions): Promise<void> {
     const meta = req.params._meta as Record<string, unknown> | undefined;
     const reporter = fromMeta(meta, eventRoot);
 
-    // Abort controller for this call.
-    const ac = new AbortController();
+    // MCP cancellation must reach host, selection and executor work.
 
     // Throttled progress notification (≤ 2/s).
     const progressToken = meta?.progressToken;
@@ -125,7 +131,7 @@ export async function startServer(opts: ServerOptions): Promise<void> {
     const args = (req.params.arguments ?? {}) as Record<string, unknown>;
     const result = await toolDef.handle(args, {
       reporter,
-      signal: ac.signal,
+      signal: extra.signal,
       onEvent: progressToken !== undefined
         ? (e) => {
             const now = Date.now();

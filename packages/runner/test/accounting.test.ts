@@ -69,26 +69,26 @@ function result(costUsd: number | null, knownCostUsd = costUsd ?? 0): JobResult 
   return { outcome: "pass", reason: null, costUsd, knownCostUsd, durationMs: 1, eventsPath: "fixture" };
 }
 
-test("scheduler includes failed-attempt charges and preserves raw retry logs", async (t) => {
+test("first known-cost infra failure stops without retry and preserves raw attempt evidence", async (t) => {
   const root = temp(t), run = runFixture();
   let calls = 0;
-  const reason = await runScheduler({ jobs: [{ problem: "p", framework: "orchestrate", rep: 0 }], config: run.config,
+  const reason = await runScheduler({ jobs: [0, 1].map((rep) => ({ problem: "p", framework: "orchestrate", rep })), config: run.config,
     runPath: root, repoRoot: root, apiKey: "fixture", baseURL: "https://example.invalid", turnLimits: {}, problemsDir: root,
-    wait: async () => {}, runAttempt: async (opts) => {
+    runAttempt: async (opts) => {
       const path = join(opts.job.dir!, "events.jsonl");
       writeFileSync(path, JSON.stringify(turn("r:1", "main", ++calls)) + "\n");
-      if (calls === 1) throw new AttemptFailure("grading infra failure", readAttemptCost(path), path, 1);
-      return { ...result(2), eventsPath: path };
+      throw new AttemptFailure("grading infra failure", readAttemptCost(path), path, 1);
     } }, run);
-  assert.equal(reason, undefined);
-  assert.equal(run.totals.costUsd, 3);
-  assert.equal(run.totals.attempts, 2);
+  assert.match(reason!, /job-failed/);
+  assert.equal(calls, 1);
+  assert.equal(run.totals.costUsd, 1);
+  assert.equal(run.totals.attempts, 1);
   const dir = join(root, "p.orchestrate.0");
-  assert.match(readFileSync(join(dir, "attempts/0/events.jsonl"), "utf8"), /"costUsd":1/);
-  assert.match(readFileSync(join(dir, "events.jsonl"), "utf8"), /"costUsd":2/);
+  assert.match(readFileSync(join(dir, "events.jsonl"), "utf8"), /"costUsd":1/);
   const job = JSON.parse(readFileSync(join(dir, "job.json"), "utf8"));
-  assert.equal(job.costUsdAllAttempts, 3);
-  assert.deepEqual(job.attempts.map((a: any) => a.costUsd), [1, 2]);
+  assert.equal(job.costUsdAllAttempts, 1);
+  assert.deepEqual(job.attempts.map((a: any) => a.costUsd), [1]);
+  assert.equal(job.attempts[0].infraError, "grading infra failure");
 });
 
 test("unknown failed charge stops dispatch/retry, preserves known lower bound", async (t) => {
@@ -96,7 +96,7 @@ test("unknown failed charge stops dispatch/retry, preserves known lower bound", 
   let calls = 0;
   const reason = await runScheduler({ jobs: [0, 1].map((rep) => ({ problem: "p", framework: "orchestrate", rep })), config: run.config,
     runPath: root, repoRoot: root, apiKey: "fixture", baseURL: "https://example.invalid", turnLimits: {}, problemsDir: root,
-    wait: async () => {}, runAttempt: async () => {
+    runAttempt: async () => {
       calls++;
       throw new AttemptFailure("request dropped", { costUsd: null, knownCostUsd: 2, costIncompleteReasons: ["unobserved-failed-model-request"] }, "fixture", 1);
     } }, run);
@@ -107,13 +107,13 @@ test("unknown failed charge stops dispatch/retry, preserves known lower bound", 
   assert.equal(run.totals.fail, 1);
 });
 
-test("exhausted known-cost failures count all three attempts in final totals", async (t) => {
+test("known-cost failure finalizes accounting without the former three-attempt retry storm", async (t) => {
   const root = temp(t), run = runFixture();
   const reason = await runScheduler({ jobs: [{ problem: "p", framework: "orchestrate", rep: 0 }], config: run.config,
     runPath: root, repoRoot: root, apiKey: "fixture", baseURL: "https://example.invalid", turnLimits: {}, problemsDir: root,
-    wait: async () => {}, runAttempt: async () => { throw new AttemptFailure("known failure", { costUsd: 1, knownCostUsd: 1, costIncompleteReasons: [] }, "fixture", 1); } }, run);
+    runAttempt: async () => { throw new AttemptFailure("known failure", { costUsd: 1, knownCostUsd: 1, costIncompleteReasons: [] }, "fixture", 1); } }, run);
   assert.match(reason!, /job-failed/);
-  assert.deepEqual(run.totals, { jobs: 1, attempts: 3, costUsd: 3, knownCostUsd: 3, pass: 0, fail: 1 });
+  assert.deepEqual(run.totals, { jobs: 1, attempts: 1, costUsd: 1, knownCostUsd: 1, pass: 0, fail: 1 });
 });
 
 test("budget reached by failed attempt prevents another paid retry", async (t) => {
@@ -121,7 +121,7 @@ test("budget reached by failed attempt prevents another paid retry", async (t) =
   let calls = 0;
   const reason = await runScheduler({ jobs: [{ problem: "p", framework: "orchestrate", rep: 0 }], config: run.config,
     runPath: root, repoRoot: root, apiKey: "fixture", baseURL: "https://example.invalid", turnLimits: {}, problemsDir: root,
-    wait: async () => {}, runAttempt: async () => { calls++; throw new AttemptFailure("known failure", { costUsd: 1, knownCostUsd: 1, costIncompleteReasons: [] }, "fixture", 1); } }, run);
+    runAttempt: async () => { calls++; throw new AttemptFailure("known failure", { costUsd: 1, knownCostUsd: 1, costIncompleteReasons: [] }, "fixture", 1); } }, run);
   assert.equal(reason, "budget"); assert.equal(calls, 1); assert.equal(run.totals.costUsd, 1);
 });
 
@@ -166,7 +166,9 @@ test("MCP error metadata and nested error uncertainty survive the main loop", as
   sink.close();
   const cost = readAttemptCost(path, loop.metrics.costIncompleteReasons);
   assert.equal(cost.costUsd, null);
-  assert.equal(cost.knownCostUsd, 4);
+  assert.equal(cost.knownCostUsd, 3);
+  assert.equal(calls, 1);
+  assert.equal(loop.outcome, "infra-error");
   assert.ok(cost.costIncompleteReasons.includes("failed-tool-may-have-unobserved-charges"));
 });
 
@@ -190,4 +192,94 @@ test("history projection refuses unknown costs instead of projecting zero", asyn
   writeFileSync(join(dir, "job.json"), JSON.stringify({ problem: "p", framework: "orchestrate", costUsdAllAttempts: null }));
   const plan = buildPlan(run.config, root);
   assert.equal(plan.projectedCostUsd, undefined);
+});
+
+test("first graded failure stops dispatch and never marks an incomplete matrix complete", async (t) => {
+  const root = temp(t), run = runFixture();
+  run.config.reps = 3;
+  const seen: number[] = [];
+  const reason = await runScheduler({ jobs: [0, 1, 2].map((rep) => ({ problem: "p", framework: "orchestrate", rep })), config: run.config,
+    runPath: root, repoRoot: root, apiKey: "fixture", baseURL: "https://example.invalid", turnLimits: {}, problemsDir: root,
+    runAttempt: async ({ job }) => { seen.push(job.rep); return { ...result(2), outcome: "fail", reason: "checks" }; } }, run);
+  assert.equal(reason, "job-failed:p.orchestrate.0");
+  assert.deepEqual(seen, [0]);
+  assert.deepEqual(run.status, { invalid: reason });
+  assert.deepEqual(run.totals, { jobs: 1, attempts: 1, costUsd: 2, knownCostUsd: 2, pass: 0, fail: 1 });
+  assert.equal(run.config.reps, 3); // Do not shrink the denominator to observed cells.
+  assert.deepEqual(JSON.parse(readFileSync(join(root, "run.json"), "utf8")).status, { invalid: reason });
+});
+
+test("failure cancels concurrent work but waits for its unknown charges and retains the first cause", async (t) => {
+  const root = temp(t), run = runFixture(); run.config.concurrency = 2;
+  let entered!: () => void;
+  const otherStarted = new Promise<void>((resolve) => { entered = resolve; });
+  const seen: number[] = [];
+  const reason = await runScheduler({ jobs: [0, 1, 2].map((rep) => ({ problem: "p", framework: "orchestrate", rep })), config: run.config,
+    runPath: root, repoRoot: root, apiKey: "fixture", baseURL: "https://example.invalid", turnLimits: {}, problemsDir: root,
+    runAttempt: async ({ job, signal }) => {
+      seen.push(job.rep);
+      if (job.rep === 0) { await otherStarted; return { ...result(2), outcome: "fail", reason: "checks" }; }
+      await new Promise<void>((resolve) => { signal!.addEventListener("abort", () => resolve(), { once: true }); entered(); });
+      assert.ok(signal!.aborted);
+      throw new AttemptFailure("cancelled while provider pending", { costUsd: null, knownCostUsd: 3,
+        costIncompleteReasons: ["cancelled-container-lifecycle"] }, "fixture", 1);
+    } }, run);
+  assert.deepEqual(seen, [0, 1]);
+  assert.equal(reason, "job-failed:p.orchestrate.0");
+  assert.deepEqual(run.totals, { jobs: 2, attempts: 2, costUsd: null, knownCostUsd: 5, pass: 0, fail: 2 });
+  const cancelled = JSON.parse(readFileSync(join(root, "p.orchestrate.1", "job.json"), "utf8"));
+  assert.equal(cancelled.costUsdAllAttempts, null);
+  assert.equal(cancelled.knownCostUsdAllAttempts, 3);
+  assert.match(cancelled.attempts[0].infraError, /cancelled/);
+});
+
+test("all passing cells still execute and retain full success criterion", async (t) => {
+  const root = temp(t), run = runFixture();
+  const reason = await runScheduler({ jobs: [0, 1, 2].map((rep) => ({ problem: "p", framework: "orchestrate", rep })), config: run.config,
+    runPath: root, repoRoot: root, apiKey: "fixture", baseURL: "https://example.invalid", turnLimits: {}, problemsDir: root,
+    runAttempt: async () => result(1) }, run);
+  assert.equal(reason, undefined);
+  assert.deepEqual(run.totals, { jobs: 3, attempts: 3, costUsd: 3, knownCostUsd: 3, pass: 3, fail: 0 });
+});
+
+test("scheduler observer error cancels siblings and drains their cost before reporting error", async (t) => {
+  const root = temp(t), run = runFixture(); run.config.concurrency = 2;
+  let started!: () => void;
+  const gate = new Promise<void>((resolve) => { started = resolve; });
+  await assert.rejects(runScheduler({ jobs: [0, 1, 2].map((rep) => ({ problem: "p", framework: "orchestrate", rep })), config: run.config,
+    runPath: root, repoRoot: root, apiKey: "fixture", baseURL: "https://example.invalid", turnLimits: {}, problemsDir: root,
+    onJobDone: (job) => { if (job.rep === 0) throw new Error("observer failed"); },
+    runAttempt: async ({ job, signal }) => {
+      if (job.rep === 0) { await gate; return result(1); }
+      await new Promise<void>((resolve) => { signal!.addEventListener("abort", () => resolve(), { once: true }); started(); });
+      return result(2); // This simulated request settled with complete usage despite abort.
+    } }, run), /scheduler error/);
+  assert.equal(run.totals.costUsd, 3);
+  assert.equal(run.totals.attempts, 2);
+  assert.deepEqual(run.status, { invalid: "scheduler-error:p.orchestrate.0" });
+});
+
+test("failure notification cancels siblings before failing attempt cleanup settles", async (t) => {
+  const root = temp(t), run = runFixture(); run.config.concurrency = 2;
+  let started!: () => void, cancelled!: () => void;
+  const entered = new Promise<void>((resolve) => { started = resolve; });
+  const observedAbort = new Promise<void>((resolve) => { cancelled = resolve; });
+  const reason = await runScheduler({ jobs: [0, 1, 2].map((rep) => ({ problem: "p", framework: "orchestrate", rep })), config: run.config,
+    runPath: root, repoRoot: root, apiKey: "fixture", baseURL: "https://example.invalid", turnLimits: {}, problemsDir: root,
+    runAttempt: async ({ job, signal, onFailure }) => {
+      if (job.rep === 0) {
+        await entered;
+        onFailure!();
+        await observedAbort; // Failure cleanup cannot settle until sibling has observed abort.
+        return { ...result(1), outcome: "fail", reason: "checks" };
+      }
+      await new Promise<void>((resolve) => {
+        signal!.addEventListener("abort", () => { cancelled(); resolve(); }, { once: true });
+        started();
+      });
+      return result(2);
+    } }, run);
+  assert.equal(reason, "job-failed:p.orchestrate.0");
+  assert.equal(run.totals.attempts, 2);
+  assert.equal(run.totals.costUsd, 3);
 });

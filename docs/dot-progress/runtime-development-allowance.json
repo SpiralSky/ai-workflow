@@ -1,0 +1,38 @@
+{
+  "status": "proposed-post-migration-development-allowance",
+  "base_commit": "75ab542c626bc7276d2ee9575956899c79b6d75d",
+  "branch": "dot/runtime-coherence-20261101",
+  "rationale": "Rebuild stale packaged runtime, enforce exact source freshness and honor explicit runner engine selection without fallback; does not alter original migration baseline inventory. Integrator must validate exact paths/hashes when extending the historical checker.",
+  "files": [
+    {
+      "path": "packages/server/build.mjs",
+      "before_sha256": "8fc3bf5a81c852b0aaa03ba5fcaa952674fbbe25c483778d66b6c2c92e8a0823",
+      "after_sha256": "73ad7b81bdb1ef0622dc851570ed83b60721122543f1ce4cb07267ab90253b2d",
+      "git_mode": "100644"
+    },
+    {
+      "path": "packages/server/dist/aiw-server.mjs",
+      "before_sha256": "8c22450ec0249dd085bb39242c30e98ab4171b8f89cab21a0e62851980e4d96c",
+      "after_sha256": "618290595f24b955c3b731a3b1d38f36d37f16117007f0328f80279f7eebd6aa",
+      "git_mode": "100755"
+    },
+    {
+      "path": "packages/server/src/cli.ts",
+      "before_sha256": "e756e5a49ce3e6b3705a3caf46b2c7807252e10ae06e129426172fad8a864b13",
+      "after_sha256": "ee2e4207f469107dde4ecb738450dce839806ff3e23171ca4f08f5a9536733db",
+      "git_mode": "100755"
+    },
+    {
+      "path": "packages/server/src/server.ts",
+      "before_sha256": "706dd38fe5b81001e6d470e064966e10cf9995dd4d629733c407a518bf745c92",
+      "after_sha256": "28f792ba3e122348a62cc78f0e6f465314a0b15827fb25c0f24d249eb071a008",
+      "git_mode": "100644"
+    },
+    {
+      "path": "packages/server/test/bundle.test.ts",
+      "before_sha256": null,
+      "after_sha256": "4590c1cc7d2c6ea14e28cd86ab7e53a4430537f4a074d70207ef5c65a0657a40",
+      "git_mode": "100644"
+    }
+  ]
+}

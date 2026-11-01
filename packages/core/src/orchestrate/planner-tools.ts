@@ -56,6 +56,7 @@ export function doTool(input: PlannerToolsInput): FrameworkTool {
       additionalProperties: false,
     },
     async handle(args: Record<string, unknown>, call: FrameworkCall): Promise<FrameworkResult> {
+      call.signal?.throwIfAborted();
       const instruction = args.instruction;
       if (typeof instruction !== "string" || !instruction.trim()) return fail("do: `instruction` must be a non-empty string");
       let override: string[] | undefined;
@@ -74,9 +75,10 @@ export function doTool(input: PlannerToolsInput): FrameworkTool {
       let lease: Awaited<ReturnType<Task["acquire"]>> | undefined;
       try {
         // 3. select
-        const selection = await input.selector.select({ instruction, override, reporter: call.reporter }, registry.decls);
+        const selection = await input.selector.select({ instruction, override, reporter: call.reporter, signal: call.signal }, registry.decls);
         // 4. lock: shared only when every shortlisted tool is read-only
         lease = await task.acquire(selection.tools.every((d) => d.meta.effect === "read") ? "shared" : "exclusive");
+        call.signal?.throwIfAborted();
         const held = lease;
         // 5-8. snapshot, run, finalise (inside runExecutor)
         const result = await runExecutor({

@@ -6,6 +6,7 @@ import { loadPrompt } from "../../framework/prompts.ts";
 export interface RerankContext {
   /** Receives the rerank `turn` event (role `selection`); overrides the reranker's own reporter. */
   reporter?: Reporter;
+  signal?: AbortSignal;
   /** Set by the reranker to true when it could not use the model's answer and kept retrieval order. */
   fallback?: boolean;
 }
@@ -63,6 +64,7 @@ export function parseNames(text: string): string[] | undefined {
 export function llmReranker(client: LLMClient, opts: { model: string; reporter?: Reporter }): Reranker {
   return {
     async rerank(instruction, candidates, ctx = {}) {
+      ctx.signal?.throwIfAborted();
       if (candidates.length === 0) return [];
       const reporter = ctx.reporter ?? opts.reporter;
       if (!reporter) throw new Error("llmReranker needs a reporter (option or ctx) to report the selection turn");
@@ -75,6 +77,7 @@ export function llmReranker(client: LLMClient, opts: { model: string; reporter?:
         .join("\n");
       const res = await wrapLLM(client, reporter, "selection").complete({
         model: opts.model,
+        signal: ctx.signal,
         system: loadPrompt("rerank"),
         tools: [],
         messages: [{ role: "user", content: `Task:\n${instruction}\n\nCandidate tools:\n${list}` }],

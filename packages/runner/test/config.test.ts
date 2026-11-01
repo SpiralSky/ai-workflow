@@ -172,3 +172,14 @@ test("resolveConfig: throws on anthropic model", () => {
     /not allowed/,
   );
 });
+
+test("campaign concurrency defaults to one, accepts explicit parallelism and rejects invalid values", () => {
+  const flags = { problems: "dev", mode: "baseline", tools: "S" as const, reps: 1,
+    model: "deepseek/deepseek-v4-flash", temperature: 0, budget: 0.5, full: false,
+    branchContext: "trace" as const, secondaryCap: 4 };
+  assert.equal(resolveConfig(flags, sampleProblems).concurrency, 1);
+  assert.equal(resolveConfig({ ...flags, concurrency: 3 }, sampleProblems).concurrency, 3);
+  for (const concurrency of [0, -1, 1.5, NaN, Infinity]) {
+    assert.throws(() => resolveConfig({ ...flags, concurrency }, sampleProblems), /positive integer/);
+  }
+});

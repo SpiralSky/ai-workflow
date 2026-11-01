@@ -63,3 +63,31 @@ test('historical record missing from tracked tree is rejected even when bytes re
   const root=snapshot(t);git(root,'update-index','--force-remove','HANDOFF.md');
   assert.throws(()=>verifyPreservation(root),/tracked source record/);
 });
+
+
+test('explicitly allowed new auth file must still match its recorded after hash',t=>{
+  const root=snapshot(t);fs.appendFileSync(path.join(root,'packages/llm/src/chatgpt-auth.ts'),'\n// unauthorized change\n');
+  assert.throws(()=>verifyPreservation(root),/Preserved content changed/);
+});
+test('allowed new file cannot disappear from the tracked snapshot',t=>{
+  const root=snapshot(t);const file='packages/runner/src/llm-broker.ts';fs.unlinkSync(path.join(root,file));git(root,'add','-u');
+  assert.throws(()=>verifyPreservation(root),/added or missing paths/);
+});
+test('development allowance cannot rewrite a baseline before state',t=>{
+  const root=snapshot(t);const file=path.join(root,'.specplane/development-allowances.json');const data=JSON.parse(fs.readFileSync(file));
+  data.changes.find(c=>c.before).before.sha256='0'.repeat(64);fs.writeFileSync(file,JSON.stringify(data));
+  assert.throws(()=>verifyPreservation(root),/before-state mismatch/);
+});
+test('original inventory content remains anchored after feature development',t=>{
+  const root=snapshot(t);fs.appendFileSync(path.join(root,'.specplane/migration-runtime-inventory.json'),' ');
+  assert.throws(()=>verifyPreservation(root),/Original migration inventory was rewritten/);
+});
+test('development allowances cannot introduce benchmark fixture changes',t=>{
+  const root=snapshot(t);const file=path.join(root,'.specplane/development-allowances.json');const data=JSON.parse(fs.readFileSync(file));
+  data.changes.push({path:'experiments/unauthorized.py',before:null,after:{path:'experiments/unauthorized.py',mode:'100644',sha256:'0'.repeat(64)},rationale:'not part of signin'});fs.writeFileSync(file,JSON.stringify(data));
+  assert.throws(()=>verifyPreservation(root),/did not match/);
+});
+test('development plans cannot become ready through the integration',t=>{
+  const root=snapshot(t);const file=path.join(root,'plans/2026-11-01-openai-plan-signin/PLAN.md');fs.writeFileSync(file,fs.readFileSync(file,'utf8').replace('status: draft','status: ready'));
+  assert.throws(()=>verifyPreservation(root),/must remain draft/);
+});

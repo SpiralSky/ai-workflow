@@ -138,6 +138,12 @@ function validateProvenance(runs: RunJSON[]): RunJSON["provenance"] {
   const first = runs[0]!;
   const problems: RunJSON["provenance"]["problems"] = Object.create(null);
   for (const run of runs) {
+    if ((run.config.provider ?? "openrouter") !== (first.config.provider ?? "openrouter") ||
+        (run.config.usageMode ?? "monetary") !== (first.config.usageMode ?? "monetary") ||
+        !isDeepStrictEqual(run.config.subscriptionLimits, first.config.subscriptionLimits) ||
+        !isDeepStrictEqual(run.provenance.inference, first.provenance.inference)) {
+      throw new Error(`Run ${run.id} has mismatched provider, usage mode, limits or inference settings`);
+    }
     for (const field of MUST_MATCH) {
       if (run.config[field] === undefined || !isDeepStrictEqual(first.config[field], run.config[field])) {
         throw new Error(`Run ${run.id} has missing or mismatched config.${field}`);

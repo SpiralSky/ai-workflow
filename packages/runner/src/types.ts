@@ -27,7 +27,12 @@ export interface RunConfig {
   frameworks: string[];
   tier: Tier;
   reps: number;
-  budgetUsd: number;
+  /** Monetary API budget; null for explicitly bounded subscription mode. */
+  budgetUsd: number | null;
+  /** Both roles share this provider; omitted preserves the legacy OpenRouter default. */
+  provider?: "openrouter" | "chatgpt";
+  usageMode?: "monetary" | "subscription";
+  subscriptionLimits?: import("./subscription.ts").SubscriptionLimits;
   concurrency: number;
   models: { main: string; secondary: string };
   temperature: number;
@@ -44,6 +49,7 @@ export interface Provenance {
   basePrompt: string;
   frameworks: Record<string, { prompt: string; tools: string; extra?: Record<string, string> }>;
   images: Record<string, string>;
+  inference?: { provider: string; usageMode: string; mainModel: string; secondaryModel: string; temperature: number | null; store?: false; stream?: true };
   problems: Record<string, { taskHash: string; turnLimit: number; wallClockMs: number }>;
 }
 
@@ -92,6 +98,7 @@ export interface RunJSON {
   config: RunConfig;
   provenance: Provenance;
   totals: { jobs: number; attempts: number; costUsd: number | null; knownCostUsd?: number; pass: number; fail: number };
+  subscriptionUsage?: import("./subscription.ts").SubscriptionUsage;
   startedAt: string;
   endedAt?: string;
 }

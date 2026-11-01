@@ -151,3 +151,10 @@ Experiments use `deepseek/deepseek-chat-v3-0324` via OpenRouter to keep per-run 
 Generated files (`framework/mcp.json`, `framework/settings.json`, `framework/prompt/.system.<mode>.md`) contain absolute paths and are not committed; `setup.sh` regenerates them.
 
 </details>
+
+### Experimental ChatGPT plan-usage backend
+
+[Sign in with ChatGPT for workflow runs](docs/openai-signin.md) describes explicit user sign-in,
+account-specific model selection, isolated host credentials, and bounded subscription usage.
+OpenRouter remains the default. The new flow is mock-tested, not live-authenticated or benchmarked;
+shared-plan usage is not a separate free allowance, and unknown dollar costs are never reported as zero.

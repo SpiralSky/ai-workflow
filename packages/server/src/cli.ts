@@ -5,7 +5,7 @@
  *
  * Usage:
  *   aiw-server --framework <variant> --host local|fallback
- *              [--tier S|L] [--root <dir>]
+ *              [--tier S|L] [--root <dir>] [--engine quickjs|isolated-vm|auto]
  *              [--events <path>] [--transcript <path>] [--blobs <dir>]
  *              [--read-only]
  *              [--max-chars N] [--priority <tool>,...]
@@ -15,10 +15,11 @@
 import { parseArgs } from "node:util";
 import { LocalHost } from "./local.ts";
 import { startServer } from "./server.ts";
-import { parseFrameworkVariant } from "@aiw/core";
+import { parseFrameworkVariant, selectRuntime } from "@aiw/core";
 
 const { values } = parseArgs({
   options: {
+    engine: { type: "string", default: "quickjs" },
     framework: { type: "string", default: "branch-only" },
     host: { type: "string", default: "local" },
     tier: { type: "string", default: "S" },
@@ -29,6 +30,7 @@ const { values } = parseArgs({
     "read-only": { type: "boolean", default: false },
     "max-chars": { type: "string" },
     priority: { type: "string" },
+    "executor-provider": { type: "string", default: "openrouter" },
     "executor-model": { type: "string" },
     "executor-api-key": { type: "string" },
     "executor-base-url": { type: "string" },
@@ -39,6 +41,13 @@ const { values } = parseArgs({
 });
 
 const { kind, variant } = parseFrameworkVariant(String(values.framework ?? "branch-only"));
+// Honor explicit engine requests before host/MCP startup; native failures never downgrade.
+const enginePreference = values.engine;
+if (enginePreference !== "quickjs" && enginePreference !== "isolated-vm" && enginePreference !== "auto") {
+  throw new Error(`Unsupported engine: ${String(enginePreference)}; expected quickjs, isolated-vm, or auto`);
+}
+const selected = await selectRuntime(enginePreference);
+console.error(`aiw-server: engine=${selected.engine}${selected.note ? ` (${selected.note})` : ""}`);
 const tier = String(values.tier ?? "S") === "L" ? "L" : "S";
 const root = String(values.root ?? process.cwd());
 const hostMode = String(values.host ?? "local");
@@ -52,6 +61,8 @@ const branchContextRaw = typeof values["branch-context"] === "string" ? values["
 const branchContext = (branchContextRaw === "trace" || branchContextRaw === "annotated" || branchContextRaw === "full")
   ? branchContextRaw
   : undefined;
+const executorProvider = String(values["executor-provider"] ?? "openrouter");
+if (executorProvider !== "openrouter" && executorProvider !== "host") throw new Error("Unknown executor provider");
 const executorModel = typeof values["executor-model"] === "string" ? values["executor-model"] : undefined;
 const executorApiKey = typeof values["executor-api-key"] === "string"
   ? values["executor-api-key"]
@@ -82,6 +93,7 @@ void values.transcript;
 void values.blobs;
 
 startServer({
+  runtime: selected.runtime,
   kind,
   variant,
   host,
@@ -91,6 +103,7 @@ startServer({
   priority,
   readOnly,
   orchestrateModel: executorModel,
+  orchestrateProvider: executorProvider,
   orchestrateApiKey: executorApiKey,
   orchestrateBaseURL: executorBaseURL,
   orchestrateWorkspaceRoot: root,
