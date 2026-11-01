@@ -120,3 +120,19 @@ test("parseNames reads arrays and lists", () => {
   assert.deepEqual(parseNames("1. a\n- b\n"), ["a", "b"]);
   assert.equal(parseNames("!!! ???"), undefined);
 });
+
+test("selection forwards cancellation to paid reranking and refuses pre-cancelled selection", async () => {
+  const controller = new AbortController();
+  const reporter = createReporter({ sink: { write() {} }, writer: "s" });
+  let calls = 0;
+  const reranker = llmReranker({ complete: async (req) => {
+    calls++;
+    assert.equal(req.signal, controller.signal);
+    controller.abort(new Error("campaign stopped"));
+    throw controller.signal.reason;
+  } }, { model: "fixture", reporter });
+  const selector = createSelector({ reranker });
+  await assert.rejects(selector.select({ instruction: "find where a symbol is defined", signal: controller.signal }, catalog()), /campaign stopped/);
+  await assert.rejects(selector.select({ instruction: "find where a symbol is defined", signal: controller.signal }, catalog()), /campaign stopped/);
+  assert.equal(calls, 1);
+});

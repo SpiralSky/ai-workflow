@@ -225,3 +225,23 @@ test("report preserves unknown task costs instead of presenting zero or partial 
   assert.equal(report.frameworks.baseline.costPerSuccessUsd, null);
   assert.match(readFileSync(join(root, "experiments/reports/result/report.md"), "utf8"), /unknown/);
 });
+
+test("combineRuns rejects mismatched provider, quota mode, admission limits and effective inference", async t => {
+  for (const field of ["provider", "usageMode", "subscriptionLimits", "inference"] as const) {
+    const first = fixtureRun("a"), second = fixtureRun("b");
+    if (field === "provider") second.config.provider = "chatgpt";
+    if (field === "usageMode") second.config.usageMode = "subscription";
+    if (field === "subscriptionLimits") second.config.subscriptionLimits = { maxCalls: 5, maxTokens: 100, maxDurationMs: 1000 };
+    if (field === "inference") second.provenance.inference = { provider: "chatgpt", usageMode: "subscription", mainModel: "fixture", secondaryModel: "fixture", temperature: null, store: false, stream: true };
+    const { root, dirs } = fixtureDirs(t, [first, second]);
+    await assert.rejects(combineRuns(dirs, "result", root), /mismatched provider/);
+  }
+});
+
+test("legacy reports explicitly label provenance as unattested rather than verified", async (t) => {
+  const { root, dirs } = fixtureDirs(t, [fixtureRun("legacy")]);
+  await combineRuns(dirs, "legacy-label", root);
+  const report = JSON.parse(readFileSync(join(root, "experiments/reports/legacy-label/report.json"), "utf8"));
+  assert.equal(report.provenanceStatus, "legacy-unattested");
+  assert.match(readFileSync(join(root, "experiments/reports/legacy-label/report.md"), "utf8"), /not a verified baseline/);
+});

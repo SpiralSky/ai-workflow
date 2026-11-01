@@ -1,0 +1,21 @@
+{
+  "cases": [
+    {
+      "match": {
+        "name": "requests"
+      },
+      "result": {
+        "name": "requests",
+        "version": "2.32.3",
+        "installed": true,
+        "log": "Collecting requests\n  Using cached requests-2.32.3-py3-none-any.whl\nSuccessfully installed requests-2.32.3"
+      }
+    }
+  ],
+  "default": {
+    "name": "{{name}}",
+    "version": "1.4.2",
+    "installed": true,
+    "log": "Collecting {{name}}\n  Using cached {{name}}-1.4.2-py3-none-any.whl\nSuccessfully installed {{name}}-1.4.2"
+  }
+}

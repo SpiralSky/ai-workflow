@@ -1,0 +1,8 @@
+{
+  "cases": [],
+  "default": {
+    "ok": true,
+    "channel": "{{channel}}",
+    "ts": "1767225600.000100"
+  }
+}

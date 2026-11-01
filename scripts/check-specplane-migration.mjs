@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import {fileURLToPath} from 'node:url';
-import {RUNTIME_SCOPE, sha256 as hash, validateInventory, trackedEntries, workingEntry, verifyWorkingInventory, verifyHistoricalInventory} from './migration-inventory.mjs';
+import {RUNTIME_SCOPE, sha256 as hash, validateInventory, trackedEntries, workingEntry, verifyWorkingInventory, verifyHistoricalInventory, applyDevelopmentAllowances} from './migration-inventory.mjs';
 export function verifyPreservation(root) {
 const read = p => fs.readFileSync(path.join(root, p), 'utf8');
 
@@ -63,7 +63,12 @@ assert.equal(testEntry.after,'node --import tsx --test test/*.test.ts');
 assert.equal(currentViewer.scripts.test,testEntry.after);
 currentViewer.scripts.test=baseViewer.scripts.test;
 assert.deepEqual(currentViewer,baseViewer,'Only the recorded viewer test entry may change');
-verifyWorkingInventory(root,runtimeInventory,{[testEntry.path]:testEntry.after_sha256});
+const replacements = {[testEntry.path]:testEntry.after_sha256};
+const development = manifest.post_migration_development_allowances ? JSON.parse(read(manifest.post_migration_development_allowances)) : null;
+if (development) {
+  const expected = applyDevelopmentAllowances(root,runtimeInventory,replacements,development);
+  verifyWorkingInventory(root,expected);
+} else verifyWorkingInventory(root,runtimeInventory,replacements);
 const historyVerification = {
   source:verifyHistoricalInventory(root,sourceInventory),
   runtime:verifyHistoricalInventory(root,runtimeInventory),
@@ -81,11 +86,11 @@ for (const group of ['features', 'architecture']) {
 const plan = read('plans/2026-11-01-specplane-migration/PLAN.md');
 assert.match(plan, /^status: draft$/m);
 assert.doesNotMatch(plan, /^status: (ready|done)$/m);
-return {manifest,historyVerification};
+return {manifest,historyVerification,developmentAllowancePaths:development?.changes.length ?? 0};
 }
 
 export function verifyMigration(root, cli) {
-const {manifest,historyVerification} = verifyPreservation(root);
+const {manifest,historyVerification,developmentAllowancePaths} = verifyPreservation(root);
 if (!cli) throw new Error('Set SPECPLANE_CLI to the tested enhanced Specplane dist/cli.js; this check does not install or approve anything.');
 const run = args => {
   const result = spawnSync(process.execPath, [path.resolve(cli), ...args], {cwd:root,encoding:'utf8'});
@@ -108,7 +113,7 @@ assert.equal(nextState.checkout, null);
 assert.deepEqual(nextState.context.filter(c => c.kind === 'spec').map(c => c.id).sort(), ['feature/framework-runner','feature/harness-integration']);
 const warnings = {};
 for (const w of report.warnings ?? []) warnings[w.type] = (warnings[w.type] ?? 0) + 1;
-return {passed:true,specs:manifest.specs.length,preservedFiles:Object.keys(manifest.preserved_files).length,baseCommit:manifest.base_commit,runtimeIntegrityReference:manifest.runtime_integrity_reference ?? manifest.base_commit,validationWarnings:warnings,cli:path.resolve(cli),cliSha256:hash(fs.readFileSync(path.resolve(cli))),planNextExit:next.status,historyVerification};
+return {passed:true,specs:manifest.specs.length,preservedFiles:Object.keys(manifest.preserved_files).length,baseCommit:manifest.base_commit,runtimeIntegrityReference:manifest.runtime_integrity_reference ?? manifest.base_commit,validationWarnings:warnings,cli:path.resolve(cli),cliSha256:hash(fs.readFileSync(path.resolve(cli))),planNextExit:next.status,historyVerification,developmentAllowancePaths};
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

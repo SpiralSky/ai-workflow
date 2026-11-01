@@ -27,7 +27,12 @@ export interface RunConfig {
   frameworks: string[];
   tier: Tier;
   reps: number;
-  budgetUsd: number;
+  /** Monetary API budget; null for explicitly bounded subscription mode. */
+  budgetUsd: number | null;
+  /** Both roles share this provider; omitted preserves the legacy OpenRouter default. */
+  provider?: "openrouter" | "chatgpt";
+  usageMode?: "monetary" | "subscription";
+  subscriptionLimits?: import("./subscription.ts").SubscriptionLimits;
   concurrency: number;
   models: { main: string; secondary: string };
   temperature: number;
@@ -37,13 +42,17 @@ export interface RunConfig {
 
 /** Provenance recorded in run.json (runner §9). */
 export interface Provenance {
+  /** Static byte snapshots plus observations from actual runtime sessions, never requested placeholders. */
+  integrity?: { version: 1; sourceHash: string; bundleHash: string; entryHash: string; promptHashes: Record<string, string>; configHash: string;
+    runtime: "pending" | "observed"; nodeVersion?: string; runtimePlatform?: { platform: string; arch: string; moduleABI: string }; wallClockEnforced: false };
   commit: string;
   dirty: boolean;
   runnerVersion: string;
   engine: string;
   basePrompt: string;
-  frameworks: Record<string, { prompt: string; tools: string; extra?: Record<string, string> }>;
+  frameworks: Record<string, { prompt: string; tools: string; extra?: Record<string, string>; observedSettings?: Record<string, unknown> }>;
   images: Record<string, string>;
+  inference?: { provider: string; usageMode: string; mainModel: string; secondaryModel: string; temperature: number | null; store?: false; stream?: true };
   problems: Record<string, { taskHash: string; turnLimit: number; wallClockMs: number }>;
 }
 
@@ -92,6 +101,7 @@ export interface RunJSON {
   config: RunConfig;
   provenance: Provenance;
   totals: { jobs: number; attempts: number; costUsd: number | null; knownCostUsd?: number; pass: number; fail: number };
+  subscriptionUsage?: import("./subscription.ts").SubscriptionUsage;
   startedAt: string;
   endedAt?: string;
 }

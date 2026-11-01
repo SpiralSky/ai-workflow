@@ -2,7 +2,14 @@
   "name": "@aiw/llm",
   "private": true,
   "type": "module",
-  "exports": { ".": "./src/index.ts" },
-  "dependencies": { "@aiw/telemetry": "*" },
-  "scripts": { "test": "tsx --test test/*.test.ts" }
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@aiw/telemetry": "*",
+    "jose": "^6.2.13"
+  },
+  "scripts": {
+    "test": "tsx --test test/*.test.ts"
+  }
 }

@@ -1,0 +1,50 @@
+{
+  "cases": [
+    {
+      "match": {
+        "name": "requests"
+      },
+      "result": {
+        "name": "requests",
+        "latest": "2.32.3",
+        "versions": [
+          "2.32.3",
+          "2.32.2",
+          "2.31.0",
+          "2.30.0"
+        ],
+        "changelog": "2.32.3: fixes a regression in connection pooling and a proxy auth leak.",
+        "docs": "https://requests.readthedocs.io"
+      }
+    },
+    {
+      "match": {
+        "name": "pytest"
+      },
+      "result": {
+        "name": "pytest",
+        "latest": "8.3.2",
+        "versions": [
+          "8.3.2",
+          "8.3.1",
+          "8.2.2",
+          "8.1.1"
+        ],
+        "changelog": "8.3.2: fixes assertion rewriting with parametrized fixtures.",
+        "docs": "https://docs.pytest.org"
+      }
+    }
+  ],
+  "default": {
+    "name": "{{name}}",
+    "latest": "1.4.2",
+    "versions": [
+      "1.4.2",
+      "1.4.1",
+      "1.3.0",
+      "1.2.5"
+    ],
+    "changelog": "1.4.2: bug fixes and documentation updates.",
+    "docs": "https://pypi.org/project/{{name}}/"
+  }
+}

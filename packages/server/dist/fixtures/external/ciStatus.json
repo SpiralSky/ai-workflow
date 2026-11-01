@@ -1,0 +1,53 @@
+{
+  "cases": [
+    {
+      "match": {
+        "branch": "fix/config-missing"
+      },
+      "result": {
+        "branch": "fix/config-missing",
+        "runs": [
+          {
+            "id": 9114,
+            "status": "failed",
+            "commit": "a41c9e2",
+            "failingJobs": [
+              "unit-tests (py3.12)"
+            ]
+          },
+          {
+            "id": 9102,
+            "status": "passed",
+            "commit": "77bd0f3",
+            "failingJobs": []
+          }
+        ]
+      }
+    }
+  ],
+  "default": {
+    "branch": "{{branch}}",
+    "runs": [
+      {
+        "id": 9120,
+        "status": "passed",
+        "commit": "e03b7a1",
+        "failingJobs": []
+      },
+      {
+        "id": 9117,
+        "status": "passed",
+        "commit": "5c2d8f4",
+        "failingJobs": []
+      },
+      {
+        "id": 9109,
+        "status": "failed",
+        "commit": "1f6a0cd",
+        "failingJobs": [
+          "lint"
+        ]
+      }
+    ]
+  }
+}

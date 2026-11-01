@@ -1,7 +1,6 @@
 import { type Host, type HostCallRequest, type HostToolDecl } from "@aiw/core";
-import { catalog, toHostDecl, type ToolCtx } from "@aiw/tools";
+import { catalog, toHostDecl, Sidecar, takeSnapshot, type ToolCtx } from "@aiw/tools";
 import type { CallCtx } from "@aiw/core";
-import type { Sidecar } from "@aiw/tools";
 import type { Snapshot } from "@aiw/tools";
 
 /** Options for `LocalHost`. */
@@ -22,7 +21,7 @@ export class LocalHost implements Host {
   private readonly tier: "S" | "L";
   private readonly opts: LocalHostOpts;
 
-  constructor(tier: "S" | "L", opts: LocalHostOpts) {
+  constructor(tier: "S" | "L", opts: LocalHostOpts, private readonly ownsResources = false) {
     this.tier = tier;
     this.opts = opts;
   }
@@ -63,6 +62,17 @@ export class LocalHost implements Host {
     return def.fn(args, toolCtx);
   }
 
-  /** No-op: the local catalog has no external connections to close. */
-  async close(): Promise<void> {}
+  /** Release resources created by createLocalHost; injected test/caller resources remain caller-owned. */
+  async close(): Promise<void> {
+    if (this.ownsResources) {
+      try { await this.opts.sidecar?.close(); } finally { this.opts.snapshot?.dispose(); }
+    }
+  }
+}
+
+/** Create a session host with the tierL sidecar and pristine startup snapshot required by its tools. */
+export async function createLocalHost(tier: "S" | "L", root: string): Promise<LocalHost> {
+  if (tier === "S") return new LocalHost(tier, { root });
+  const snapshot = await takeSnapshot(root);
+  return new LocalHost(tier, { root, snapshot, sidecar: new Sidecar({ root }) }, true);
 }

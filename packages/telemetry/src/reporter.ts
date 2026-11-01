@@ -6,6 +6,8 @@ export interface Reporter {
   readonly scope: string | null;
   turn(e: {
     model: string;
+    providerModel?: string;
+    providerSystemFingerprint?: string;
     role: Role;
     usage: Usage;
     costUsd?: number;

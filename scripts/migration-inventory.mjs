@@ -78,3 +78,44 @@ export function verifyHistoricalInventory(root, inventory) {
   assert.deepEqual(sorted(rows),sorted(inventory.files),'Recorded source inventory differs from available historical objects');
   return 'verified historical objects and self-contained inventory';
 }
+
+/** Apply explicit reviewed development deltas without rewriting the immutable migration baseline. */
+export function applyDevelopmentAllowances(root, inventory, replacements, allowances) {
+  assert.equal(allowances.version,1);
+  assert.equal(allowances.kind,'post-migration-development');
+  assert.match(allowances.base_commit,/^[a-f0-9]{40}$/);
+  assert.match(allowances.verified_development_head,/^[a-f0-9]{40}$/);
+  assert.ok(Array.isArray(allowances.user_requests) && allowances.user_requests.length > 0);
+  assert.ok(allowances.user_requests.every(request => typeof request === 'string' && request.trim()));
+  const anchors = ['.specplane/migration-runtime-inventory.json','.specplane/migration-source-inventory.json'];
+  assert.deepEqual(Object.keys(allowances.original_inventory_sha256).sort(),anchors.sort());
+  for (const file of anchors) assert.equal(sha256(fs.readFileSync(path.join(root,file))),allowances.original_inventory_sha256[file],`Original migration inventory was rewritten: ${file}`);
+  const expected = new Map(inventory.files.map(entry=>[entry.path,{...entry,sha256:replacements[entry.path] ?? entry.sha256}]));
+  const seen = new Set();
+  assert.ok(Array.isArray(allowances.changes) && allowances.changes.length > 0);
+  for (const change of allowances.changes) {
+    assert.ok(!seen.has(change.path),`Duplicate development allowance: ${change.path}`);seen.add(change.path);
+    // Permit only the two explicit image packaging files; benchmark fixtures/permissions remain excluded.
+    assert.match(change.path,/^(packages\/(core|llm|runner|server|telemetry)\/|packages\/tools\/(?:src\/sidecar\.ts|python\/aiw_sidecar\/(?:execution|rpc)\.py)$|package-lock\.json$|experiments\/docker\/aiw-base\/Dockerfile(?:\.dockerignore)?$)/);
+    assert.ok(typeof change.rationale === 'string' && change.rationale.trim());
+    assert.deepEqual(change.before,expected.get(change.path) ?? null,`Development before-state mismatch: ${change.path}`);
+    assert.ok(change.after,'This bounded development scope does not authorize deleting baseline runtime files');
+    validateInventory({version:1,source_ref:inventory.source_ref,files:[change.after]});
+    assert.equal(change.after.path,change.path);
+    assert.notDeepEqual(change.before,change.after,`Unnecessary development allowance: ${change.path}`);
+    expected.set(change.path,change.after);
+  }
+  assert.deepEqual([...allowances.draft_plans].sort(),['plans/2026-11-01-all-provider-host-broker/PLAN.md','plans/2026-11-01-failfast-campaign/PLAN.md','plans/2026-11-01-openai-plan-signin/PLAN.md','plans/2026-11-01-provenance-readiness/PLAN.md']);
+  for (const file of allowances.draft_plans) {
+    assert.match(file,/^plans\/2026-11-01-(all-provider-host-broker|failfast-campaign|openai-plan-signin|provenance-readiness)\/PLAN\.md$/);
+    const text=fs.readFileSync(path.join(root,file),'utf8');
+    const frontmatter = /^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/.exec(text);
+    assert.ok(frontmatter,`Missing development plan frontmatter: ${file}`);
+    assert.match(frontmatter[1],/^status: draft\r?$/m,`Development plan must remain draft: ${file}`);
+  }
+  if (allowances.hygiene_metadata) {
+    assert.deepEqual(allowances.hygiene_metadata.files.map(e=>e.path).sort(), [".gitignore","docs/dot-progress/ignore-hygiene.md","docs/dot-progress/runtime-hygiene-followup.md","scripts/check-gitignore.sh","scripts/check-runtime-gitignore.sh"]);
+    verifyWorkingInventory(root, allowances.hygiene_metadata);
+  }
+  return {...inventory,files:[...expected.values()]};
+}

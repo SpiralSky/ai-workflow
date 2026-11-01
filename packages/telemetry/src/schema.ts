@@ -33,7 +33,9 @@ export const EventSchema = z.discriminatedUnion("kind", [
   z.object({
     ...common,
     kind: z.literal("turn"),
-    model: z.string(),
+    model: z.string(), // Requested identifier, possibly an alias.
+    providerModel: z.string().optional(),
+    providerSystemFingerprint: z.string().optional(),
     role: RoleSchema,
     usage: UsageSchema,
     costUsd: z.number().optional(),

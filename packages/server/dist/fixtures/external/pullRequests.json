@@ -1,0 +1,105 @@
+{
+  "cases": [
+    {
+      "match": {
+        "op": "comments",
+        "number": 212
+      },
+      "result": {
+        "comments": [
+          {
+            "author": "r.tanaka",
+            "path": "src/config.py",
+            "line": 41,
+            "body": "Can this fall back to the default instead of raising?"
+          },
+          {
+            "author": "m.alvarez",
+            "path": "tests/test_config.py",
+            "line": 12,
+            "body": "Please add a case for an empty file."
+          }
+        ]
+      }
+    },
+    {
+      "match": {
+        "op": "comments"
+      },
+      "result": {
+        "comments": []
+      }
+    },
+    {
+      "match": {
+        "op": "get",
+        "number": 212
+      },
+      "result": {
+        "pullRequest": {
+          "number": 212,
+          "title": "Make config loading tolerant of missing files",
+          "author": "m.alvarez",
+          "state": "open",
+          "base": "main",
+          "head": "fix/config-missing",
+          "changedFiles": 3,
+          "checks": "passing",
+          "reviewers": [
+            "r.tanaka"
+          ]
+        }
+      }
+    },
+    {
+      "match": {
+        "op": "get"
+      },
+      "result": {
+        "pullRequest": {
+          "number": "{{number}}",
+          "title": "Bump lint rules",
+          "author": "k.osei",
+          "state": "merged",
+          "base": "main",
+          "head": "chore/lint",
+          "changedFiles": 5,
+          "checks": "passing",
+          "reviewers": []
+        }
+      }
+    },
+    {
+      "match": {
+        "op": "list",
+        "state": "closed"
+      },
+      "result": {
+        "pullRequests": [
+          {
+            "number": 205,
+            "title": "Drop Python 3.9 support",
+            "author": "j.lindqvist",
+            "state": "merged"
+          }
+        ]
+      }
+    }
+  ],
+  "default": {
+    "pullRequests": [
+      {
+        "number": 212,
+        "title": "Make config loading tolerant of missing files",
+        "author": "m.alvarez",
+        "state": "open"
+      },
+      {
+        "number": 214,
+        "title": "Add retry to the HTTP client",
+        "author": "r.tanaka",
+        "state": "open"
+      }
+    ]
+  }
+}

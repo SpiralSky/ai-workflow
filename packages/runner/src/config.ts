@@ -11,6 +11,8 @@ import { createRequire } from "node:module";
 import { DEFAULT_TRACE_LIMITS, parseFrameworkVariant } from "@aiw/core";
 import type { RunConfig, Provenance, Tier, BranchContext } from "./types.ts";
 
+import { validateSubscriptionLimits, type SubscriptionLimits } from "./subscription.ts";
+
 export { RunConfig, Provenance };
 
 /** Package version read from package.json. */
@@ -107,6 +109,9 @@ export function resolveKind(
   return "pilot";
 }
 
+/** Conservative campaign default: calibrate one paid task at a time. */
+export const DEFAULT_CONCURRENCY = 1;
+
 /** Options parsed from `aiw eval` flags. */
 export interface EvalFlags {
   problems: string;
@@ -118,11 +123,14 @@ export interface EvalFlags {
   temperature: number;
   budget: number;
   full: boolean;
-  concurrency: number;
+  concurrency?: number;
   branchContext: BranchContext;
   secondaryCap: number;
   untilReps?: number;
   combineWith?: string;
+  provider?: "openrouter" | "chatgpt";
+  usageMode?: "monetary" | "subscription";
+  subscriptionLimits?: SubscriptionLimits;
 }
 
 /**
@@ -145,13 +153,7 @@ function sha256(text: string): string {
 function basePromptHash(): string {
   // Resolve relative to this package's location
   const dir = fileURLToPath(new URL("../../core/prompts/base.md", import.meta.url));
-  let text: string;
-  try {
-    text = readFileSync(dir, "utf8");
-  } catch {
-    return sha256("(missing)");
-  }
-  return sha256(text);
+  return sha256(readFileSync(dir, "utf8"));
 }
 
 /**
@@ -159,16 +161,10 @@ function basePromptHash(): string {
  * @param cwd - working directory for git commands
  */
 export function gitProvenance(cwd: string): { commit: string; dirty: boolean } {
-  let commit = "(unknown)";
-  let dirty = false;
-  try {
-    commit = execSync("git rev-parse HEAD", { cwd, encoding: "utf8" }).trim();
-    const status = execSync("git status --porcelain", { cwd, encoding: "utf8" }).trim();
-    dirty = status.length > 0;
-  } catch {
-    // Not a git repo or git unavailable
-  }
-  return { commit, dirty };
+  const commit = execSync("git rev-parse HEAD", { cwd, encoding: "utf8" }).trim();
+  const status = execSync("git status --porcelain", { cwd, encoding: "utf8" }).trim();
+  if (!/^[a-f0-9]{40,64}$/.test(commit)) throw new Error("git did not report a valid commit");
+  return { commit, dirty: status.length > 0 };
 }
 
 /**
@@ -182,7 +178,7 @@ export function buildProvenance(cwd: string): Omit<Provenance, "frameworks" | "i
     commit: git.commit,
     dirty: git.dirty,
     runnerVersion: runnerVersion(),
-    engine: "isolated-vm",
+    engine: "pending",
     basePrompt: basePromptHash(),
   };
 }
@@ -205,6 +201,19 @@ export function resolveConfig(
   flags: EvalFlags,
   availableProblems: Array<{ id: string; size: string; set: string }>,
 ): RunConfig {
+  const concurrency = flags.concurrency ?? DEFAULT_CONCURRENCY;
+  if (!Number.isSafeInteger(concurrency) || concurrency < 1) throw new Error("concurrency must be a positive integer");
+  const provider = flags.provider ?? "openrouter";
+  const usageMode = flags.usageMode ?? "monetary";
+  if (provider !== "openrouter" && provider !== "chatgpt") throw new Error("Unknown provider");
+  if (usageMode !== "monetary" && usageMode !== "subscription") throw new Error("Unknown usage mode");
+  if ((provider === "chatgpt") !== (usageMode === "subscription")) throw new Error("ChatGPT requires explicit subscription usage mode; OpenRouter requires monetary mode");
+  if (provider === "chatgpt") {
+    if (!flags.subscriptionLimits) throw new Error("Subscription usage requires explicit call, token and duration limits");
+    validateSubscriptionLimits(flags.subscriptionLimits);
+    if (concurrency !== 1) throw new Error("Subscription campaigns require concurrency 1");
+    if (!flags.model || flags.model.includes("/")) throw new Error("Select an explicit account-available OpenAI model slug");
+  } else if (flags.subscriptionLimits) throw new Error("Subscription limits require ChatGPT provider");
   validateModel(flags.model);
   if (flags.secondaryModel) validateModel(flags.secondaryModel);
 
@@ -227,8 +236,10 @@ export function resolveConfig(
     frameworks,
     tier: flags.tools,
     reps: flags.reps,
-    budgetUsd: flags.budget,
-    concurrency: flags.concurrency,
+    budgetUsd: usageMode === "subscription" ? null : flags.budget,
+    provider, usageMode,
+    ...(flags.subscriptionLimits ? { subscriptionLimits: flags.subscriptionLimits } : {}),
+    concurrency,
     models: {
       main: flags.model,
       secondary: flags.secondaryModel ?? flags.model,

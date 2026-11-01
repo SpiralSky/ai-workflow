@@ -115,6 +115,7 @@ function meanCost(history: JobJSON[], problem: string, framework: string): numbe
  */
 export function buildPlan(config: RunConfig, repoRoot: string): Plan {
   const jobs = expandJobs(config);
+  if (config.usageMode === "subscription") return { jobs };
   const history = loadHistory(repoRoot);
   if (history.length === 0) return { jobs };
 

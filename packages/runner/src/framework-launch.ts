@@ -4,19 +4,17 @@ import type { RunConfig } from "./types.ts";
 /** Resolves an effective framework treatment and its executor launch arguments.
  * @param framework - requested canonical or uncanonicalized variant id
  * @param config - run-wide defaults, overridden by explicit supported variant keys
- * @param credentials - passed to the server as before; never logged here
  */
-export function frameworkLaunch(framework: string, config: RunConfig, credentials: { apiKey: string; baseURL: string }): {
-  id: string; needsExecutor: boolean; executorArgs: string[];
+export function frameworkLaunch(framework: string, config: RunConfig): {
+  id: string; needsExecutor: boolean; network: "none"; executorArgs: string[];
 } {
   const parsed = parseFrameworkVariant(framework);
   const needsExecutor = parsed.kind === "orchestrate";
   return {
-    id: parsed.id, needsExecutor,
+    id: parsed.id, needsExecutor, network: "none",
     executorArgs: needsExecutor ? [
       "--executor-model", config.models.secondary,
-      "--executor-api-key", credentials.apiKey,
-      "--executor-base-url", credentials.baseURL,
+      "--executor-provider", "host",
       "--secondary-cap", String(parsed.variant.secondary ?? config.secondaryCap),
     ] : [],
   };

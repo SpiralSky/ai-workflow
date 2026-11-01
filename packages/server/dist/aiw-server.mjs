@@ -11237,8 +11237,146 @@ function cutList(items, maxCount, hint) {
 }
 
 // packages/tools/src/sidecar.ts
+import { spawn as spawn2 } from "node:child_process";
 import { fileURLToPath } from "node:url";
-var PYTHON_DIR = fileURLToPath(new URL("../python", import.meta.url));
+import { createInterface } from "node:readline";
+var PYTHON_DIR = fileURLToPath(new URL("./python", import.meta.url));
+var Sidecar = class {
+  proc;
+  pending = /* @__PURE__ */ new Map();
+  nextId = 1;
+  closing = /* @__PURE__ */ new Set();
+  opts;
+  constructor(opts) {
+    this.opts = opts;
+  }
+  /** Process id of the running sidecar (for tests); undefined when not started. */
+  get pid() {
+    return this.proc?.pid;
+  }
+  /** Starts the process if it is not running. */
+  start() {
+    if (this.proc) return this.proc;
+    const base = this.opts.env ?? process.env;
+    const venv = base.AIW_VENV || "/opt/aiw/venv";
+    const env = { ...toolEnv(base), PYTHONPATH: PYTHON_DIR, PYTHONUNBUFFERED: "1", PYTHONDONTWRITEBYTECODE: "1" };
+    const proc = spawn2(`${venv}/bin/python`, ["-m", "aiw_sidecar", this.opts.root], { cwd: this.opts.root, env, detached: process.platform !== "win32", stdio: ["pipe", "pipe", "pipe"] });
+    this.proc = proc;
+    let stderr = "";
+    proc.stderr.on("data", (d2) => stderr = (stderr + d2).slice(-500));
+    createInterface({ input: proc.stdout }).on("line", (line) => this.onLine(line));
+    proc.stdin.on("error", () => {
+    });
+    const die = (why) => {
+      if (this.proc === proc) this.proc = void 0;
+      this.failPending(proc, why);
+    };
+    proc.on("error", (e) => die(`sidecar failed to start: ${e.message}`));
+    proc.on("close", () => die(`sidecar crashed${stderr.trim() ? `: ${stderr.trim().split("\n").pop()}` : ""}`));
+    return proc;
+  }
+  /** Rejects the calls in flight on `proc`. */
+  failPending(proc, why) {
+    for (const [id, p] of [...this.pending]) {
+      if (p.proc !== proc) continue;
+      this.pending.delete(id);
+      p.reject(new Error(why));
+    }
+  }
+  onLine(line) {
+    let msg;
+    try {
+      msg = JSON.parse(line);
+    } catch {
+      return;
+    }
+    const p = this.pending.get(msg.id);
+    if (!p) return;
+    this.pending.delete(msg.id);
+    if (msg.error) p.reject(new Error(msg.error.message));
+    else p.resolve(msg.result);
+  }
+  /**
+   * Calls a sidecar method (named like the tool).
+   * @param method - method name
+   * @param params - JSON params
+   * @param signal - abort rejects this call with `aborted` and sends the sidecar a cancel: exec tools kill their child, other work finishes and its reply is dropped
+   * @throws `aborted`, `sidecar crashed`, or the sidecar's error message
+   */
+  call(method, params, signal) {
+    if (signal?.aborted) return Promise.reject(new Error("aborted"));
+    return new Promise((resolve2, reject) => {
+      const id = this.nextId++;
+      const onAbort = () => {
+        const p = this.pending.get(id);
+        if (!p || !this.pending.delete(id)) return;
+        p.proc.stdin.write(JSON.stringify({ method: "$cancel", params: { id } }) + "\n");
+        reject(new Error("aborted"));
+      };
+      signal?.addEventListener("abort", onAbort, { once: true });
+      const done = (f) => (v) => {
+        signal?.removeEventListener("abort", onAbort);
+        f(v);
+      };
+      try {
+        const proc = this.start();
+        this.pending.set(id, { proc, resolve: done(resolve2), reject: done(reject) });
+        proc.stdin.write(JSON.stringify({ id, method, params }) + "\n");
+      } catch (e) {
+        this.pending.delete(id);
+        done(reject)(e);
+      }
+    });
+  }
+  /** Gracefully cancel owned work, reap the sidecar, and bound shutdown; later calls may restart it. */
+  async close() {
+    const proc = this.proc;
+    if (proc) {
+      this.proc = void 0;
+      this.failPending(proc, "sidecar crashed");
+      const stopped = new Promise((resolve2, reject) => {
+        const signal = (kind2) => {
+          if (!proc.pid) return;
+          try {
+            if (process.platform === "win32") proc.kill(kind2);
+            else process.kill(-proc.pid, kind2);
+          } catch (error62) {
+            if (error62.code !== "ESRCH") throw error62;
+          }
+        };
+        const timer = setTimeout(() => {
+          try {
+            signal("SIGKILL");
+          } catch (error62) {
+            reject(error62);
+          }
+        }, 2e3);
+        proc.once("close", () => {
+          clearTimeout(timer);
+          resolve2();
+        });
+        proc.once("exit", () => {
+          try {
+            signal("SIGKILL");
+          } catch (error62) {
+            clearTimeout(timer);
+            reject(error62);
+          }
+        });
+        try {
+          signal("SIGTERM");
+        } catch (error62) {
+          clearTimeout(timer);
+          reject(error62);
+        }
+      });
+      this.closing.add(stopped);
+      void stopped.finally(() => this.closing.delete(stopped)).catch(() => {
+      });
+    }
+    await Promise.all(this.closing);
+  }
+};
 function needSidecar(sc) {
   if (!sc) throw new Error("no sidecar");
   return sc;
@@ -11310,7 +11448,7 @@ function checkTools(sc) {
 
 // packages/tools/src/l/external/fixtures.ts
 import { readFileSync as readFileSync2 } from "node:fs";
-var DIR = new URL("../../../fixtures/external/", import.meta.url);
+var DIR = new URL("./fixtures/external/", import.meta.url);
 var cache = /* @__PURE__ */ new Map();
 function load(tool) {
   let f = cache.get(tool);
@@ -12726,7 +12864,7 @@ import { readFile as readFile4 } from "node:fs/promises";
 import { join as join4 } from "node:path";
 
 // packages/tools/src/l/vcs/common.ts
-import { spawn as spawn2 } from "node:child_process";
+import { spawn as spawn3 } from "node:child_process";
 var MAX_DIFF_OUT = 6e3;
 function scope(root2, p) {
   const rel = relPath(root2, resolveInRoot(root2, p ?? "."));
@@ -12737,7 +12875,7 @@ function currentFiles(root2, has) {
 }
 function runGit(ctx, args) {
   return new Promise((resolve2, reject) => {
-    const child = spawn2("git", ["--no-pager", "-c", "core.quotepath=off", ...args], {
+    const child = spawn3("git", ["--no-pager", "-c", "core.quotepath=off", ...args], {
       cwd: ctx.root,
       env: toolEnv(ctx.env ?? process.env),
       stdio: ["ignore", "pipe", "pipe"],
@@ -12957,7 +13095,7 @@ function makeRestore(snapshot) {
 }
 
 // packages/tools/src/s/bash.ts
-import { spawn as spawn3 } from "node:child_process";
+import { spawn as spawn4 } from "node:child_process";
 var DEFAULT_TIMEOUT_MS = 6e4;
 var TIMEOUT_CODE = 124;
 var ABORT_CODE = 130;
@@ -13004,7 +13142,7 @@ var bash = {
     const timeoutMs = args.timeoutMs ?? DEFAULT_TIMEOUT_MS;
     return await new Promise((resolve2, reject) => {
       if (ctx.signal.aborted) return resolve2({ code: ABORT_CODE, out: "[aborted]" });
-      const child = spawn3("bash", ["-lc", args.cmd], {
+      const child = spawn4("bash", ["-lc", args.cmd], {
         cwd: ctx.root,
         env: toolEnv(ctx.env ?? process.env),
         detached: true,
@@ -13267,14 +13405,70 @@ function catalog(tier2, opts) {
   ];
 }
 
+// packages/tools/src/snapshot.ts
+import { spawn as spawn5 } from "node:child_process";
+import { mkdtempSync, rmSync } from "node:fs";
+import { mkdir as mkdir4, readFile as readFile9, stat as stat3 } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join as join6 } from "node:path";
+function runTar(args) {
+  return new Promise((resolve2, reject) => {
+    const child = spawn5("tar", args, { env: toolEnv(), stdio: ["ignore", "ignore", "pipe"] });
+    let err = "";
+    child.stderr.on("data", (d2) => err += d2);
+    child.on("error", reject);
+    child.on("close", (code) => code === 0 || code === 1 ? resolve2() : reject(new Error(`tar failed: ${err.trim()}`)));
+  });
+}
+async function takeSnapshot(root2) {
+  const dir = mkdtempSync(join6(tmpdir(), "aiw-snapshot-"));
+  const onExit = () => rmSync(dir, { recursive: true, force: true });
+  process.once("exit", onExit);
+  try {
+    const archive = join6(dir, "workspace.tar");
+    await runTar(["-C", root2, "--exclude=.git", "--exclude=node_modules", "-cf", archive, "."]);
+    const files = join6(dir, "files");
+    let extracted;
+    const extract = () => extracted ??= mkdir4(files).then(() => runTar(["-C", files, "-xf", archive]));
+    return {
+      archive,
+      async list() {
+        await extract();
+        return [...walk(files)].map((abs) => relPath(files, abs)).sort();
+      },
+      async read(path) {
+        await extract();
+        return await readFile9(resolveInRoot(files, path)).catch((e) => {
+          if (e.code === "ENOENT" || e.code === "EISDIR") return null;
+          throw e;
+        });
+      },
+      async mode(path) {
+        await extract();
+        return await stat3(resolveInRoot(files, path)).then((s) => s.mode & 511, () => null);
+      },
+      dispose() {
+        process.off("exit", onExit);
+        rmSync(dir, { recursive: true, force: true });
+      }
+    };
+  } catch (e) {
+    onExit();
+    process.off("exit", onExit);
+    throw e;
+  }
+}
+
 // packages/server/src/local.ts
 var LocalHost = class {
-  tier;
-  opts;
-  constructor(tier2, opts) {
+  constructor(tier2, opts, ownsResources = false) {
+    this.ownsResources = ownsResources;
     this.tier = tier2;
     this.opts = opts;
   }
+  ownsResources;
+  tier;
+  opts;
   /**
    * Returns the catalog tools for this tier as host tool declarations.
    * @returns host tool declarations in catalog order
@@ -13309,10 +13503,26 @@ var LocalHost = class {
     const args = typeof req.args === "object" && req.args !== null ? req.args : {};
     return def.fn(args, toolCtx);
   }
-  /** No-op: the local catalog has no external connections to close. */
+  /** Release resources created by createLocalHost; injected test/caller resources remain caller-owned. */
   async close() {
+    if (this.ownsResources) {
+      try {
+        await this.opts.sidecar?.close();
+      } finally {
+        this.opts.snapshot?.dispose();
+      }
+    }
   }
 };
+async function createLocalHost(tier2, root2) {
+  if (tier2 === "S") return new LocalHost(tier2, { root: root2 });
+  const snapshot = await takeSnapshot(root2);
+  return new LocalHost(tier2, { root: root2, snapshot, sidecar: new Sidecar({ root: root2 }) }, true);
+}
+
+// packages/server/src/server.ts
+import { createHash as createHash5 } from "node:crypto";
+import { readFileSync as readFileSync4 } from "node:fs";
 
 // node_modules/zod/v4/core/index.js
 var core_exports2 = {};
@@ -14177,17 +14387,17 @@ function partial(Class2, schema, mask, name = "partial") {
   if (hasChecks) {
     throw new Error(`.${name}() cannot be used on object schemas containing refinements`);
   }
-  const selected = mask ? new Set(maskedKeys(schema, mask)) : void 0;
+  const selected2 = mask ? new Set(maskedKeys(schema, mask)) : void 0;
   const newShape = {};
-  mirrorShape(newShape, schema, Reflect.ownKeys(sourceShape(schema)), Class2 && ((value, key) => selected && !selected.has(key) ? value : new Class2({ type: "optional", innerType: value })));
+  mirrorShape(newShape, schema, Reflect.ownKeys(sourceShape(schema)), Class2 && ((value, key) => selected2 && !selected2.has(key) ? value : new Class2({ type: "optional", innerType: value })));
   return clone(schema, mergeDefs(schema._zod.def, { shape: newShape, checks: [] }));
 }
 function required(Class2, schema, mask) {
-  const selected = mask ? new Set(maskedKeys(schema, mask)) : void 0;
+  const selected2 = mask ? new Set(maskedKeys(schema, mask)) : void 0;
   const newShape = {};
   mirrorShape(newShape, schema, Reflect.ownKeys(sourceShape(schema)), (value, key) => (
     // overwrite with non-optional
-    selected && !selected.has(key) ? value : new Class2({ type: "nonoptional", innerType: value })
+    selected2 && !selected2.has(key) ? value : new Class2({ type: "nonoptional", innerType: value })
   ));
   return clone(schema, mergeDefs(schema._zod.def, { shape: newShape }));
 }
@@ -37447,6 +37657,75 @@ function renderTrace(result, opts) {
   return lines2.join("\n");
 }
 
+// packages/core/src/branch/engines/isolated-vm.ts
+var ivmModule;
+function loadIsolatedVM() {
+  ivmModule ??= import("isolated-vm").then((m) => m.default ?? m);
+  return ivmModule;
+}
+var isolatedVMRuntime = {
+  async create({ memoryMb }) {
+    const ivm = await loadIsolatedVM();
+    const isolate = new ivm.Isolate({ memoryLimit: memoryMb });
+    const context = isolate.createContextSync();
+    return {
+      load(js, filename) {
+        isolate.compileScriptSync(js, { filename }).runSync(context);
+      },
+      bridge(fns) {
+        context.global.setSync("__callRef", new ivm.Reference((s) => fns.call(s)));
+        context.global.setSync("__flushRef", new ivm.Reference((s) => fns.flush(s)));
+        isolate.compileScriptSync(
+          `(function (callRef, flushRef) {
+              globalThis.__host = {
+                call: (s) => callRef.apply(undefined, [s], { result: { promise: true } }),
+                flush: (s) => flushRef.applySync(undefined, [s]),
+              };
+            })(__callRef, __flushRef);
+            delete globalThis.__callRef; delete globalThis.__flushRef;`,
+          { filename: "bridge.js" }
+        ).runSync(context);
+      },
+      run: (expr) => context.eval(expr, { promise: true, copy: true, filename: "run.js" }),
+      dispose() {
+        if (!isolate.isDisposed) isolate.dispose();
+      },
+      get disposed() {
+        return isolate.isDisposed;
+      }
+    };
+  }
+};
+
+// packages/core/src/branch/engines/index.ts
+function hasNoNodeSnapshot() {
+  return process.execArgv.includes("--no-node-snapshot") || /(^|\s)--no-node-snapshot(\s|$)/.test(process.env.NODE_OPTIONS ?? "");
+}
+async function selectRuntime(pref) {
+  if (pref === "quickjs") return { runtime: quickJSRuntime, engine: "quickjs" };
+  let failure2;
+  if (!hasNoNodeSnapshot()) failure2 = "Node was not started with --no-node-snapshot";
+  else {
+    try {
+      await loadIsolatedVM();
+    } catch (e) {
+      failure2 = `isolated-vm could not be loaded (${e?.message ?? e})`;
+    }
+  }
+  if (pref === "isolated-vm") {
+    if (failure2) throw new Error(`engine "isolated-vm" is unavailable: ${failure2}. Install isolated-vm for this platform (Node 22 or 24) and start Node with --no-node-snapshot.`);
+    return { runtime: isolatedVMRuntime, engine: "isolated-vm" };
+  }
+  if (failure2) {
+    return {
+      runtime: quickJSRuntime,
+      engine: "quickjs",
+      note: `using the QuickJS engine (${failure2}); for the faster isolated-vm engine install isolated-vm for this platform (Node 22 or 24) and start Node with --no-node-snapshot`
+    };
+  }
+  return { runtime: isolatedVMRuntime, engine: "isolated-vm" };
+}
+
 // packages/core/src/registry/normalize.ts
 var dropInvalid = (s) => s.replace(/[^A-Za-z0-9_$]/g, "");
 function camel(s) {
@@ -37865,6 +38144,9 @@ var EventSchema = external_exports.discriminatedUnion("kind", [
     ...common,
     kind: external_exports.literal("turn"),
     model: external_exports.string(),
+    // Requested identifier, possibly an alias.
+    providerModel: external_exports.string().optional(),
+    providerSystemFingerprint: external_exports.string().optional(),
     role: RoleSchema2,
     usage: UsageSchema,
     costUsd: external_exports.number().optional(),
@@ -38085,13 +38367,27 @@ function wrapTools(tools, reporter) {
   }
   return out;
 }
+function fromMeta(meta3, root2) {
+  const parent = meta3?.["aiw/parent"];
+  const harnessId = meta3?.["aiw/harnessId"];
+  return root2.scopedTo(
+    typeof parent === "string" ? parent : null,
+    typeof harnessId === "string" ? harnessId : void 0
+  );
+}
 function wrapLLM(client, reporter, role, opts = {}) {
   return {
     async complete(req) {
       const t0 = performance.now();
       const res = await client.complete(req);
       const latencyMs = Math.round(performance.now() - t0);
+      const response = res.response;
+      const observed = {
+        ...typeof response?.model === "string" && response.model ? { providerModel: response.model } : {},
+        ...typeof response?.system_fingerprint === "string" && response.system_fingerprint ? { providerSystemFingerprint: response.system_fingerprint } : {}
+      };
       const turnId = reporter.turn({
+        ...observed,
         model: req.model,
         role,
         usage: res.usage,
@@ -38851,7 +39147,7 @@ ${h.code}
     async findTools(args) {
       const need = typeof args.need === "string" ? args.need.trim() : "";
       if (!need) throw new Error("findTools: `need` must be a non-empty string");
-      const sel = await input2.selector.select({ instruction: need, exclude: [...present.keys()], reporter: currentReporter() ?? reporter }, registry2.decls);
+      const sel = await input2.selector.select({ instruction: need, exclude: [...present.keys()], reporter: currentReporter() ?? reporter, signal: input2.signal }, registry2.decls);
       const added = sel.tools.filter((d2) => !present.has(d2.name)).slice(0, escalationLimit);
       escalations.push({ kind: "escalation", need, tools: added.map((d2) => d2.name) });
       if (!added.length) return "No other tools match that need.";
@@ -38921,6 +39217,7 @@ ${notes.join("\n")}` : text;
   let exhausted = false;
   const request = async () => {
     used++;
+    input2.signal?.throwIfAborted();
     const body = { model: input2.model, system, tools: [branchToolDef()], messages: [...messages], signal: input2.signal };
     if (input2.temperature !== void 0) body.temperature = input2.temperature;
     const res = await llm.complete(body);
@@ -39008,6 +39305,7 @@ function doTool(input2) {
       additionalProperties: false
     },
     async handle(args, call) {
+      call.signal?.throwIfAborted();
       const instruction = args.instruction;
       if (typeof instruction !== "string" || !instruction.trim()) return fail("do: `instruction` must be a non-empty string");
       let override;
@@ -39022,8 +39320,9 @@ function doTool(input2) {
       const step = task.startStep({ instruction, executor: input2.model });
       let lease;
       try {
-        const selection = await input2.selector.select({ instruction, override, reporter: call.reporter }, registry2.decls);
+        const selection = await input2.selector.select({ instruction, override, reporter: call.reporter, signal: call.signal }, registry2.decls);
         lease = await task.acquire(selection.tools.every((d2) => d2.meta.effect === "read") ? "shared" : "exclusive");
+        call.signal?.throwIfAborted();
         const held = lease;
         const result = await runExecutor({
           instruction,
@@ -39174,6 +39473,7 @@ function parseNames(text) {
 function llmReranker(client, opts) {
   return {
     async rerank(instruction, candidates, ctx = {}) {
+      ctx.signal?.throwIfAborted();
       if (candidates.length === 0) return [];
       const reporter = ctx.reporter ?? opts.reporter;
       if (!reporter) throw new Error("llmReranker needs a reporter (option or ctx) to report the selection turn");
@@ -39184,6 +39484,7 @@ function llmReranker(client, opts) {
       }).join("\n");
       const res = await wrapLLM(client, reporter, "selection").complete({
         model: opts.model,
+        signal: ctx.signal,
         system: loadPrompt("rerank"),
         tools: [],
         messages: [{ role: "user", content: `Task:
@@ -39212,6 +39513,7 @@ function createSelector(opts) {
   const n = opts.n ?? DEFAULT_N;
   return {
     async select(q, catalog2) {
+      q.signal?.throwIfAborted();
       const exclude = new Set(q.exclude ?? []);
       const byName = new Map(catalog2.map((d2) => [d2.name, d2]));
       if (q.override) {
@@ -39221,7 +39523,7 @@ function createSelector(opts) {
         return { tools: tools2, stages: { retrieved: [], final: tools2.map((d2) => d2.name), override: true } };
       }
       const retrieved = retrieve(q.instruction, catalog2, { k, exclude });
-      const ctx = { reporter: q.reporter, fallback: false };
+      const ctx = { reporter: q.reporter, signal: q.signal, fallback: false };
       const reranked = await opts.reranker.rerank(q.instruction, retrieved.map((r) => r.tool), ctx);
       const tools = complete(reranked.slice(0, n), catalog2).filter((d2) => !exclude.has(d2.name));
       const stages = {
@@ -39236,14 +39538,14 @@ function createSelector(opts) {
 }
 
 // packages/core/src/orchestrate/task.ts
-import { readFile as readFile10, stat as stat3 } from "node:fs/promises";
+import { readFile as readFile11, stat as stat4 } from "node:fs/promises";
 import { isAbsolute as isAbsolute2, relative as relative2, resolve as resolvePath } from "node:path";
 
 // packages/core/src/orchestrate/changes.ts
 import { execFile } from "node:child_process";
 import { createHash as createHash4 } from "node:crypto";
-import { lstat, readdir as readdir2, readFile as readFile9 } from "node:fs/promises";
-import { join as join6 } from "node:path";
+import { lstat, readdir as readdir2, readFile as readFile10 } from "node:fs/promises";
+import { join as join7 } from "node:path";
 import { promisify } from "node:util";
 var execFileAsync = promisify(execFile);
 var IGNORED_DIRS = [".git", "node_modules", "__pycache__", ".pytest_cache", ".venv"];
@@ -39271,14 +39573,14 @@ function inIgnoredDir(relPath2) {
 async function walk3(root2) {
   let matcher = (_p, _d) => false;
   try {
-    matcher = gitignoreMatcher(await readFile9(join6(root2, ".gitignore"), "utf8"));
+    matcher = gitignoreMatcher(await readFile10(join7(root2, ".gitignore"), "utf8"));
   } catch {
   }
   const out = [];
   const visit2 = async (rel) => {
     let entries;
     try {
-      entries = await readdir2(join6(root2, rel), { withFileTypes: true });
+      entries = await readdir2(join7(root2, rel), { withFileTypes: true });
     } catch {
       return;
     }
@@ -39316,7 +39618,7 @@ async function gitFiles(root2) {
   return { files: [...new Set(listed.split("\0").filter(Boolean))], dirty };
 }
 async function hashFile(path) {
-  return createHash4("sha1").update(await readFile9(path)).digest("hex");
+  return createHash4("sha1").update(await readFile10(path)).digest("hex");
 }
 async function snapshotWorkspace(root2, prev) {
   const viaGit = await gitFiles(root2);
@@ -39326,7 +39628,7 @@ async function snapshotWorkspace(root2, prev) {
   for (const p of files) {
     let st;
     try {
-      st = await lstat(join6(root2, p));
+      st = await lstat(join7(root2, p));
     } catch {
       continue;
     }
@@ -39343,7 +39645,7 @@ async function snapshotWorkspace(root2, prev) {
     await Promise.all(
       toHash.slice(i, i + 32).map(async (p) => {
         try {
-          snap.get(p).sha1 = await hashFile(join6(root2, p));
+          snap.get(p).sha1 = await hashFile(join7(root2, p));
         } catch {
           snap.delete(p);
         }
@@ -39456,7 +39758,7 @@ function fsCodeReader(root2) {
       const abs = resolvePath(root2, path);
       const rel = relative2(root2, abs);
       if (rel.startsWith("..") || isAbsolute2(rel)) throw new Error(`path outside the workspace: ${path}`);
-      return readFile10(abs, "utf8");
+      return readFile11(abs, "utf8");
     }
   };
 }
@@ -39465,7 +39767,7 @@ function fsPathExists(root2) {
     const abs = resolvePath(root2, path);
     const rel = relative2(root2, abs);
     if (rel.startsWith("..") || isAbsolute2(rel)) return false;
-    return stat3(abs).then(() => true, () => false);
+    return stat4(abs).then(() => true, () => false);
   };
 }
 var Task = class {
@@ -39636,7 +39938,7 @@ function buildFramework(kind2, realRegistry, opts) {
     if (opts.variant?.hotPaths) throw new Error("hot paths not built yet");
     if (opts.variant?.executor === "calls") throw new Error("executor variant `calls` is not built yet");
     task = o.task ?? new Task({ workspaceRoot: o.workspaceRoot });
-    const reranker = (o.rerank ?? "llm") === "none" ? noneReranker : llmReranker(o.client, { model: o.rerankModel ?? o.model });
+    const reranker = (opts.variant?.rerank ?? o.rerank ?? "llm") === "none" ? noneReranker : llmReranker(o.client, { model: o.rerankModel ?? o.model });
     const planner = {
       task,
       registry: registry2,
@@ -39650,7 +39952,7 @@ function buildFramework(kind2, realRegistry, opts) {
       pathExists: o.pathExists ?? fsPathExists(o.workspaceRoot),
       runtime: opts.runtime,
       limits: {
-        turns: o.turns,
+        turns: opts.variant?.secondary ?? o.turns,
         reportMaxChars: o.reportMaxChars,
         outputCap: opts.outputCap,
         timeoutMs: opts.timeoutMs,
@@ -39666,6 +39968,38 @@ function buildFramework(kind2, realRegistry, opts) {
   }
   const toolsHash = sha256(canonicalJSON(tools.map((t) => ({ name: t.name, description: t.description, inputSchema: t.inputSchema }))));
   return { kind: kind2, instructions, tools, fingerprint: { promptHash: sha256(instructions), toolsHash }, state, ...task ? { task } : {} };
+}
+
+// packages/core/src/framework/variant.ts
+function parseFrameworkVariant(raw) {
+  const match = /^(baseline|branch-only|orchestrate)(?:\[([^\[\]]*)\])?$/.exec(raw.trim());
+  if (!match) throw new Error(`Invalid framework variant: ${raw}`);
+  const kind2 = match[1];
+  const variant3 = {};
+  const pairs = /* @__PURE__ */ new Map();
+  const content = match[2]?.trim();
+  for (const rawPart of content ? content.split(",") : []) {
+    const part = rawPart.trim();
+    const [key, value, extra] = part.split("=").map((s) => s.trim());
+    if (!key || extra !== void 0 || pairs.has(key)) throw new Error(`Malformed or duplicate variant key: ${part}`);
+    const positiveInt = () => {
+      if (!value || !/^[1-9][0-9]*$/.test(value) || !Number.isSafeInteger(Number(value))) {
+        throw new Error(`${key} must be a positive safe integer`);
+      }
+      return Number(value);
+    };
+    if (key === "catalog") variant3.catalog = positiveInt();
+    else if (key === "toolSearch" && kind2 === "branch-only" && value === void 0) variant3.toolSearch = true;
+    else if (key === "rerank" && kind2 === "orchestrate" && (value === "llm" || value === "none")) variant3.rerank = value;
+    else if (key === "secondary" && kind2 === "orchestrate") variant3.secondary = positiveInt();
+    else if (key === "executor" && kind2 === "orchestrate" && value === "branch") variant3.executor = value;
+    else if (key === "hotPaths" || key === "executor" && value === "calls") {
+      throw new Error(`Framework treatment is not implemented: ${part}`);
+    } else throw new Error(`Unsupported variant for ${kind2}: ${part}`);
+    pairs.set(key, value === void 0 ? key : `${key}=${value}`);
+  }
+  const suffix = [...pairs.keys()].sort().map((key) => pairs.get(key)).join(",");
+  return { kind: kind2, variant: variant3, id: suffix ? `${kind2}[${suffix}]` : kind2 };
 }
 
 // packages/llm/src/usage.ts
@@ -39730,21 +40064,21 @@ function createChatClient(opts) {
           signal: abort
         });
         text = await res.text();
-      } catch (e) {
-        if (signal instanceof AbortSignal && signal.aborted) throw e;
-        throw new LLMError("infra", `request failed: ${e.message}`);
+      } catch {
+        if (signal instanceof AbortSignal && signal.aborted) throw new DOMException("Model request cancelled", "AbortError");
+        throw new LLMError("infra", "Model request failed");
       }
       let json2;
       try {
         json2 = JSON.parse(text);
       } catch {
         const kind2 = res.ok ? "infra" : classifyAPIError(res.status, text);
-        throw new LLMError(kind2, `HTTP ${res.status}: unparseable body: ${text.slice(0, 300)}`, res.status);
+        throw new LLMError(kind2, `HTTP ${res.status}: invalid provider response`, res.status);
       }
       if (!res.ok || json2?.error) {
         const message = String(json2?.error?.message ?? text).slice(0, 500);
         const status = res.ok ? numericCode(json2?.error?.code) : res.status;
-        throw new LLMError(classifyAPIError(status, message), `HTTP ${res.status}: ${message}`, status);
+        throw new LLMError(classifyAPIError(status, message), `HTTP ${res.status}: provider request rejected`, status);
       }
       const choice = json2?.choices?.[0];
       if (choice?.finish_reason === "content_filter") {
@@ -39752,7 +40086,7 @@ function createChatClient(opts) {
       }
       const msg = choice?.message;
       if (!msg || !msg.content && !msg.tool_calls?.length) {
-        throw new LLMError("infra", `empty response: ${text.slice(0, 300)}`, res.status);
+        throw new LLMError("infra", "empty provider response", res.status);
       }
       return { response: json2, ...normaliseUsage("openai-chat", json2) };
     }
@@ -39760,15 +40094,86 @@ function createChatClient(opts) {
 }
 var numericCode = (c) => typeof c === "number" ? c : void 0;
 
+// packages/llm/src/chatgpt-auth.ts
+var ISSUER = "https://auth.openai.com";
+var AUTHORIZE = `${ISSUER}/api/accounts/authorize`;
+var TOKEN = `${ISSUER}/api/accounts/oauth/token`;
+var JWKS = `${ISSUER}/.well-known/jwks.json`;
+var DISCOVERY = `${ISSUER}/.well-known/openid-configuration`;
+
+// packages/llm/src/chatgpt-client.ts
+var MAX_EVENT_BYTES = 16 * 1024 * 1024;
+
+// packages/server/src/host-client.ts
+import { randomUUID } from "node:crypto";
+var HostCompletionSchema = ResultSchema.extend({
+  response: external_exports.unknown(),
+  usage: external_exports.object({
+    input: external_exports.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER),
+    output: external_exports.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER),
+    cachedRead: external_exports.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER).optional(),
+    cacheWrite: external_exports.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER).optional()
+  }).refine((usage) => (usage.cachedRead ?? 0) <= usage.input),
+  costUsd: external_exports.number().finite().nonnegative().optional(),
+  cacheHit: external_exports.boolean().optional()
+});
+var HostErrorDataSchema = external_exports.object({ aiwLLMError: external_exports.object({
+  kind: external_exports.enum(["infra", "context-limit", "other"]),
+  status: external_exports.number().int().min(100).max(599).optional()
+}).strict() }).strict();
+function createHostLLMClient(server, opts = {}) {
+  const timeoutMs = opts.timeoutMs ?? 3e5;
+  if (!Number.isSafeInteger(timeoutMs) || timeoutMs < 1) throw new Error("Invalid host LLM timeout");
+  return {
+    async complete(req) {
+      const callerSignal = req.signal instanceof AbortSignal ? req.signal : void 0;
+      const timeout = AbortSignal.timeout(timeoutMs);
+      const signal = callerSignal ? AbortSignal.any([callerSignal, timeout]) : timeout;
+      signal.throwIfAborted();
+      const endpoint = server();
+      if (!endpoint.getClientCapabilities()?.experimental?.["aiw/llm/complete"]) {
+        throw new LLMError("infra", "Host LLM broker is not available");
+      }
+      const requestId = randomUUID();
+      const cancel = () => {
+        void endpoint.notification({ method: "aiw/llm/cancel", params: { requestId } }).catch(() => {
+        });
+      };
+      signal?.addEventListener("abort", cancel, { once: true });
+      try {
+        const result = await endpoint.request({ method: "aiw/llm/complete", params: {
+          requestId,
+          system: req.system,
+          messages: req.messages,
+          tools: req.tools
+        } }, HostCompletionSchema, { signal, timeout: timeoutMs });
+        return { response: result.response, usage: result.usage, costUsd: result.costUsd, cacheHit: result.cacheHit };
+      } catch (error62) {
+        cancel();
+        if (callerSignal?.aborted) throw new DOMException("Host LLM request cancelled", "AbortError");
+        const classified = HostErrorDataSchema.safeParse(error62 instanceof McpError ? error62.data : void 0);
+        throw new LLMError(
+          classified.success ? classified.data.aiwLLMError.kind : "infra",
+          "Host LLM request failed",
+          classified.success ? classified.data.aiwLLMError.status : void 0
+        );
+      } finally {
+        signal?.removeEventListener("abort", cancel);
+      }
+    }
+  };
+}
+
 // packages/server/src/server.ts
 async function startServer(opts) {
   const hostDecls = await opts.host.tools();
   const registry2 = buildRegistry(hostDecls);
+  let mcpServer;
   let orchestrateOpts;
   if (opts.kind === "orchestrate") {
     if (!opts.orchestrateModel) throw new Error("orchestrate requires --executor-model");
-    if (!opts.orchestrateApiKey) throw new Error("orchestrate requires an executor API key (--executor-api-key or OPENROUTER_API_KEY)");
-    const client = createChatClient({
+    if (opts.orchestrateProvider !== "host" && !opts.orchestrateApiKey) throw new Error("orchestrate requires an executor API key (--executor-api-key or OPENROUTER_API_KEY)");
+    const client = opts.orchestrateProvider === "host" ? createHostLLMClient(() => mcpServer) : createChatClient({
       baseURL: opts.orchestrateBaseURL ?? "https://openrouter.ai/api/v1",
       apiKey: opts.orchestrateApiKey,
       timeoutMs: 3e5
@@ -39781,6 +40186,7 @@ async function startServer(opts) {
     };
   }
   const framework = buildFramework(opts.kind, registry2, {
+    runtime: opts.runtime,
     host: opts.host,
     variant: opts.variant,
     branchContext: opts.branchContext,
@@ -39788,20 +40194,28 @@ async function startServer(opts) {
     priority: opts.priority,
     orchestrate: orchestrateOpts
   });
-  const mcpServer = new Server(
+  mcpServer = new Server(
     { name: "aiw-server", version: "1.0.0" },
     {
       capabilities: { tools: {} },
       instructions: framework.instructions || void 0
     }
   );
+  const actualRuntime = opts.runtime ?? quickJSRuntime;
+  const engine = actualRuntime === isolatedVMRuntime ? "isolated-vm" : actualRuntime === quickJSRuntime ? "quickjs" : "custom-unattested";
+  const digest = (value) => createHash5("sha256").update(value).digest("hex");
+  const prompts = Object.fromEntries(["base", "branch-only", "branch-tool", "do-tool", "executor", "orchestrate", "rerank", "resolve-tool"].map((name) => [name, digest(loadPrompt(name))]));
+  const entryHash = process.argv[1] ? digest(readFileSync4(process.argv[1])) : null;
   mcpServer.setRequestHandler(ListToolsRequestSchema, async () => ({
+    _meta: { "aiw/runtimeProvenance": { version: 1, engine, entryHash, prompts, catalogHash: digest(canonicalJSON(hostDecls)), settings: { kind: opts.kind, variant: opts.variant ?? {}, branchContext: opts.branchContext ?? "trace", secondaryCap: opts.secondaryCap ?? 4, secondaryTemperature: orchestrateOpts?.temperature ?? null }, nodeVersion: process.version, runtimePlatform: { platform: process.platform, arch: process.arch, moduleABI: process.versions.modules } } },
     tools: framework.tools.map((t) => ({
       name: t.name,
       description: t.description,
       inputSchema: t.inputSchema
     }))
   }));
+  const eventSink = opts.eventsPath ? new FileSink(opts.eventsPath) : new NoopSink();
+  const eventRoot = createReporter({ sink: eventSink, writer: "s" });
   mcpServer.setRequestHandler(CallToolRequestSchema, async (req, extra) => {
     const start = Date.now();
     const toolDef = framework.tools.find((t) => t.name === req.params.name);
@@ -39812,21 +40226,15 @@ async function startServer(opts) {
         _meta: { "aiw/durationMs": Date.now() - start }
       };
     }
-    const sink = opts.eventsPath ? new FileSink(opts.eventsPath) : new NoopSink();
-    const reporter = createReporter({ sink, writer: "s" });
     const meta3 = req.params._meta;
-    const harnessId = typeof meta3?.["aiw/harnessId"] === "string" ? meta3["aiw/harnessId"] : void 0;
-    const parentId = typeof meta3?.["aiw/parent"] === "string" ? meta3["aiw/parent"] : void 0;
-    void parentId;
-    void harnessId;
-    const ac = new AbortController();
+    const reporter = fromMeta(meta3, eventRoot);
     const progressToken = meta3?.progressToken;
     let lastNotifyMs = 0;
     const THROTTLE_MS = 500;
     const args = req.params.arguments ?? {};
     const result = await toolDef.handle(args, {
       reporter,
-      signal: ac.signal,
+      signal: extra.signal,
       onEvent: progressToken !== void 0 ? (e) => {
         const now = Date.now();
         if (now - lastNotifyMs < THROTTLE_MS) return;
@@ -39850,12 +40258,21 @@ async function startServer(opts) {
     };
   });
   const transport = new StdioServerTransport();
+  const closeOnEOF = () => {
+    void mcpServer.close();
+  };
+  process.stdin.once("end", closeOnEOF);
+  mcpServer.onclose = () => {
+    process.stdin.off("end", closeOnEOF);
+    void opts.host.close().catch((error62) => console.error("aiw-server: host close failed", error62));
+  };
   await mcpServer.connect(transport);
 }
 
 // packages/server/src/cli.ts
 var { values } = parseArgs({
   options: {
+    engine: { type: "string", default: "quickjs" },
     framework: { type: "string", default: "branch-only" },
     host: { type: "string", default: "local" },
     tier: { type: "string", default: "S" },
@@ -39866,6 +40283,7 @@ var { values } = parseArgs({
     "read-only": { type: "boolean", default: false },
     "max-chars": { type: "string" },
     priority: { type: "string" },
+    "executor-provider": { type: "string", default: "openrouter" },
     "executor-model": { type: "string" },
     "executor-api-key": { type: "string" },
     "executor-base-url": { type: "string" },
@@ -39874,19 +40292,13 @@ var { values } = parseArgs({
   },
   strict: false
 });
-function parseFramework(raw) {
-  const bracket = raw.indexOf("[");
-  const base = bracket === -1 ? raw : raw.slice(0, bracket);
-  const keyStr = bracket === -1 ? "" : raw.slice(bracket + 1).replace(/]$/, "");
-  const kind2 = base;
-  const variant3 = {};
-  for (const part of keyStr.split(",").filter(Boolean)) {
-    if (part === "toolSearch") variant3.toolSearch = true;
-    else if (part.startsWith("catalog=")) variant3.catalog = parseInt(part.slice(8), 10);
-  }
-  return { kind: kind2, variant: variant3 };
+var { kind, variant: variant2 } = parseFrameworkVariant(String(values.framework ?? "branch-only"));
+var enginePreference = values.engine;
+if (enginePreference !== "quickjs" && enginePreference !== "isolated-vm" && enginePreference !== "auto") {
+  throw new Error(`Unsupported engine: ${String(enginePreference)}; expected quickjs, isolated-vm, or auto`);
 }
-var { kind, variant: variant2 } = parseFramework(String(values.framework ?? "branch-only"));
+var selected = await selectRuntime(enginePreference);
+console.error(`aiw-server: engine=${selected.engine}${selected.note ? ` (${selected.note})` : ""}`);
 var tier = String(values.tier ?? "S") === "L" ? "L" : "S";
 var root = String(values.root ?? process.cwd());
 var hostMode = String(values.host ?? "local");
@@ -39898,6 +40310,8 @@ var priorityStr = typeof values.priority === "string" ? values.priority : void 0
 var priority = priorityStr ? priorityStr.split(",").filter(Boolean) : void 0;
 var branchContextRaw = typeof values["branch-context"] === "string" ? values["branch-context"] : void 0;
 var branchContext = branchContextRaw === "trace" || branchContextRaw === "annotated" || branchContextRaw === "full" ? branchContextRaw : void 0;
+var executorProvider = String(values["executor-provider"] ?? "openrouter");
+if (executorProvider !== "openrouter" && executorProvider !== "host") throw new Error("Unknown executor provider");
 var executorModel = typeof values["executor-model"] === "string" ? values["executor-model"] : void 0;
 var executorApiKey = typeof values["executor-api-key"] === "string" ? values["executor-api-key"] : process.env["OPENROUTER_API_KEY"] ?? process.env["OPENAI_API_KEY"];
 var executorBaseURL = typeof values["executor-base-url"] === "string" ? values["executor-base-url"] : process.env["OPENAI_BASE_URL"];
@@ -39905,17 +40319,23 @@ var secondaryCapRaw = typeof values["secondary-cap"] === "string" ? parseInt(val
 var secondaryCap = secondaryCapRaw !== void 0 && !isNaN(secondaryCapRaw) ? secondaryCapRaw : void 0;
 var host;
 if (hostMode === "local") {
-  host = new LocalHost(tier, { root });
+  host = await createLocalHost(tier, root);
 } else if (hostMode === "fallback") {
   console.error("aiw-server: --host fallback is not yet implemented; using local");
-  host = new LocalHost(tier, { root });
+  host = await createLocalHost(tier, root);
 } else {
   console.error(`aiw-server: unknown --host "${hostMode}"; using local`);
-  host = new LocalHost(tier, { root });
+  host = await createLocalHost(tier, root);
+}
+for (const [signal, code] of [["SIGINT", 130], ["SIGTERM", 143]]) {
+  process.once(signal, () => {
+    void host.close().finally(() => process.exit(code));
+  });
 }
 void values.transcript;
 void values.blobs;
 startServer({
+  runtime: selected.runtime,
   kind,
   variant: variant2,
   host,
@@ -39925,11 +40345,13 @@ startServer({
   priority,
   readOnly,
   orchestrateModel: executorModel,
+  orchestrateProvider: executorProvider,
   orchestrateApiKey: executorApiKey,
   orchestrateBaseURL: executorBaseURL,
   orchestrateWorkspaceRoot: root,
   secondaryCap
-}).catch((err) => {
+}).catch(async (err) => {
+  await host.close();
   console.error("aiw-server: fatal error:", err);
   process.exit(1);
 });
