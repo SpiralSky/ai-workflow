@@ -105,3 +105,8 @@ test('reviewed ignore hygiene cannot be silently weakened',t=>{
   const root=snapshot(t);fs.appendFileSync(path.join(root,'.gitignore'),'\n!.env\n');
   assert.throws(()=>verifyPreservation(root),/Preserved content changed/);
 });
+
+test('runtime hygiene helper cannot be silently weakened',t=>{
+  const root=snapshot(t);fs.appendFileSync(path.join(root,'scripts/check-runtime-gitignore.sh'),'\n# unauthorized weakening\n');
+  assert.throws(()=>verifyPreservation(root),/Preserved content changed/);
+});

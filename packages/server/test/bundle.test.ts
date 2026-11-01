@@ -1,3 +1,6 @@
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { test } from "node:test";
 import { spawnSync } from "node:child_process";
 import assert from "node:assert/strict";
@@ -71,3 +74,35 @@ test("server forwards its explicit runtime into branch execution instead of usin
     assert.match(JSON.stringify(result), /explicit-runtime-fixture/);
   } finally { await client.close(); }
 });
+
+// Migration and runtime snapshots share the base hygiene file byte-for-byte. Keep
+// stronger packaged-resource checks enforced by the authoritative server suite.
+const repositoryRoot = fileURLToPath(new URL("../../../", import.meta.url));
+const runtimeHygiene = fileURLToPath(new URL("../../../scripts/check-runtime-gitignore.sh", import.meta.url));
+
+test("runtime hygiene enforces baseline and packaged resource trackability", () => {
+  const result = spawnSync("sh", [runtimeHygiene], { cwd: repositoryRoot, encoding: "utf8" });
+  assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
+});
+
+for (const asset of [
+  "packages/server/dist/python/aiw_sidecar/__init__.py",
+  "packages/server/dist/fixtures/external/ciStatus.json",
+  "packages/tools/python/requirements.txt",
+]) {
+  test(`runtime hygiene rejects an index missing ${asset} without touching the real index`, () => {
+    const temporary = mkdtempSync(join(tmpdir(), "aiw-hygiene-index-"));
+    const env = { ...process.env, GIT_INDEX_FILE: join(temporary, "index") };
+    try {
+      const read = spawnSync("git", ["read-tree", "HEAD"], { cwd: repositoryRoot, env, encoding: "utf8" });
+      assert.equal(read.status, 0, read.stderr);
+      const remove = spawnSync("git", ["update-index", "--force-remove", "--", asset], { cwd: repositoryRoot, env, encoding: "utf8" });
+      assert.equal(remove.status, 0, remove.stderr);
+      const result = spawnSync("sh", [runtimeHygiene], { cwd: repositoryRoot, env, encoding: "utf8" });
+      assert.notEqual(result.status, 0, "Missing tracked asset must fail");
+      assert.match(result.stderr, new RegExp(asset.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+      const actual = spawnSync("git", ["ls-files", "--error-unmatch", "--", asset], { cwd: repositoryRoot, encoding: "utf8" });
+      assert.equal(actual.status, 0, "Real Git index must remain unchanged");
+    } finally { rmSync(temporary, { recursive: true, force: true }); }
+  });
+}

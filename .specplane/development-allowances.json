@@ -1188,9 +1188,9 @@
       "after": {
         "path": "packages/server/test/bundle.test.ts",
         "mode": "100644",
-        "sha256": "b381b494b8fd0beb79be9c1354158cb47ec48226ed3873d78672810da441b67a"
+        "sha256": "e9959ec5d79aede196ec30cc7a86580eb69a8c8e027a7800db36123053d11970"
       },
-      "rationale": "Rebuild/verify coherent tracked runtime and honor explicit engine selection without silent fallback. Follow-up: verified packaged native/tierL resources and lifecycle integration."
+      "rationale": "Preserve runtime asset hygiene enforcement while resolving independently added migration hygiene files."
     },
     {
       "path": "packages/server/test/packaged-readiness.test.ts",
@@ -2123,7 +2123,7 @@
   },
   "hygiene_metadata": {
     "version": 1,
-    "source_ref": "f54d21e569104bae236e16575b1bca608dbb479a",
+    "source_ref": "1122dd49db480f08ac27033e02ef553fd9a42f70",
     "files": [
       {
         "path": ".gitignore",
@@ -2133,12 +2133,22 @@
       {
         "path": "docs/dot-progress/ignore-hygiene.md",
         "mode": "100644",
-        "sha256": "3a16b3e93466cf8b7f238717f0d15505ecab431d369d1874686de255b66ffff1"
+        "sha256": "3c8c48ef63ae833b838ff52f5e85640dae571cde056114fbbd46d197278e15fb"
+      },
+      {
+        "path": "docs/dot-progress/runtime-hygiene-followup.md",
+        "mode": "100644",
+        "sha256": "cc90f0e7ae275d900d7adf42e08e0ad46f9d87d4f2e40aa7a05b4e4e94b72c90"
       },
       {
         "path": "scripts/check-gitignore.sh",
         "mode": "100644",
-        "sha256": "277fc3f01d320e8fb5e784de9578a5750d8e55ac1ada73af2a46cc01ccb6a1d2"
+        "sha256": "f745d470dc7c861fb0795597999592d5ec2c39eb82b579167e6147db39bfb506"
+      },
+      {
+        "path": "scripts/check-runtime-gitignore.sh",
+        "mode": "100644",
+        "sha256": "1e4a502b5efa5878439ed575dc64df521a1ace29d3c365897f26a6209a06e7ed"
       }
     ]
   },

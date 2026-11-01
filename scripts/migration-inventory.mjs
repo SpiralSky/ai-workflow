@@ -114,7 +114,7 @@ export function applyDevelopmentAllowances(root, inventory, replacements, allowa
     assert.match(frontmatter[1],/^status: draft\r?$/m,`Development plan must remain draft: ${file}`);
   }
   if (allowances.hygiene_metadata) {
-    assert.deepEqual(allowances.hygiene_metadata.files.map(e=>e.path).sort(), ['.gitignore','docs/dot-progress/ignore-hygiene.md','scripts/check-gitignore.sh']);
+    assert.deepEqual(allowances.hygiene_metadata.files.map(e=>e.path).sort(), [".gitignore","docs/dot-progress/ignore-hygiene.md","docs/dot-progress/runtime-hygiene-followup.md","scripts/check-gitignore.sh","scripts/check-runtime-gitignore.sh"]);
     verifyWorkingInventory(root, allowances.hygiene_metadata);
   }
   return {...inventory,files:[...expected.values()]};
