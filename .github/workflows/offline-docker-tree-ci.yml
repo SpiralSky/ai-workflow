@@ -1,0 +1,60 @@
+name: Verified tree offline Docker CI
+on:
+  push:
+    branches: [dot/docker-tree-ci-20261101]
+permissions:
+  contents: read
+concurrency:
+  group: offline-docker-tree-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  offline:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    defaults:
+      run:
+        shell: bash --noprofile --norc -euo pipefail {0}
+    env:
+      PYTHONDONTWRITEBYTECODE: '1'
+      PIP_DISABLE_PIP_VERSION_CHECK: '1'
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4 verified 2026-11-01
+        with:
+          persist-credentials: false
+      - name: Retrieve and verify immutable reviewed source tree
+        timeout-minutes: 10
+        env:
+          GH_READ_TOKEN: ${{ github.token }}
+        run: python3 .ci/restore_source.py "$GITHUB_WORKSPACE" "$RUNNER_TEMP/aiw-verified-source"
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4 verified 2026-11-01
+        with:
+          node-version: '24.22.1'
+      - name: Verify Docker and install locked JavaScript dependencies
+        timeout-minutes: 5
+        working-directory: ${{ runner.temp }}/aiw-verified-source
+        run: |
+          docker version
+          npm ci --ignore-scripts --no-audit --no-fund
+      - name: Build existing fixture base image
+        timeout-minutes: 5
+        working-directory: ${{ runner.temp }}/aiw-verified-source
+        run: docker build --progress=plain -t aiw-base:latest experiments/docker/aiw-base
+      - name: Smoke prerequisite (actual Docker grading, no model)
+        timeout-minutes: 3
+        working-directory: ${{ runner.temp }}/aiw-verified-source
+        run: node --import tsx scripts/docker-fixture-ci.mjs smoke
+      - name: Prepare documented Python tool dependencies
+        timeout-minutes: 4
+        working-directory: ${{ runner.temp }}/aiw-verified-source
+        run: |
+          python3.12 -m venv packages/tools/.venv
+          packages/tools/.venv/bin/pip install -r packages/tools/python/requirements.txt
+          packages/tools/.venv/bin/pyright --version
+      - name: Offline package tests and host fixture diagnostics
+        timeout-minutes: 6
+        working-directory: ${{ runner.temp }}/aiw-verified-source
+        run: node scripts/test-cloud.mjs
+      - name: Remaining actual Docker fixture selfchecks (sequential fail-stop)
+        timeout-minutes: 8
+        working-directory: ${{ runner.temp }}/aiw-verified-source
+        run: node --import tsx scripts/docker-fixture-ci.mjs remaining
