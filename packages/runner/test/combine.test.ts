@@ -245,3 +245,19 @@ test("legacy reports explicitly label provenance as unattested rather than verif
   assert.equal(report.provenanceStatus, "legacy-unattested");
   assert.match(readFileSync(join(root, "experiments/reports/legacy-label/report.md"), "utf8"), /not a verified baseline/);
 });
+
+test("DeepSeek estimates remain separately labeled and cannot combine with measured provider runs", async t => {
+  const a = fixtureRun("estimated");
+  a.config.provider = "deepseek"; a.config.usageMode = "estimated"; a.config.budgetUsd = null;
+  a.config.estimatedLimits = { maxCalls: 4, maxTokens: 100, maxDurationMs: 30000, estimateLimitUsd: 0.5 };
+  const { root, dirs } = fixtureDirs(t, [a]);
+  const job = join(dirs[0]!, "p1.baseline.0"); mkdirSync(job);
+  writeFileSync(join(job, "job.json"), JSON.stringify({ format: 1, framework: "baseline", problem: "p1", rep: 0, outcome: "pass", reason: null, attempts: [], costUsdAllAttempts: null, estimatedCost: { basis: "deepseek-flash:2026-11-01:off-peak", estimatedUsd: 0.012, knownEstimatedUsd: 0.012 }, durationMs: 1 }));
+  await combineRuns(dirs, "estimate", root);
+  const report = JSON.parse(readFileSync(join(root, "experiments/reports/estimate/report.json"), "utf8"));
+  assert.equal(report.frameworks.baseline.meanCostUsd, null);
+  assert.equal(report.frameworks.baseline.meanEstimatedCostUsd, 0.012);
+  assert.match(readFileSync(join(root, "experiments/reports/estimate/report.md"), "utf8"), /ESTIMATE/);
+  const b = fixtureRun("measured"); const mixed = fixtureDirs(t, [a, b]);
+  await assert.rejects(combineRuns(mixed.dirs, "mixed", mixed.root), /provider/);
+});

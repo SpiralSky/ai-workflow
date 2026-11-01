@@ -7,6 +7,7 @@
 | ID | Title | Status | Dependencies | Specs |
 |----|-------|--------|--------------|-------|
 | [2026-11-01-all-provider-host-broker](2026-11-01-all-provider-host-broker/PLAN.md) | Keep orchestration credentials and inference on the host | draft | — | architecture/runner, feature/framework-runner |
+| [2026-11-01-direct-deepseek](2026-11-01-direct-deepseek/PLAN.md) | Direct DeepSeek provider with bounded estimates | draft | — | architecture/runner, architecture/framework-server, feature/framework-runner |
 | [2026-11-01-failfast-campaign](2026-11-01-failfast-campaign/PLAN.md) | Stop evaluation campaigns on first terminal failure | draft | — | architecture/runner, feature/framework-runner |
 | [2026-11-01-openai-plan-signin](2026-11-01-openai-plan-signin/PLAN.md) | Sign in with ChatGPT for workflow runs | draft | — | architecture/runner, architecture/framework-server, architecture/system-overview, feature/framework-runner |
 | [2026-11-01-provenance-readiness](2026-11-01-provenance-readiness/PLAN.md) | Attest actual evaluation runtime inputs before model work | draft | — | architecture/runner, feature/framework-runner |
@@ -21,6 +22,7 @@ _None._
 ```mermaid
 graph TD
     p_2026_11_01_all_provider_host_broker[all-provider-host-broker]:::draft
+    p_2026_11_01_direct_deepseek[direct-deepseek]:::draft
     p_2026_11_01_failfast_campaign[failfast-campaign]:::draft
     p_2026_11_01_openai_plan_signin[openai-plan-signin]:::draft
     p_2026_11_01_provenance_readiness[provenance-readiness]:::draft

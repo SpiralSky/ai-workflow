@@ -114,6 +114,7 @@ function meanCost(history: JobJSON[], problem: string, framework: string): numbe
  * @returns plan with jobs and optional projected cost
  */
 export function buildPlan(config: RunConfig, repoRoot: string): Plan {
+  if (config.usageMode === "estimated") return { jobs: expandJobs(config) };
   const jobs = expandJobs(config);
   if (config.usageMode === "subscription") return { jobs };
   const history = loadHistory(repoRoot);

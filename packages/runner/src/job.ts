@@ -38,6 +38,7 @@ export interface JobOptions {
   /** AbortSignal for budget and fail-fast cancellation. */
   signal?: AbortSignal;
   /** Host-only shared subscription gate; absent for the unchanged paid API client. */
+  estimated?: ReturnType<typeof import("./estimated.ts").boundEstimatedClient>;
   subscription?: ReturnType<typeof import("./subscription.ts").boundSubscriptionClient>;
   /** Notify the campaign before terminal failure cleanup, so siblings stop promptly. */
   onFailure?: () => void;
@@ -80,7 +81,9 @@ export async function runJobAttempt(opts: JobOptions): Promise<JobResult> {
   const { job, config, runPath, repoRoot, apiKey, baseURL, signal, turnLimits, problemsDir } = opts;
 
   if (config.provider === "chatgpt" && (!opts.subscription || config.usageMode !== "subscription")) throw new Error("ChatGPT requires bounded subscription runtime");
-  const client = opts.subscription?.client ?? createChatClient({ baseURL, apiKey, timeoutMs: 300_000 });
+  if (config.provider === "deepseek" && (!opts.estimated || config.usageMode !== "estimated")) throw new Error("DeepSeek requires bounded estimate runtime");
+  if (opts.estimated && (config.provider !== "deepseek" || opts.subscription)) throw new Error("Estimated runtime cannot be mixed with another provider");
+  const client = opts.estimated?.client ?? opts.subscription?.client ?? createChatClient({ baseURL, apiKey, timeoutMs: 300_000 });
 
   // Validate treatment before creating artifacts or starting any container.
   const launch = frameworkLaunch(job.framework, config);

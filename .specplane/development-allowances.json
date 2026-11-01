@@ -2,7 +2,7 @@
   "version": 1,
   "kind": "post-migration-development",
   "base_commit": "75ab542c626bc7276d2ee9575956899c79b6d75d",
-  "verified_development_head": "b7f801e247f1735c8dd396f4b068550b39714ac0",
+  "verified_development_head": "a5065f2e56579286755f3fea395a40a852a29a90",
   "authorization_kind": "development requests only; final approval and merge remain human-only",
   "user_requests": [
     "Add sign in to open ai support for ai-workflow workflow runs",
@@ -23,7 +23,8 @@
     "plans/2026-11-01-failfast-campaign/PLAN.md",
     "plans/2026-11-01-openai-plan-signin/PLAN.md",
     "plans/2026-11-01-provenance-readiness/PLAN.md",
-    "plans/2026-11-01-all-provider-host-broker/PLAN.md"
+    "plans/2026-11-01-all-provider-host-broker/PLAN.md",
+    "plans/2026-11-01-direct-deepseek/PLAN.md"
   ],
   "changes": [
     {
@@ -183,6 +184,16 @@
       "rationale": "Regression for host-only orchestration provider credentials and network-none task launch."
     },
     {
+      "path": "packages/llm/src/deepseek-client.ts",
+      "before": null,
+      "after": {
+        "path": "packages/llm/src/deepseek-client.ts",
+        "mode": "100644",
+        "sha256": "ef007c249855fe70af5190ec9b7df07c2268c54546396d391e75ea4d027def55"
+      },
+      "rationale": "Bounded direct DeepSeek provider, reasoning continuation and explicit estimated usage/cost regressions."
+    },
+    {
       "path": "packages/llm/src/index.ts",
       "before": {
         "path": "packages/llm/src/index.ts",
@@ -192,9 +203,9 @@
       "after": {
         "path": "packages/llm/src/index.ts",
         "mode": "100644",
-        "sha256": "4f284cb11581d143a07edd5f1f81b679c444a964a4ac3ca9e7cac8dd2b758844"
+        "sha256": "a65f637125b34f55d62d64e13896e59b584b0774c9a631e2aa7d8072c40813da"
       },
-      "rationale": "OpenAI sign-in, bounded host-brokered workflow usage and security regressions; fail-fast cancellation where shared with runner/core/server."
+      "rationale": "OpenAI sign-in, bounded host-brokered workflow usage and security regressions; fail-fast cancellation where shared with runner/core/server. Follow-up: bounded direct DeepSeek provider with host-only credentials and explicit estimated costs."
     },
     {
       "path": "packages/llm/test/chatgpt-auth.test.ts",
@@ -215,6 +226,16 @@
         "sha256": "010eaf84c0bc7c7366d2b53fe7458e12287b2df9bdd7c285727ee63259e96ea2"
       },
       "rationale": "OpenAI sign-in, bounded host-brokered workflow usage and security regressions; fail-fast cancellation where shared with runner/core/server."
+    },
+    {
+      "path": "packages/llm/test/deepseek.test.ts",
+      "before": null,
+      "after": {
+        "path": "packages/llm/test/deepseek.test.ts",
+        "mode": "100644",
+        "sha256": "5f687f0ea058c4920187bd61be4089232af386d4a5037fd833e6154eb30bf302"
+      },
+      "rationale": "Bounded direct DeepSeek provider, reasoning continuation and explicit estimated usage/cost regressions."
     },
     {
       "path": "packages/runner/package.json",
@@ -260,9 +281,9 @@
       "after": {
         "path": "packages/runner/src/cli.ts",
         "mode": "100755",
-        "sha256": "6df1afa7bf30c51a2b556cf9a8fc9a1377f97264a320c9a4291db8ae9271c189"
+        "sha256": "ae70236b609f48a7568df70860d6e0fbff2016be696fd19930d7fc3304fac7c6"
       },
-      "rationale": "OpenAI sign-in, bounded host-brokered workflow usage and security regressions; fail-fast cancellation where shared with runner/core/server. Follow-up: actual runtime provenance gate and immutable observed-image grading."
+      "rationale": "OpenAI sign-in, bounded host-brokered workflow usage and security regressions; fail-fast cancellation where shared with runner/core/server. Follow-up: actual runtime provenance gate and immutable observed-image grading. Follow-up: bounded direct DeepSeek provider with host-only credentials and explicit estimated costs."
     },
     {
       "path": "packages/runner/src/combine.ts",
@@ -274,9 +295,9 @@
       "after": {
         "path": "packages/runner/src/combine.ts",
         "mode": "100644",
-        "sha256": "2ba56292cce2bf98d7aa204f1b542cbbce2921758db4aa6f35aae68f22b9a85f"
+        "sha256": "38077abfd415eccfb9e3af31eb88d1d4f483ddbaba780e1fb5ebeac9cf6236a4"
       },
-      "rationale": "OpenAI sign-in, bounded host-brokered workflow usage and security regressions; fail-fast cancellation where shared with runner/core/server. Follow-up: actual runtime provenance gate and immutable observed-image grading."
+      "rationale": "OpenAI sign-in, bounded host-brokered workflow usage and security regressions; fail-fast cancellation where shared with runner/core/server. Follow-up: actual runtime provenance gate and immutable observed-image grading. Follow-up: bounded direct DeepSeek provider with host-only credentials and explicit estimated costs."
     },
     {
       "path": "packages/runner/src/config.ts",
@@ -288,9 +309,9 @@
       "after": {
         "path": "packages/runner/src/config.ts",
         "mode": "100644",
-        "sha256": "c5491d8279aac50afe58badcd271a167680564efa62f59164e580d07dd364ed6"
+        "sha256": "3f2da68bb22219876b5010c70a2b81ca70c39ecc0e23d47281583ca6fea38497"
       },
-      "rationale": "OpenAI sign-in, bounded host-brokered workflow usage and security regressions; fail-fast cancellation where shared with runner/core/server. Follow-up: actual runtime provenance gate and immutable observed-image grading."
+      "rationale": "OpenAI sign-in, bounded host-brokered workflow usage and security regressions; fail-fast cancellation where shared with runner/core/server. Follow-up: actual runtime provenance gate and immutable observed-image grading. Follow-up: bounded direct DeepSeek provider with host-only credentials and explicit estimated costs."
     },
     {
       "path": "packages/runner/src/container.ts",
@@ -305,6 +326,16 @@
         "sha256": "91a6e7cd7424403ea2ddbac4687350d9a0d8dd1f4f7bd59a1f84949f2a87ee51"
       },
       "rationale": "Selected verified immutable image identity and case-preserving Docker references; no CI wrapper/fixtures imported. Security follow-up: all orchestration credentials/inference stay host-side, typed sanitized provider errors."
+    },
+    {
+      "path": "packages/runner/src/estimated.ts",
+      "before": null,
+      "after": {
+        "path": "packages/runner/src/estimated.ts",
+        "mode": "100644",
+        "sha256": "fc0543460509e55331a5ba46f1161611be1f3b6c5ee6399b5033672676bdb81f"
+      },
+      "rationale": "Bounded direct DeepSeek provider, reasoning continuation and explicit estimated usage/cost regressions."
     },
     {
       "path": "packages/runner/src/framework-launch.ts",
@@ -344,9 +375,9 @@
       "after": {
         "path": "packages/runner/src/job.ts",
         "mode": "100644",
-        "sha256": "b4ae20460a2c3463405c355c20692bac1f348ad01c9486e20be3f6fdaac9b87c"
+        "sha256": "ced5fbc88e5fdf53b7796723ad283f0faa584da13ebbe0f5d90c46087e1de4d1"
       },
-      "rationale": "OpenAI sign-in, bounded host-brokered workflow usage and security regressions; fail-fast cancellation where shared with runner/core/server. Follow-up: actual runtime provenance gate and immutable observed-image grading. Security follow-up: reject reverse inference until provenance is persisted; revoke on cleanup. Security follow-up: all orchestration credentials/inference stay host-side, typed sanitized provider errors."
+      "rationale": "OpenAI sign-in, bounded host-brokered workflow usage and security regressions; fail-fast cancellation where shared with runner/core/server. Follow-up: actual runtime provenance gate and immutable observed-image grading. Security follow-up: reject reverse inference until provenance is persisted; revoke on cleanup. Security follow-up: all orchestration credentials/inference stay host-side, typed sanitized provider errors. Follow-up: bounded direct DeepSeek provider with host-only credentials and explicit estimated costs."
     },
     {
       "path": "packages/runner/src/llm-broker.ts",
@@ -354,9 +385,9 @@
       "after": {
         "path": "packages/runner/src/llm-broker.ts",
         "mode": "100644",
-        "sha256": "29296410c8487aee4677ae450b2db4ed96bff3c6d13469009e295f8ddce6695a"
+        "sha256": "e41e7c29f17695d715f70629241aeef575227b4315b2cad943510573d575d07c"
       },
-      "rationale": "OpenAI sign-in, bounded host-brokered workflow usage and security regressions; fail-fast cancellation where shared with runner/core/server. Security follow-up: reject reverse inference until provenance is persisted; revoke on cleanup. Security follow-up: all orchestration credentials/inference stay host-side, typed sanitized provider errors."
+      "rationale": "OpenAI sign-in, bounded host-brokered workflow usage and security regressions; fail-fast cancellation where shared with runner/core/server. Security follow-up: reject reverse inference until provenance is persisted; revoke on cleanup. Security follow-up: all orchestration credentials/inference stay host-side, typed sanitized provider errors. Follow-up: bounded direct DeepSeek provider with host-only credentials and explicit estimated costs."
     },
     {
       "path": "packages/runner/src/loop.ts",
@@ -368,9 +399,9 @@
       "after": {
         "path": "packages/runner/src/loop.ts",
         "mode": "100644",
-        "sha256": "a024dcc7b0c924be5035a3ad4d79e74bb943a5617b150964df7b88d205aaf4aa"
+        "sha256": "ef6e18b7ad87ec60726cd3f4a90138b5fe3ee8bfee434745b0abe7c10daf2069"
       },
-      "rationale": "OpenAI sign-in, bounded host-brokered workflow usage and security regressions; fail-fast cancellation where shared with runner/core/server."
+      "rationale": "OpenAI sign-in, bounded host-brokered workflow usage and security regressions; fail-fast cancellation where shared with runner/core/server. Follow-up: bounded direct DeepSeek provider with host-only credentials and explicit estimated costs."
     },
     {
       "path": "packages/runner/src/mcp.ts",
@@ -396,9 +427,9 @@
       "after": {
         "path": "packages/runner/src/plan.ts",
         "mode": "100644",
-        "sha256": "7ba92ce95241e0126e500a5a6efcc48dabc50a272e78a21eba45b5ba00ca5e17"
+        "sha256": "c1acab6660f9ad837182819b63633fdac13452b3b7745eed153a618240370f76"
       },
-      "rationale": "OpenAI sign-in, bounded host-brokered workflow usage and security regressions; fail-fast cancellation where shared with runner/core/server."
+      "rationale": "OpenAI sign-in, bounded host-brokered workflow usage and security regressions; fail-fast cancellation where shared with runner/core/server. Follow-up: bounded direct DeepSeek provider with host-only credentials and explicit estimated costs."
     },
     {
       "path": "packages/runner/src/provenance.ts",
@@ -434,9 +465,9 @@
       "after": {
         "path": "packages/runner/src/scheduler.ts",
         "mode": "100644",
-        "sha256": "b23683d1a33a9166d70acfb6a7646222acb9b18a7552f3fdb183f9b78d15fb2f"
+        "sha256": "b830a231f09e00c01a325afe2b56259dffa7c70becfd7be3544895f5b1213a32"
       },
-      "rationale": "OpenAI sign-in, bounded host-brokered workflow usage and security regressions; fail-fast cancellation where shared with runner/core/server. Follow-up: actual runtime provenance gate and immutable observed-image grading."
+      "rationale": "OpenAI sign-in, bounded host-brokered workflow usage and security regressions; fail-fast cancellation where shared with runner/core/server. Follow-up: actual runtime provenance gate and immutable observed-image grading. Follow-up: bounded direct DeepSeek provider with host-only credentials and explicit estimated costs."
     },
     {
       "path": "packages/runner/src/subscription.ts",
@@ -458,9 +489,9 @@
       "after": {
         "path": "packages/runner/src/types.ts",
         "mode": "100644",
-        "sha256": "7a95dcf0f3533d017f766df204e214d18e41295dbd9085267f66a78ccedc50aa"
+        "sha256": "a3b2a0ffcc2fef584175ead4851f837c576777c5350b086be2028bbc3f03b068"
       },
-      "rationale": "OpenAI sign-in, bounded host-brokered workflow usage and security regressions; fail-fast cancellation where shared with runner/core/server. Follow-up: actual runtime provenance gate and immutable observed-image grading."
+      "rationale": "OpenAI sign-in, bounded host-brokered workflow usage and security regressions; fail-fast cancellation where shared with runner/core/server. Follow-up: actual runtime provenance gate and immutable observed-image grading. Follow-up: bounded direct DeepSeek provider with host-only credentials and explicit estimated costs."
     },
     {
       "path": "packages/runner/test/accounting.test.ts",
@@ -516,9 +547,9 @@
       "after": {
         "path": "packages/runner/test/combine.test.ts",
         "mode": "100644",
-        "sha256": "97f750d9b6cebc4b0fdb71fb14b7d3fd1ce11d1d1efb4a522c8b1ea849e506d0"
+        "sha256": "008210862edd628aeecb6035b13b33347b04d211356f029afe3a972dddf3f069"
       },
-      "rationale": "OpenAI sign-in, bounded host-brokered workflow usage and security regressions; fail-fast cancellation where shared with runner/core/server. Follow-up: actual runtime provenance gate and immutable observed-image grading."
+      "rationale": "OpenAI sign-in, bounded host-brokered workflow usage and security regressions; fail-fast cancellation where shared with runner/core/server. Follow-up: actual runtime provenance gate and immutable observed-image grading. Follow-up: bounded direct DeepSeek provider with host-only credentials and explicit estimated costs."
     },
     {
       "path": "packages/runner/test/config.test.ts",
@@ -543,6 +574,26 @@
         "sha256": "4a083c6880e53d32dcef05cefcfb4e4688e2a8f412006edc8c698b7f9b01158b"
       },
       "rationale": "Selected verified immutable image identity and case-preserving Docker references; no CI wrapper/fixtures imported. Follow-up: actual runtime provenance gate and immutable observed-image grading."
+    },
+    {
+      "path": "packages/runner/test/deepseek-hostbroker.test.ts",
+      "before": null,
+      "after": {
+        "path": "packages/runner/test/deepseek-hostbroker.test.ts",
+        "mode": "100644",
+        "sha256": "2dcc6f0edf6cfbb5cf8c60b43bf62e9de057c3b9dc9c9c892a8029163c11fdb7"
+      },
+      "rationale": "Bounded direct DeepSeek provider, reasoning continuation and explicit estimated usage/cost regressions."
+    },
+    {
+      "path": "packages/runner/test/deepseek.test.ts",
+      "before": null,
+      "after": {
+        "path": "packages/runner/test/deepseek.test.ts",
+        "mode": "100644",
+        "sha256": "4834acd724aeb0fce365c9a1bf5a2762e6ea42ffcf89c124cc6015761ccae299"
+      },
+      "rationale": "Bounded direct DeepSeek provider, reasoning continuation and explicit estimated usage/cost regressions."
     },
     {
       "path": "packages/runner/test/framework-launch.test.ts",
@@ -632,9 +683,9 @@
       "after": {
         "path": "packages/server/dist/aiw-server.mjs",
         "mode": "100755",
-        "sha256": "6e5009e1e38a831309bb3f214bda1d405400b6f35c5295f542c298e86c44097f"
+        "sha256": "e36b819e096df4762e20ca6e18b8ff67977aa229cb30954fe0b432465ae8452c"
       },
-      "rationale": "Rebuild/verify coherent tracked runtime and honor explicit engine selection without silent fallback. Follow-up: verified packaged native/tierL resources and lifecycle integration. Follow-up: awaited graceful sidecar descendant shutdown. Follow-up: actual runtime provenance gate and immutable observed-image grading. Security follow-up: all orchestration credentials/inference stay host-side, typed sanitized provider errors."
+      "rationale": "Rebuild/verify coherent tracked runtime and honor explicit engine selection without silent fallback. Follow-up: verified packaged native/tierL resources and lifecycle integration. Follow-up: awaited graceful sidecar descendant shutdown. Follow-up: actual runtime provenance gate and immutable observed-image grading. Security follow-up: all orchestration credentials/inference stay host-side, typed sanitized provider errors. Follow-up: bounded direct DeepSeek provider with host-only credentials and explicit estimated costs."
     },
     {
       "path": "packages/server/dist/fixtures/external/ciStatus.json",
@@ -930,9 +981,9 @@
       "after": {
         "path": "packages/server/src/host-client.ts",
         "mode": "100644",
-        "sha256": "d3a6032e0bbb2b5846d0fa26601b5372ff64316116de749677012b90f2d918d0"
+        "sha256": "f6a16ecc737a7cbdc6ca55ef634bdceb78a007a8077ab910d63b572a5849bd9a"
       },
-      "rationale": "OpenAI sign-in, bounded host-brokered workflow usage and security regressions; fail-fast cancellation where shared with runner/core/server. Security follow-up: all orchestration credentials/inference stay host-side, typed sanitized provider errors."
+      "rationale": "OpenAI sign-in, bounded host-brokered workflow usage and security regressions; fail-fast cancellation where shared with runner/core/server. Security follow-up: all orchestration credentials/inference stay host-side, typed sanitized provider errors. Follow-up: bounded direct DeepSeek provider with host-only credentials and explicit estimated costs."
     },
     {
       "path": "packages/server/src/local.ts",
@@ -1016,9 +1067,9 @@
       "after": {
         "path": "packages/telemetry/src/reporter.ts",
         "mode": "100644",
-        "sha256": "4d73ee6bcd72aef1c7c64bc96d51a9158d6192a188f66c7bac961db1978b9320"
+        "sha256": "18f48cdc911940b33d8f71090736e6f6aca33ee390e14fd009fb1aeb840ef0c6"
       },
-      "rationale": "Truthful pre-model provenance gate and provider observations, without fabricated model versions or task completion."
+      "rationale": "Truthful pre-model provenance gate and provider observations, without fabricated model versions or task completion. Follow-up: bounded direct DeepSeek provider with host-only credentials and explicit estimated costs."
     },
     {
       "path": "packages/telemetry/src/schema.ts",
@@ -1030,9 +1081,9 @@
       "after": {
         "path": "packages/telemetry/src/schema.ts",
         "mode": "100644",
-        "sha256": "ce740c00ac67cce108fc5c2ca4b92df57df9c52ecba9f997568d9ee9e3f70342"
+        "sha256": "a7a2b022055954f9903206671d0387e8df8657fdf219b24ffde9834d4bb628f5"
       },
-      "rationale": "Truthful pre-model provenance gate and provider observations, without fabricated model versions or task completion."
+      "rationale": "Truthful pre-model provenance gate and provider observations, without fabricated model versions or task completion. Follow-up: bounded direct DeepSeek provider with host-only credentials and explicit estimated costs."
     },
     {
       "path": "packages/telemetry/src/wrap.ts",
@@ -1044,9 +1095,9 @@
       "after": {
         "path": "packages/telemetry/src/wrap.ts",
         "mode": "100644",
-        "sha256": "a5d9f74b88ce633e4f66032b6e67fbcf84b62ebcf704f491b5ba2d32952bf511"
+        "sha256": "174df9ad2df4b6e2f4cbe39ae0b60a2b9852a20be0d20c2040e672deba3451c2"
       },
-      "rationale": "Truthful pre-model provenance gate and provider observations, without fabricated model versions or task completion."
+      "rationale": "Truthful pre-model provenance gate and provider observations, without fabricated model versions or task completion. Follow-up: bounded direct DeepSeek provider with host-only credentials and explicit estimated costs."
     },
     {
       "path": "packages/telemetry/test/telemetry.test.ts",
@@ -2120,6 +2171,265 @@
           "path": "packages/server/src/host-client.ts",
           "mode": "100644",
           "sha256": "d3a6032e0bbb2b5846d0fa26601b5372ff64316116de749677012b90f2d918d0"
+        }
+      }
+    ]
+  },
+  "direct_deepseek_followup": {
+    "base_commit": "42ff9e5773614dec4c314daf68a19e59bac8e488",
+    "source_commit": "188e1d1fb4694100b02fd116f49886afeca68d3a",
+    "changes": [
+      {
+        "path": "packages/llm/src/deepseek-client.ts",
+        "before": null,
+        "after": {
+          "path": "packages/llm/src/deepseek-client.ts",
+          "mode": "100644",
+          "sha256": "ef007c249855fe70af5190ec9b7df07c2268c54546396d391e75ea4d027def55"
+        }
+      },
+      {
+        "path": "packages/llm/src/index.ts",
+        "before": {
+          "path": "packages/llm/src/index.ts",
+          "mode": "100644",
+          "sha256": "4f284cb11581d143a07edd5f1f81b679c444a964a4ac3ca9e7cac8dd2b758844"
+        },
+        "after": {
+          "path": "packages/llm/src/index.ts",
+          "mode": "100644",
+          "sha256": "a65f637125b34f55d62d64e13896e59b584b0774c9a631e2aa7d8072c40813da"
+        }
+      },
+      {
+        "path": "packages/llm/test/deepseek.test.ts",
+        "before": null,
+        "after": {
+          "path": "packages/llm/test/deepseek.test.ts",
+          "mode": "100644",
+          "sha256": "5f687f0ea058c4920187bd61be4089232af386d4a5037fd833e6154eb30bf302"
+        }
+      },
+      {
+        "path": "packages/runner/src/cli.ts",
+        "before": {
+          "path": "packages/runner/src/cli.ts",
+          "mode": "100755",
+          "sha256": "6df1afa7bf30c51a2b556cf9a8fc9a1377f97264a320c9a4291db8ae9271c189"
+        },
+        "after": {
+          "path": "packages/runner/src/cli.ts",
+          "mode": "100755",
+          "sha256": "ae70236b609f48a7568df70860d6e0fbff2016be696fd19930d7fc3304fac7c6"
+        }
+      },
+      {
+        "path": "packages/runner/src/combine.ts",
+        "before": {
+          "path": "packages/runner/src/combine.ts",
+          "mode": "100644",
+          "sha256": "2ba56292cce2bf98d7aa204f1b542cbbce2921758db4aa6f35aae68f22b9a85f"
+        },
+        "after": {
+          "path": "packages/runner/src/combine.ts",
+          "mode": "100644",
+          "sha256": "38077abfd415eccfb9e3af31eb88d1d4f483ddbaba780e1fb5ebeac9cf6236a4"
+        }
+      },
+      {
+        "path": "packages/runner/src/config.ts",
+        "before": {
+          "path": "packages/runner/src/config.ts",
+          "mode": "100644",
+          "sha256": "c5491d8279aac50afe58badcd271a167680564efa62f59164e580d07dd364ed6"
+        },
+        "after": {
+          "path": "packages/runner/src/config.ts",
+          "mode": "100644",
+          "sha256": "3f2da68bb22219876b5010c70a2b81ca70c39ecc0e23d47281583ca6fea38497"
+        }
+      },
+      {
+        "path": "packages/runner/src/estimated.ts",
+        "before": null,
+        "after": {
+          "path": "packages/runner/src/estimated.ts",
+          "mode": "100644",
+          "sha256": "fc0543460509e55331a5ba46f1161611be1f3b6c5ee6399b5033672676bdb81f"
+        }
+      },
+      {
+        "path": "packages/runner/src/job.ts",
+        "before": {
+          "path": "packages/runner/src/job.ts",
+          "mode": "100644",
+          "sha256": "b4ae20460a2c3463405c355c20692bac1f348ad01c9486e20be3f6fdaac9b87c"
+        },
+        "after": {
+          "path": "packages/runner/src/job.ts",
+          "mode": "100644",
+          "sha256": "ced5fbc88e5fdf53b7796723ad283f0faa584da13ebbe0f5d90c46087e1de4d1"
+        }
+      },
+      {
+        "path": "packages/runner/src/llm-broker.ts",
+        "before": {
+          "path": "packages/runner/src/llm-broker.ts",
+          "mode": "100644",
+          "sha256": "29296410c8487aee4677ae450b2db4ed96bff3c6d13469009e295f8ddce6695a"
+        },
+        "after": {
+          "path": "packages/runner/src/llm-broker.ts",
+          "mode": "100644",
+          "sha256": "e41e7c29f17695d715f70629241aeef575227b4315b2cad943510573d575d07c"
+        }
+      },
+      {
+        "path": "packages/runner/src/loop.ts",
+        "before": {
+          "path": "packages/runner/src/loop.ts",
+          "mode": "100644",
+          "sha256": "a024dcc7b0c924be5035a3ad4d79e74bb943a5617b150964df7b88d205aaf4aa"
+        },
+        "after": {
+          "path": "packages/runner/src/loop.ts",
+          "mode": "100644",
+          "sha256": "ef6e18b7ad87ec60726cd3f4a90138b5fe3ee8bfee434745b0abe7c10daf2069"
+        }
+      },
+      {
+        "path": "packages/runner/src/plan.ts",
+        "before": {
+          "path": "packages/runner/src/plan.ts",
+          "mode": "100644",
+          "sha256": "7ba92ce95241e0126e500a5a6efcc48dabc50a272e78a21eba45b5ba00ca5e17"
+        },
+        "after": {
+          "path": "packages/runner/src/plan.ts",
+          "mode": "100644",
+          "sha256": "c1acab6660f9ad837182819b63633fdac13452b3b7745eed153a618240370f76"
+        }
+      },
+      {
+        "path": "packages/runner/src/scheduler.ts",
+        "before": {
+          "path": "packages/runner/src/scheduler.ts",
+          "mode": "100644",
+          "sha256": "b23683d1a33a9166d70acfb6a7646222acb9b18a7552f3fdb183f9b78d15fb2f"
+        },
+        "after": {
+          "path": "packages/runner/src/scheduler.ts",
+          "mode": "100644",
+          "sha256": "b830a231f09e00c01a325afe2b56259dffa7c70becfd7be3544895f5b1213a32"
+        }
+      },
+      {
+        "path": "packages/runner/src/types.ts",
+        "before": {
+          "path": "packages/runner/src/types.ts",
+          "mode": "100644",
+          "sha256": "7a95dcf0f3533d017f766df204e214d18e41295dbd9085267f66a78ccedc50aa"
+        },
+        "after": {
+          "path": "packages/runner/src/types.ts",
+          "mode": "100644",
+          "sha256": "a3b2a0ffcc2fef584175ead4851f837c576777c5350b086be2028bbc3f03b068"
+        }
+      },
+      {
+        "path": "packages/runner/test/combine.test.ts",
+        "before": {
+          "path": "packages/runner/test/combine.test.ts",
+          "mode": "100644",
+          "sha256": "97f750d9b6cebc4b0fdb71fb14b7d3fd1ce11d1d1efb4a522c8b1ea849e506d0"
+        },
+        "after": {
+          "path": "packages/runner/test/combine.test.ts",
+          "mode": "100644",
+          "sha256": "008210862edd628aeecb6035b13b33347b04d211356f029afe3a972dddf3f069"
+        }
+      },
+      {
+        "path": "packages/runner/test/deepseek-hostbroker.test.ts",
+        "before": null,
+        "after": {
+          "path": "packages/runner/test/deepseek-hostbroker.test.ts",
+          "mode": "100644",
+          "sha256": "2dcc6f0edf6cfbb5cf8c60b43bf62e9de057c3b9dc9c9c892a8029163c11fdb7"
+        }
+      },
+      {
+        "path": "packages/runner/test/deepseek.test.ts",
+        "before": null,
+        "after": {
+          "path": "packages/runner/test/deepseek.test.ts",
+          "mode": "100644",
+          "sha256": "4834acd724aeb0fce365c9a1bf5a2762e6ea42ffcf89c124cc6015761ccae299"
+        }
+      },
+      {
+        "path": "packages/server/dist/aiw-server.mjs",
+        "before": {
+          "path": "packages/server/dist/aiw-server.mjs",
+          "mode": "100755",
+          "sha256": "6e5009e1e38a831309bb3f214bda1d405400b6f35c5295f542c298e86c44097f"
+        },
+        "after": {
+          "path": "packages/server/dist/aiw-server.mjs",
+          "mode": "100755",
+          "sha256": "e36b819e096df4762e20ca6e18b8ff67977aa229cb30954fe0b432465ae8452c"
+        }
+      },
+      {
+        "path": "packages/server/src/host-client.ts",
+        "before": {
+          "path": "packages/server/src/host-client.ts",
+          "mode": "100644",
+          "sha256": "d3a6032e0bbb2b5846d0fa26601b5372ff64316116de749677012b90f2d918d0"
+        },
+        "after": {
+          "path": "packages/server/src/host-client.ts",
+          "mode": "100644",
+          "sha256": "f6a16ecc737a7cbdc6ca55ef634bdceb78a007a8077ab910d63b572a5849bd9a"
+        }
+      },
+      {
+        "path": "packages/telemetry/src/reporter.ts",
+        "before": {
+          "path": "packages/telemetry/src/reporter.ts",
+          "mode": "100644",
+          "sha256": "4d73ee6bcd72aef1c7c64bc96d51a9158d6192a188f66c7bac961db1978b9320"
+        },
+        "after": {
+          "path": "packages/telemetry/src/reporter.ts",
+          "mode": "100644",
+          "sha256": "18f48cdc911940b33d8f71090736e6f6aca33ee390e14fd009fb1aeb840ef0c6"
+        }
+      },
+      {
+        "path": "packages/telemetry/src/schema.ts",
+        "before": {
+          "path": "packages/telemetry/src/schema.ts",
+          "mode": "100644",
+          "sha256": "ce740c00ac67cce108fc5c2ca4b92df57df9c52ecba9f997568d9ee9e3f70342"
+        },
+        "after": {
+          "path": "packages/telemetry/src/schema.ts",
+          "mode": "100644",
+          "sha256": "a7a2b022055954f9903206671d0387e8df8657fdf219b24ffde9834d4bb628f5"
+        }
+      },
+      {
+        "path": "packages/telemetry/src/wrap.ts",
+        "before": {
+          "path": "packages/telemetry/src/wrap.ts",
+          "mode": "100644",
+          "sha256": "a5d9f74b88ce633e4f66032b6e67fbcf84b62ebcf704f491b5ba2d32952bf511"
+        },
+        "after": {
+          "path": "packages/telemetry/src/wrap.ts",
+          "mode": "100644",
+          "sha256": "174df9ad2df4b6e2f4cbe39ae0b60a2b9852a20be0d20c2040e672deba3451c2"
         }
       }
     ]

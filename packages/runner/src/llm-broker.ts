@@ -83,6 +83,7 @@ export function installHostLLMBroker(client: Client, opts: HostLLMBrokerOptions)
       signal.throwIfAborted();
       // No access tokens or connection configuration are returned across this channel.
       return { response: completion.response, usage: completion.usage,
+        ...(completion.deepseekEstimate ? { deepseekEstimate: completion.deepseekEstimate } : {}),
         ...(completion.costUsd !== undefined ? { costUsd: completion.costUsd } : {}),
         ...(completion.cacheHit !== undefined ? { cacheHit: completion.cacheHit } : {}) };
     } catch (error) {

@@ -38149,6 +38149,7 @@ var EventSchema = external_exports.discriminatedUnion("kind", [
     providerSystemFingerprint: external_exports.string().optional(),
     role: RoleSchema2,
     usage: UsageSchema,
+    deepseekEstimate: external_exports.object({ basis: external_exports.string(), estimatedUsd: external_exports.number().nonnegative(), cacheHitTokens: external_exports.number().int().nonnegative(), cacheMissTokens: external_exports.number().int().nonnegative(), outputTokens: external_exports.number().int().nonnegative() }).optional(),
     costUsd: external_exports.number().optional(),
     cacheHit: external_exports.boolean().optional(),
     latencyMs: external_exports.number()
@@ -38391,6 +38392,7 @@ function wrapLLM(client, reporter, role, opts = {}) {
         model: req.model,
         role,
         usage: res.usage,
+        deepseekEstimate: res.deepseekEstimate,
         costUsd: res.costUsd,
         cacheHit: res.cacheHit,
         latencyMs
@@ -40104,6 +40106,9 @@ var DISCOVERY = `${ISSUER}/.well-known/openid-configuration`;
 // packages/llm/src/chatgpt-client.ts
 var MAX_EVENT_BYTES = 16 * 1024 * 1024;
 
+// packages/llm/src/deepseek-client.ts
+var MARGIN_MS = 5 * 6e4;
+
 // packages/server/src/host-client.ts
 import { randomUUID } from "node:crypto";
 var HostCompletionSchema = ResultSchema.extend({
@@ -40115,7 +40120,8 @@ var HostCompletionSchema = ResultSchema.extend({
     cacheWrite: external_exports.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER).optional()
   }).refine((usage) => (usage.cachedRead ?? 0) <= usage.input),
   costUsd: external_exports.number().finite().nonnegative().optional(),
-  cacheHit: external_exports.boolean().optional()
+  cacheHit: external_exports.boolean().optional(),
+  deepseekEstimate: external_exports.object({ basis: external_exports.literal("deepseek-flash:2026-11-01:off-peak"), estimatedUsd: external_exports.number().finite().nonnegative(), cacheHitTokens: external_exports.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER), cacheMissTokens: external_exports.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER), outputTokens: external_exports.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER) }).strict().optional()
 });
 var HostErrorDataSchema = external_exports.object({ aiwLLMError: external_exports.object({
   kind: external_exports.enum(["infra", "context-limit", "other"]),
@@ -40147,7 +40153,7 @@ function createHostLLMClient(server, opts = {}) {
           messages: req.messages,
           tools: req.tools
         } }, HostCompletionSchema, { signal, timeout: timeoutMs });
-        return { response: result.response, usage: result.usage, costUsd: result.costUsd, cacheHit: result.cacheHit };
+        return { response: result.response, usage: result.usage, costUsd: result.costUsd, cacheHit: result.cacheHit, ...result.deepseekEstimate ? { deepseekEstimate: result.deepseekEstimate } : {} };
       } catch (error62) {
         cancel();
         if (callerSignal?.aborted) throw new DOMException("Host LLM request cancelled", "AbortError");
