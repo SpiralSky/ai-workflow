@@ -261,3 +261,14 @@ test("DeepSeek estimates remain separately labeled and cannot combine with measu
   const b = fixtureRun("measured"); const mixed = fixtureDirs(t, [a, b]);
   await assert.rejects(combineRuns(mixed.dirs, "mixed", mixed.root), /provider/);
 });
+
+test("direct TypeSafe classifier provider and campaign limits isolate estimated reports", async t => {
+  const a = fixtureRun("a"), b = fixtureRun("b");
+  const classifier = { provider: "typesafe" as const, model: "jev-1.14.0", threshold: 0.8, policy: "noul-v1" as const,
+    limits: { maxCalls: 5, maxTokens: 1000, maxDurationMs: 30000, estimateLimitUsd: 0.01 } };
+  a.config.classifier = classifier;
+  for (const changed of [{ ...classifier, provider: "openrouter-decisions" as const }, { ...classifier, limits: { ...classifier.limits, maxCalls: 6 } }]) {
+    b.config.classifier = changed;
+    const { root, dirs } = fixtureDirs(t, [a, b]); await assert.rejects(combineRuns(dirs, "mixed-classifier", root), /provider|limits/);
+  }
+});

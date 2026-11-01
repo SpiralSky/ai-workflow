@@ -153,6 +153,7 @@ function validateProvenance(runs: RunJSON[]): RunJSON["provenance"] {
         (run.config.usageMode ?? "monetary") !== (first.config.usageMode ?? "monetary") ||
         !isDeepStrictEqual(run.config.subscriptionLimits, first.config.subscriptionLimits) ||
         !isDeepStrictEqual(run.config.estimatedLimits, first.config.estimatedLimits) ||
+        !isDeepStrictEqual(run.config.classifier, first.config.classifier) ||
         !isDeepStrictEqual(run.provenance.inference, first.provenance.inference)) {
       throw new Error(`Run ${run.id} has mismatched provider, usage mode, limits or inference settings`);
     }

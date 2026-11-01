@@ -1,3 +1,4 @@
+import { classifierReranker } from "../orchestrate/selection/classifier.ts";
 import { canonicalJSON, currentReporter, sha256, wrapTools } from "@aiw/telemetry";
 import { compileBranch } from "../branch/compile.ts";
 import { quickJSRuntime } from "../branch/engines/index.ts";
@@ -171,7 +172,10 @@ export function buildFramework(kind: FrameworkKind, realRegistry: Registry, opts
     if (opts.variant?.hotPaths) throw new Error("hot paths not built yet");
     if (opts.variant?.executor === "calls") throw new Error("executor variant `calls` is not built yet");
     task = o.task ?? new Task({ workspaceRoot: o.workspaceRoot });
-    const reranker = (opts.variant?.rerank ?? o.rerank ?? "llm") === "none" ? noneReranker : llmReranker(o.client, { model: o.rerankModel ?? o.model });
+    const rerankMode = opts.variant?.rerank ?? o.rerank ?? "llm";
+    if (rerankMode === "classifier" && !o.classifier) throw new Error("classifier rerank requires explicit typed client/settings");
+    const reranker = rerankMode === "classifier" ? classifierReranker(o.classifier!.client, o.classifier!)
+      : rerankMode === "none" ? noneReranker : llmReranker(o.client, { model: o.rerankModel ?? o.model });
     const planner = {
       task, registry, host: opts.host, client: o.client, model: o.model, temperature: o.temperature, transcript: o.transcript,
       selector: o.selector ?? createSelector({ reranker }),

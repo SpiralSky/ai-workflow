@@ -20,7 +20,7 @@ export interface MCPSession {
   /** Closed until the job has verified and persisted runtime provenance. */
   inferenceAdmission?: HostLLMAdmission;
   /** Unauthenticated local server observation; validated against mounted artifacts before model work. */
-  runtimeProvenance?: { version: number; engine: string; entryHash: string | null; prompts: Record<string, string>; catalogHash: string; settings: { kind: string; variant: Record<string, unknown>; branchContext: string; secondaryCap: number; secondaryTemperature?: number | null }; nodeVersion?: string; runtimePlatform?: { platform: string; arch: string; moduleABI: string } };
+  runtimeProvenance?: { version: number; engine: string; entryHash: string | null; prompts: Record<string, string>; catalogHash: string; settings: { kind: string; variant: Record<string, unknown>; branchContext: string; secondaryCap: number; secondaryTemperature?: number | null; classifier?: { model: string; threshold: number; policy: string } }; nodeVersion?: string; runtimePlatform?: { platform: string; arch: string; moduleABI: string } };
   /** Framework instructions from the server's initialize response, used as the system prompt supplement. */
   instructions?: string;
   /** @internal */
@@ -46,7 +46,7 @@ export async function openMCPSession(serverDescriptor: {
   });
 
   const client = new Client({ name: "aiw-runner", version: "1.0.0" }, broker
-    ? { capabilities: { experimental: { "aiw/llm/complete": {} } } } : undefined);
+    ? { capabilities: { experimental: { "aiw/llm/complete": {}, ...(broker.classifierClient ? { "aiw/classifier/classify": {} } : {}) } } } : undefined);
   const inferenceAdmission = broker ? installHostLLMBroker(client, broker) : undefined;
   try {
     await client.connect(transport);

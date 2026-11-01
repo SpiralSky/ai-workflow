@@ -1,13 +1,14 @@
 import type { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { RequestSchema, NotificationSchema, McpError, ErrorCode } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
-import { LLMError } from "@aiw/llm";
+import { LLMError, validateDecisionsRequest, type DecisionsClient } from "@aiw/llm";
 import type { LLMClient } from "@aiw/telemetry";
 
 /** Opt-in reverse LLM channel. Credentials and provider settings remain on the host. */
 export interface HostLLMBrokerOptions {
   secondaryClient: LLMClient;
   secondaryModel: string;
+  classifierClient?: DecisionsClient;
   signal?: AbortSignal;
   maxRequestBytes?: number;
 }
@@ -93,6 +94,30 @@ export function installHostLLMBroker(client: Client, opts: HostLLMBrokerOptions)
             ...(Number.isInteger(error.status) && error.status! >= 100 && error.status! <= 599 ? { status: error.status } : {}) } }
         : undefined;
       throw new McpError(ErrorCode.InternalError, signal.aborted ? "Host LLM request cancelled" : "Host LLM request failed", classified);
+    } finally { active.delete(requestId); }
+  });
+  if (opts.classifierClient) client.setRequestHandler(RequestSchema.extend({
+    method: z.literal("aiw/classifier/classify"),
+    params: z.object({ requestId: z.string().uuid(), instruction: z.string().max(32768),
+      candidates: z.array(z.object({ id: z.string().max(64), name: z.string().max(256),
+        whenToUse: z.string().max(8192), whenNotToUse: z.string().max(8192).optional() }).strict()).max(20),
+    }).strict(),
+  }), async (request, extra) => {
+    if (!admitted || session.signal.aborted || opts.signal?.aborted) throw new McpError(ErrorCode.InvalidRequest, "Host classifier admission is closed");
+    const { requestId, instruction, candidates } = request.params;
+    if (seen.has(requestId) || seen.size >= 10000) throw new McpError(ErrorCode.InvalidParams, "Classifier request ID reused or session limit reached");
+    seen.add(requestId);
+    try { validateDecisionsRequest({ instruction, candidates }); }
+    catch { throw new McpError(ErrorCode.InvalidParams, "Invalid classifier request"); }
+    const controller = new AbortController(); active.set(requestId, controller);
+    const signal = AbortSignal.any([session.signal, controller.signal, extra.signal, ...(opts.signal ? [opts.signal] : [])]);
+    try {
+      signal.throwIfAborted();
+      const result = await opts.classifierClient!.classify({ instruction, candidates, signal });
+      signal.throwIfAborted();
+      return { ...(result.classifierEstimate ? { classifierEstimate: result.classifierEstimate } : {}), failure: result.failure, answers: result.answers, usage: result.usage, costUsd: result.costUsd, providerModel: result.providerModel, provider: result.provider };
+    } catch {
+      throw new McpError(ErrorCode.InternalError, signal.aborted ? "Host classifier request cancelled" : "Host classifier request failed");
     } finally { active.delete(requestId); }
   });
   return admission;

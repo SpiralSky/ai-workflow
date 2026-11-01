@@ -1,3 +1,4 @@
+import { createDecisionsClient } from "@aiw/llm";
 /**
  * Runs one job attempt end to end.
  * Runner architecture §4; job lifecycle §4.1–§4.4.
@@ -38,6 +39,7 @@ export interface JobOptions {
   /** AbortSignal for budget and fail-fast cancellation. */
   signal?: AbortSignal;
   /** Host-only shared subscription gate; absent for the unchanged paid API client. */
+  classifierEstimated?: ReturnType<typeof import("./classifier-estimated.ts").boundClassifierEstimatedClient>;
   estimated?: ReturnType<typeof import("./estimated.ts").boundEstimatedClient>;
   subscription?: ReturnType<typeof import("./subscription.ts").boundSubscriptionClient>;
   /** Notify the campaign before terminal failure cleanup, so siblings stop promptly. */
@@ -87,6 +89,11 @@ export async function runJobAttempt(opts: JobOptions): Promise<JobResult> {
 
   // Validate treatment before creating artifacts or starting any container.
   const launch = frameworkLaunch(job.framework, config);
+  if (config.classifier?.provider === "openrouter-decisions" && launch.id.includes("rerank=classifier") && baseURL.replace(/\/$/, "") !== "https://openrouter.ai/api/v1") throw new Error("Classifier campaigns require the canonical OpenRouter chat provider; cross-endpoint credentials are refused");
+  if (config.classifier?.provider === "typesafe" && (!opts.classifierEstimated || config.provider !== "deepseek" || config.usageMode !== "estimated")) throw new Error("Direct classifier requires bounded host runtime");
+  if (opts.classifierEstimated && config.classifier?.provider !== "typesafe") throw new Error("Classifier runtime/provider mismatch");
+  const classifierClient = config.classifier && launch.id.includes("rerank=classifier")
+    ? config.classifier.provider === "typesafe" ? opts.classifierEstimated!.client : createDecisionsClient({ apiKey, model: config.classifier.model }) : undefined;
   const jobDir = job.dir ?? createJobDir(runPath, job);
   const eventsPath = join(jobDir, "events.jsonl");
   const sink = new FileSink(eventsPath);
@@ -139,7 +146,8 @@ export async function runJobAttempt(opts: JobOptions): Promise<JobResult> {
       ];
       const serverDescriptor = await startServer(ctr, serverArgs);
       session = await openMCPSession(serverDescriptor, launch.needsExecutor
-        ? { secondaryClient: client, secondaryModel: config.models.secondary, signal } : undefined);
+        ? { secondaryClient: client, secondaryModel: config.models.secondary, signal,
+            ...(classifierClient ? { classifierClient } : {}) } : undefined);
 
       signal?.throwIfAborted();
       if (!opts.provenance || !opts.onProvenance) throw new Error("job lacks persisted provenance gate");

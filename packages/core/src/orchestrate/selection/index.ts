@@ -6,6 +6,7 @@ import type { Reranker } from "./rerank.ts";
 
 export * from "./retrieve.ts";
 export * from "./rerank.ts";
+export * from "./classifier.ts";
 export * from "./complete.ts";
 
 /** Default shortlist size after rerank (orchestrate §7.2). */
@@ -23,6 +24,7 @@ export interface SelectionStages {
   override?: boolean;
   /** The rerank answer was unusable and retrieval order was kept. */
   rerankFallback?: boolean;
+  rerankFallbackReason?: string;
 }
 
 /** The shortlist and how it came about. */
@@ -76,7 +78,7 @@ export function createSelector(opts: { reranker: Reranker; k?: number; n?: numbe
         return { tools, stages: { retrieved: [], final: tools.map((d) => d.name), override: true } };
       }
       const retrieved = retrieve(q.instruction, catalog, { k, exclude });
-      const ctx = { reporter: q.reporter, signal: q.signal, fallback: false };
+      const ctx = { reporter: q.reporter, signal: q.signal, fallback: false, fallbackReason: undefined as string | undefined };
       const reranked = await opts.reranker.rerank(q.instruction, retrieved.map((r) => r.tool), ctx);
       const tools = complete(reranked.slice(0, n), catalog).filter((d) => !exclude.has(d.name));
       const stages: SelectionStages = {
@@ -85,6 +87,7 @@ export function createSelector(opts: { reranker: Reranker; k?: number; n?: numbe
         final: tools.map((d) => d.name),
       };
       if (ctx.fallback) stages.rerankFallback = true;
+      if (ctx.fallbackReason) stages.rerankFallbackReason = ctx.fallbackReason;
       return { tools, stages };
     },
   };

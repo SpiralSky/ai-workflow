@@ -119,6 +119,9 @@ export function attestJob(provenance: Provenance, config: RunConfig, problem: st
   if (!HASH.test(runtime.catalogHash) || !runtime.settings || runtime.settings.kind !== parsed.kind ||
       canonicalJSON(runtime.settings.variant) !== canonicalJSON(parsed.variant) || runtime.settings.branchContext !== config.branch.context ||
       (parsed.kind === "orchestrate" && runtime.settings.secondaryCap !== (parsed.variant.secondary ?? config.secondaryCap))) throw new Error("server treatment/settings differ from configured job");
+  const expectedClassifier = parsed.variant.rerank === "classifier" && config.classifier
+    ? { model: config.classifier.model, threshold: config.classifier.threshold, policy: config.classifier.policy } : undefined;
+  if (canonicalJSON(runtime.settings.classifier ?? null) !== canonicalJSON(expectedClassifier ?? null)) throw new Error("server classifier settings differ from configured job");
   if (!session.tools.length) throw new Error("server did not expose tools for fingerprinting");
   const fingerprint = { prompt: hashText(session.instructions ?? ""), tools: hashText(canonicalJSON(session.tools)),
     observedSettings: { ...runtime.settings },

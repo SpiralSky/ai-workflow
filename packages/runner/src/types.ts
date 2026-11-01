@@ -36,6 +36,7 @@ export interface RunConfig {
   subscriptionLimits?: import("./subscription.ts").SubscriptionLimits;
   concurrency: number;
   models: { main: string; secondary: string };
+  classifier?: { provider: "openrouter-decisions" | "typesafe"; limits?: import("./estimated.ts").EstimatedLimits; model: string; threshold: number; policy: "noul-v1" };
   temperature: number;
   secondaryCap: number;
   branch: BranchConfig;
@@ -85,6 +86,7 @@ export interface JobJSON {
   outcome: "pass" | "fail";
   reason: null | "checks" | "turn-limit" | "timeout" | "patch-failed" | "context-limit";
   attempts: AttemptRecord[];
+  estimatedCostComponents?: { deepseek: { basis: string; estimatedUsd: number | null; knownEstimatedUsd: number }; typesafe: { basis: string; estimatedUsd: number | null; knownEstimatedUsd: number } };
   estimatedCost?: { basis: string; estimatedUsd: number | null; knownEstimatedUsd: number };
   costUsdAllAttempts: number | null;
   knownCostUsdAllAttempts?: number;
@@ -103,6 +105,7 @@ export interface RunJSON {
   config: RunConfig;
   provenance: Provenance;
   totals: { jobs: number; attempts: number; costUsd: number | null; knownCostUsd?: number; pass: number; fail: number };
+  classifierEstimatedUsage?: import("./classifier-estimated.ts").ClassifierEstimatedUsage;
   estimatedUsage?: import("./estimated.ts").EstimatedUsage;
   subscriptionUsage?: import("./subscription.ts").SubscriptionUsage;
   startedAt: string;

@@ -15,8 +15,9 @@ import { createRunDir, generateRunId, writeRunJSON } from "./rundir.ts";
 import { runScheduler } from "./scheduler.ts";
 import { combineRuns } from "./combine.ts";
 import { buildProblems, checkProblems } from "./problems/index.ts";
-import { createDeepSeekClient, createChatGPTAuth, createChatGPTClient, listChatGPTModels } from "@aiw/llm";
+import { createTypeSafeDecisionsClient, createDeepSeekClient, createChatGPTAuth, createChatGPTClient, listChatGPTModels } from "@aiw/llm";
 import { boundSubscriptionClient } from "./subscription.ts";
+import { boundClassifierEstimatedClient } from "./classifier-estimated.ts";
 import { boundEstimatedClient } from "./estimated.ts";
 import { authCommand } from "./auth-cli.ts";
 
@@ -38,7 +39,7 @@ Usage:
               [--secondary-model <model>]  [--temperature 0]
               [--budget 0.50]  [--full]  [--concurrency 1]
               [--branch-context trace|annotated|full]
-              [--secondary-cap 4]
+              [--secondary-cap 4] [--classifier-provider openrouter-decisions|typesafe] [--classifier-model <decision-model>] [--classifier-threshold <0.5..1>]
               [--provider openrouter|chatgpt|deepseek] [--usage-mode monetary|subscription|estimated]
               [--estimate-limit-usd N] [--account <saved-id>] [--max-calls N --max-tokens N --max-duration-ms N]
               [--until-reps N]  [--combine-with <report>]
@@ -69,6 +70,13 @@ async function evalCommand(argv: string[]): Promise<void> {
       "max-tokens": { type: "string" },
       "max-duration-ms": { type: "string" },
       "secondary-model": { type: "string" },
+      "classifier-provider": { type: "string" },
+      "classifier-max-calls": { type: "string" },
+      "classifier-max-tokens": { type: "string" },
+      "classifier-max-duration-ms": { type: "string" },
+      "classifier-estimate-limit-usd": { type: "string" },
+      "classifier-model": { type: "string" },
+      "classifier-threshold": { type: "string" },
       temperature: { type: "string" },
       budget: { type: "string" },
       full: { type: "boolean", default: false },
@@ -132,6 +140,13 @@ async function evalCommand(argv: string[]): Promise<void> {
       reps: parseInt(values.reps ?? "1", 10),
       model: values.model ?? "deepseek/deepseek-v4-flash",
       secondaryModel: values["secondary-model"],
+      classifierProvider: values["classifier-provider"] as "openrouter-decisions" | "typesafe" | undefined,
+      ...(["classifier-max-calls", "classifier-max-tokens", "classifier-max-duration-ms", "classifier-estimate-limit-usd"].some(k => values[k as keyof typeof values] !== undefined) ? { classifierLimits: {
+        maxCalls: Number(values["classifier-max-calls"]), maxTokens: Number(values["classifier-max-tokens"]),
+        maxDurationMs: Number(values["classifier-max-duration-ms"]), estimateLimitUsd: Number(values["classifier-estimate-limit-usd"]),
+      } } : {}),
+      classifierModel: values["classifier-model"],
+      classifierThreshold: values["classifier-threshold"] !== undefined ? Number(values["classifier-threshold"]) : undefined,
       temperature: parseFloat(values.temperature ?? "0"),
       budget: parseFloat(values.budget ?? "0.50"),
       full: values.full ?? false,
@@ -172,6 +187,9 @@ async function evalCommand(argv: string[]): Promise<void> {
 
   const estimated = useDeepSeek ? boundEstimatedClient(createDeepSeekClient({ apiKey }), config.estimatedLimits!) : undefined;
 
+  const classifierEstimated = config.classifier?.provider === "typesafe" ? boundClassifierEstimatedClient(
+    createTypeSafeDecisionsClient({ apiKey: process.env["TYPESAFE_API_KEY"] ?? "", model: config.classifier.model }), config.classifier.limits!) : undefined;
+
   const runId = generateRunId();
 
   const runDir = createRunDir(root, runId, config, provenance);
@@ -195,7 +213,7 @@ async function evalCommand(argv: string[]): Promise<void> {
       repoRoot: root,
       apiKey,
       baseURL,
-      subscription, estimated,
+      subscription, estimated, classifierEstimated,
       turnLimits: {}, // populated from provenance in full impl
       problemsDir,
       onJobDone: (job, result) => {
