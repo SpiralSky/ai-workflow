@@ -34,6 +34,9 @@ jobs:
         working-directory: ${{ runner.temp }}/aiw-verified-source
         run: |
           docker version
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y ripgrep
+          rg --version
           npm ci --ignore-scripts --no-audit --no-fund
       - name: Build existing fixture base image
         timeout-minutes: 5
@@ -50,6 +53,12 @@ jobs:
           python3.12 -m venv packages/tools/.venv
           packages/tools/.venv/bin/pip install -r packages/tools/python/requirements.txt
           packages/tools/.venv/bin/pyright --version
+      - name: Recheck ripgrep-dependent tests first
+        timeout-minutes: 2
+        working-directory: ${{ runner.temp }}/aiw-verified-source
+        run: |
+          rg --version
+          node --import tsx --test --test-name-pattern 'grep: rg and JS fallback agree|grep/findFiles: ignore files' packages/tools/test/s.test.ts
       - name: Offline package tests and host fixture diagnostics
         timeout-minutes: 6
         working-directory: ${{ runner.temp }}/aiw-verified-source
