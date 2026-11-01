@@ -51,3 +51,14 @@ All PRs are drafts and stacked in the order above. No approvals or merges.
 ## Autonomous decisions
 
 Keep provider credentials host-only; use fixed official endpoints and strict admission/cancellation gates. Preserve optional existing behavior until full success is measured. Treat actual costs and tariff estimates separately, retain unknown totals and known subtotals, and stop after unknown accounting rather than allowing further spend. Keep original specification hashes immutable and put new experimental requirements in separately labeled extensions. None of these technical decisions constitutes user plan/PR approval.
+
+## Hygiene stack follow-up — 2026-11-01 10:38 UTC
+
+PR #2 had two hygiene-only add/add conflicts after independent base/head additions. Both files now match the base exactly; stronger packaged-resource checks are retained in a separate helper enforced by the authoritative server tests. Equivalent append-only fixes are on PR #3 and #4. No branches merged or rebased, no force pushes, runtime source and generated bundles unchanged.
+
+- PR #2 remote `5d170bdc9560c01ff19a8b9d0e062fb46b4b8a2e`; local `0df34a255d672b4b5b9120e75c864bbe2bf29912`; tree `e42cade73d0034f647d6848364d5da9e4741a859`.
+- PR #3 remote `5a88fabc6f1a704ef74833de7c6d04c662a17ec1`; local `47b56824e0d8ec4f1eb783a53be914e6c1d17cf1`; tree `78d1ff750bf16f4d689d04e8ad070c1c7d01238f`.
+- PR #4 remote `5405b19ba2f9d23684e6aee96d713fc368132301`; local `3b664eed68f423bae30fa94a80f027fc38f2ecc3`; tree `4df6fffdc7c7900a3966ad27993e15b3af0dccd2`.
+- GitHub verified all four PRs clean/mergeable, draft and unmerged. This is not approval.
+- Full unchanged test inventories passed serialized: 537/551/595 package tests respectively, plus23 script tests each, zero skips/failures. Typecheck, snapshot preservation, freshness and10 focused postcommit checks passed.
+- Normal parallel sign-in runs twice reproduced the existing Jedi unsure-list failure; isolated24-test and serialized101-tool suites passed. Assertions/repository test configuration were not weakened. An isolated root-cause investigation is active, not claiming the flaky default is fixed. Prior Docker tests apply to unchanged runtime artifacts, not a fresh whole-snapshot rerun.
