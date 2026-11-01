@@ -9,7 +9,8 @@ export interface Reporter {
     providerModel?: string;
     providerSystemFingerprint?: string;
     role: Role;
-    usage: Usage;
+    usage?: Usage;
+    classifierEstimate?: { basis: string; estimatedUsd: number; inputTokens: number; outputTokens: number };
     deepseekEstimate?: { basis: string; estimatedUsd: number; cacheHitTokens: number; cacheMissTokens: number; outputTokens: number };
     costUsd?: number;
     cacheHit?: boolean;

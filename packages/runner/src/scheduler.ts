@@ -14,6 +14,7 @@ export interface SchedulerOptions {
   /** Deterministic execution seam; defaults to the real attempt implementation. */
   runAttempt?: typeof runJobAttempt;
   /** Host-only bounded provider; never serialized into run configuration. */
+  classifierEstimated?: ReturnType<typeof import("./classifier-estimated.ts").boundClassifierEstimatedClient>;
   estimated?: ReturnType<typeof import("./estimated.ts").boundEstimatedClient>;
   subscription?: ReturnType<typeof import("./subscription.ts").boundSubscriptionClient>;
 }
@@ -25,6 +26,8 @@ export async function runScheduler(opts: SchedulerOptions, runJSON: RunJSON): Pr
   if ((opts.config.provider === "deepseek" || opts.config.usageMode === "estimated") && !estimatedMode) throw new Error("Invalid DeepSeek usage mode");
   if (estimatedMode && (!opts.estimated || !opts.config.estimatedLimits || opts.config.concurrency !== 1)) throw new Error("DeepSeek requires bounded host runtime");
   if (opts.estimated && (!estimatedMode || opts.subscription)) throw new Error("Estimated runtime cannot be mixed with another provider");
+  if (opts.config.classifier?.provider === "typesafe" && (!estimatedMode || !opts.classifierEstimated || !opts.config.classifier.limits)) throw new Error("Direct classifier requires explicit bounded estimated runtime");
+  if (opts.classifierEstimated && opts.config.classifier?.provider !== "typesafe") throw new Error("Classifier runtime/provider mismatch");
   const bounded = opts.estimated ?? opts.subscription;
   const subscriptionMode = opts.config.provider === "chatgpt" && opts.config.usageMode === "subscription";
   if ((opts.config.provider === "chatgpt" || opts.config.usageMode === "subscription") && !subscriptionMode) throw new Error("Invalid provider/usage mode pairing");
@@ -47,6 +50,7 @@ export async function runScheduler(opts: SchedulerOptions, runJSON: RunJSON): Pr
   /** Writes counters after attempts and terminal jobs, including exhausted failures. */
   function flush(): void {
     runJSON.totals = { jobs: pass + fail, attempts, costUsd: subscriptionMode || estimatedMode || incomplete ? null : knownCostUsd, knownCostUsd, pass, fail };
+    if (opts.classifierEstimated) runJSON.classifierEstimatedUsage = opts.classifierEstimated.snapshot();
     if (estimatedMode) runJSON.estimatedUsage = opts.estimated!.snapshot();
     if (subscriptionMode) runJSON.subscriptionUsage = opts.subscription!.snapshot();
     writeRunJSON(opts.runPath, runJSON);
@@ -54,6 +58,7 @@ export async function runScheduler(opts: SchedulerOptions, runJSON: RunJSON): Pr
   /** Executes one attempt only; diagnosis and another paid run require an explicit new campaign. */
   async function runOne(original: Job): Promise<void> {
     const job = { ...original, dir: original.dir ?? createJobDir(opts.runPath, original) };
+    const classifierEstimateBefore = opts.classifierEstimated?.snapshot().knownEstimatedUsd ?? 0;
     const estimateBefore = opts.estimated?.snapshot().knownEstimatedUsd ?? 0;
     const records: AttemptRecord[] = [];
     let jobKnown = 0;
@@ -101,7 +106,7 @@ export async function runScheduler(opts: SchedulerOptions, runJSON: RunJSON): Pr
       } else {
         // Only absent per-request USD is expected for subscription usage. Corrupt/missing
         // telemetry and unobserved lifecycle work still invalidate the campaign.
-        if (bounded!.snapshot().incomplete || cost.knownCostUsd !== 0 ||
+        if (bounded!.snapshot().incomplete || opts.classifierEstimated?.snapshot().incomplete || cost.knownCostUsd !== 0 ||
             cost.costIncompleteReasons.some(reason => !["missing-or-invalid-turn-cost", "incomplete-attempt-cost"].includes(reason))) {
           stop(estimatedMode ? "estimated-usage-incomplete" : "subscription-usage-incomplete");
         }
@@ -116,9 +121,16 @@ export async function runScheduler(opts: SchedulerOptions, runJSON: RunJSON): Pr
       outcome, reason: result?.reason ?? null, attempts: records,
       costUsdAllAttempts: reasons.size ? null : jobKnown, knownCostUsdAllAttempts: jobKnown,
       ...(reasons.size ? { costIncompleteReasons: [...reasons] } : {}),
-      ...(estimatedMode ? { estimatedCost: { basis: opts.estimated!.snapshot().priceBasis,
-        estimatedUsd: opts.estimated!.snapshot().incomplete ? null : opts.estimated!.snapshot().knownEstimatedUsd - estimateBefore,
-        knownEstimatedUsd: opts.estimated!.snapshot().knownEstimatedUsd - estimateBefore } } : {}),
+      ...(estimatedMode ? (() => {
+        const main = opts.estimated!.snapshot(), classifier = opts.classifierEstimated?.snapshot();
+        const deepseek = { basis: main.priceBasis, estimatedUsd: main.incomplete ? null : main.knownEstimatedUsd - estimateBefore, knownEstimatedUsd: main.knownEstimatedUsd - estimateBefore };
+        if (!classifier) return { estimatedCost: deepseek };
+        const typesafe = { basis: classifier.priceBasis, estimatedUsd: classifier.incomplete ? null : classifier.knownEstimatedUsd - classifierEstimateBefore, knownEstimatedUsd: classifier.knownEstimatedUsd - classifierEstimateBefore };
+        return { estimatedCostComponents: { deepseek, typesafe }, estimatedCost: {
+          basis: `${deepseek.basis}+${typesafe.basis}`,
+          estimatedUsd: deepseek.estimatedUsd === null || typesafe.estimatedUsd === null ? null : deepseek.estimatedUsd + typesafe.estimatedUsd,
+          knownEstimatedUsd: deepseek.knownEstimatedUsd + typesafe.knownEstimatedUsd } };
+      })() : {}),
       durationMs, rollups: result?.rollups,
     };
     writeJobJSON(job.dir, jobJSON);
@@ -129,6 +141,7 @@ export async function runScheduler(opts: SchedulerOptions, runJSON: RunJSON): Pr
   async function worker(): Promise<void> {
     while (!controller.signal.aborted && next < opts.jobs.length) {
       if ((subscriptionMode || estimatedMode) && bounded!.stopReason()) { stop(bounded!.stopReason()!); break; }
+      if (opts.classifierEstimated?.stopReason()) { stop(opts.classifierEstimated.stopReason()!); break; }
       const job = opts.jobs[next++]!;
       try { await runOne(job); }
       catch (error) {

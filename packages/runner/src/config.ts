@@ -1,3 +1,5 @@
+import { isDecisionsModel } from "@aiw/llm";
+import { validateClassifierPolicy } from "@aiw/core";
 /**
  * Resolve run configuration from CLI flags and compute provenance fields.
  * Runner architecture §9; framework-runner §6.6, §7.1.
@@ -120,6 +122,10 @@ export interface EvalFlags {
   reps: number;
   model: string;
   secondaryModel?: string;
+  classifierProvider?: "openrouter-decisions" | "typesafe";
+  classifierLimits?: import("./estimated.ts").EstimatedLimits;
+  classifierModel?: string;
+  classifierThreshold?: number;
   temperature: number;
   budget: number;
   full: boolean;
@@ -229,6 +235,23 @@ export function resolveConfig(
   const frameworks = expandModes(flags.mode);
   if (frameworks.length === 0) throw new Error("No framework modes selected (--mode)");
 
+  const classifierEnabled = frameworks.some(id => parseFrameworkVariant(id).variant.rerank === "classifier");
+  const classifierProvider = flags.classifierProvider ?? "openrouter-decisions";
+  if (classifierEnabled) {
+    if (classifierProvider === "typesafe") {
+      if (provider !== "deepseek" || usageMode !== "estimated") throw new Error("Direct TypeSafe requires explicit DeepSeek estimated mode; mixed subscription/paid use is unsupported");
+      if (flags.classifierModel !== "jev-1.14.0") throw new Error("Direct TypeSafe requires pinned jev-1.14.0");
+      if (!flags.classifierLimits) throw new Error("Direct TypeSafe requires campaign classifier call/token/duration/estimate limits");
+      validateSubscriptionLimits(flags.classifierLimits);
+      if (!Number.isFinite(flags.classifierLimits.estimateLimitUsd) || flags.classifierLimits.estimateLimitUsd <= 0) throw new Error("Invalid classifier estimate limit");
+    } else if (classifierProvider === "openrouter-decisions") {
+      if (provider !== "openrouter" || usageMode !== "monetary") throw new Error("OpenRouter classifier requires OpenRouter monetary accounting; mixed usage is unsupported");
+      if (!isDecisionsModel(flags.classifierModel)) throw new Error("Select an explicit supported classifier model");
+      if (flags.classifierLimits) throw new Error("Classifier estimate limits require direct TypeSafe");
+    } else throw new Error("Unknown classifier provider");
+    validateClassifierPolicy(flags.classifierThreshold!, "noul-v1");
+  } else if (flags.classifierModel !== undefined || flags.classifierThreshold !== undefined || flags.classifierProvider !== undefined || flags.classifierLimits !== undefined) throw new Error("Classifier settings require orchestrate[rerank=classifier]");
+
   const problemIds = selectProblems(flags.problems, availableProblems);
   if (problemIds.length === 0) throw new Error("No problems selected (--problems)");
 
@@ -250,6 +273,7 @@ export function resolveConfig(
     ...(flags.estimatedLimits ? { estimatedLimits: flags.estimatedLimits } : {}),
     ...(flags.subscriptionLimits ? { subscriptionLimits: flags.subscriptionLimits } : {}),
     concurrency,
+    ...(classifierEnabled ? { classifier: { provider: classifierProvider, ...(flags.classifierLimits ? { limits: flags.classifierLimits } : {}), model: flags.classifierModel!, threshold: flags.classifierThreshold!, policy: "noul-v1" as const } } : {}),
     models: {
       main: flags.model,
       secondary: flags.secondaryModel ?? flags.model,

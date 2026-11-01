@@ -167,3 +167,16 @@ test("untracked source is rejected while unrelated credential storage is not sca
   put("packages/server/src/new.ts", "new source");
   assert.throws(() => collectStaticProvenance(root, config, base, () => {}), /untracked runtime source/);
 });
+
+test("classifier model, threshold and policy are observed settings, not request-only provenance", t => {
+  const { config, provenance } = fixture(t);
+  config.frameworks = ["orchestrate[rerank=classifier]"];
+  config.classifier = { provider: "openrouter-decisions", model: "typesafe/jev-1.14", threshold: 0.8, policy: "noul-v1" };
+  const observed = session(provenance);
+  observed.runtimeProvenance!.settings = { kind: "orchestrate", variant: { rerank: "classifier" }, branchContext: "trace", secondaryCap: 4 };
+  assert.throws(() => attestJob(provenance, config, "p", config.frameworks[0], image, observed), /classifier settings differ/);
+  observed.runtimeProvenance!.settings.classifier = { model: config.classifier.model, threshold: 0.7, policy: "noul-v1" };
+  assert.throws(() => attestJob(provenance, config, "p", config.frameworks[0], image, observed), /classifier settings differ/);
+  observed.runtimeProvenance!.settings.classifier.threshold = 0.8;
+  assert.doesNotThrow(() => attestJob(provenance, config, "p", config.frameworks[0], image, observed));
+});

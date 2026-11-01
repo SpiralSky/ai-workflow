@@ -2,7 +2,7 @@
   "version": 1,
   "kind": "post-migration-development",
   "base_commit": "75ab542c626bc7276d2ee9575956899c79b6d75d",
-  "verified_development_head": "a5065f2e56579286755f3fea395a40a852a29a90",
+  "verified_development_head": "09773499da6e55cb2c0b2419b80fe4b7b08faca0",
   "authorization_kind": "development requests only; final approval and merge remain human-only",
   "user_requests": [
     "Add sign in to open ai support for ai-workflow workflow runs",
@@ -20,11 +20,15 @@
     ".specplane/migration-source-inventory.json": "adaa67f9f48596ea3cb6b63ff6a124a1276936e2f70997bde296d108dd967648"
   },
   "draft_plans": [
+    "plans/2026-11-01-all-provider-host-broker/PLAN.md",
+    "plans/2026-11-01-classifier-evaluation/PLAN.md",
+    "plans/2026-11-01-direct-deepseek/PLAN.md",
+    "plans/2026-11-01-direct-typesafe-classifier/PLAN.md",
     "plans/2026-11-01-failfast-campaign/PLAN.md",
     "plans/2026-11-01-openai-plan-signin/PLAN.md",
     "plans/2026-11-01-provenance-readiness/PLAN.md",
-    "plans/2026-11-01-all-provider-host-broker/PLAN.md",
-    "plans/2026-11-01-direct-deepseek/PLAN.md"
+    "plans/2026-11-01-tool-env-secrets/PLAN.md",
+    "plans/2026-11-01-typed-classifier-reranker/PLAN.md"
   ],
   "changes": [
     {
@@ -66,6 +70,48 @@
       "rationale": "OpenAI sign-in, bounded host-brokered workflow usage and security regressions; fail-fast cancellation where shared with runner/core/server."
     },
     {
+      "path": "packages/core/src/framework/build.ts",
+      "before": {
+        "path": "packages/core/src/framework/build.ts",
+        "mode": "100644",
+        "sha256": "c2436a69358054b0d0cc965feb8eef64995e38a4ee81948904486db092a39b6f"
+      },
+      "after": {
+        "path": "packages/core/src/framework/build.ts",
+        "mode": "100644",
+        "sha256": "8b33bb4bfc7c76614748fadea5665468d7c3862010466c4cd87dfaa01987e8f5"
+      },
+      "rationale": "Host-only optional typed classifier with strict probability/usage contract and same selector completion."
+    },
+    {
+      "path": "packages/core/src/framework/types.ts",
+      "before": {
+        "path": "packages/core/src/framework/types.ts",
+        "mode": "100644",
+        "sha256": "d30f50d5f5ddc562a403726ff7e1374f850c13b6f51861c13f920c91a5966eb6"
+      },
+      "after": {
+        "path": "packages/core/src/framework/types.ts",
+        "mode": "100644",
+        "sha256": "d8e42d93a885e56854493fbe01bf2bcea84ec0a3e454c874ba388bc9f430acea"
+      },
+      "rationale": "Host-only optional typed classifier with strict probability/usage contract and same selector completion."
+    },
+    {
+      "path": "packages/core/src/framework/variant.ts",
+      "before": {
+        "path": "packages/core/src/framework/variant.ts",
+        "mode": "100644",
+        "sha256": "bea19ff8a4f066812bac3bb05854da9e7ad306f92c8d5b87e2b32d12b7cdf194"
+      },
+      "after": {
+        "path": "packages/core/src/framework/variant.ts",
+        "mode": "100644",
+        "sha256": "1c5b4e31ea1ad217cfd23e430416be80717b283a7d187fe046ddbbbd0409745f"
+      },
+      "rationale": "Host-only optional typed classifier with strict probability/usage contract and same selector completion."
+    },
+    {
       "path": "packages/core/src/orchestrate/executor.ts",
       "before": {
         "path": "packages/core/src/orchestrate/executor.ts",
@@ -94,6 +140,16 @@
       "rationale": "Stop concurrent work and propagate cancellation after terminal failures, preserving task success requirements."
     },
     {
+      "path": "packages/core/src/orchestrate/selection/classifier.ts",
+      "before": null,
+      "after": {
+        "path": "packages/core/src/orchestrate/selection/classifier.ts",
+        "mode": "100644",
+        "sha256": "90ec44ac345135d623f331ba9da6df60f989f8459b9dbb1e18eaba4c1cf8b29b"
+      },
+      "rationale": "Host-only optional typed classifier with strict probability/usage contract and same selector completion. Phase2: direct TypeSafe filtering with separate estimates and shared bounded campaign counters."
+    },
+    {
       "path": "packages/core/src/orchestrate/selection/index.ts",
       "before": {
         "path": "packages/core/src/orchestrate/selection/index.ts",
@@ -103,9 +159,9 @@
       "after": {
         "path": "packages/core/src/orchestrate/selection/index.ts",
         "mode": "100644",
-        "sha256": "5a18769d32386c945fd64a03201597f23c99b01e36bd72de217404c7d5ca903b"
+        "sha256": "9b7fcaa6f5951d54134eb923bb0f0fa3760f64410a95ac992b356c0387b46c81"
       },
-      "rationale": "Stop concurrent work and propagate cancellation after terminal failures, preserving task success requirements."
+      "rationale": "Stop concurrent work and propagate cancellation after terminal failures, preserving task success requirements. Follow-up: host-only optional typed classifier selection, complete cost/fallback evidence."
     },
     {
       "path": "packages/core/src/orchestrate/selection/rerank.ts",
@@ -117,9 +173,19 @@
       "after": {
         "path": "packages/core/src/orchestrate/selection/rerank.ts",
         "mode": "100644",
-        "sha256": "893a4ae61ad070b2191dcda5a43f8ca040fed8b4b33a5db17b86d65de6b5db0a"
+        "sha256": "1f5b3114f0eb57b2323dc4ab8e9a7e93dde140f20fa076e9fcd84e85ef45721d"
       },
-      "rationale": "Stop concurrent work and propagate cancellation after terminal failures, preserving task success requirements."
+      "rationale": "Stop concurrent work and propagate cancellation after terminal failures, preserving task success requirements. Follow-up: host-only optional typed classifier selection, complete cost/fallback evidence."
+    },
+    {
+      "path": "packages/core/test/classifier.test.ts",
+      "before": null,
+      "after": {
+        "path": "packages/core/test/classifier.test.ts",
+        "mode": "100644",
+        "sha256": "b0c016a909f0f9bcd6c47fe318f000dae9bbb09072a11b28de9561ad68cddb60"
+      },
+      "rationale": "Host-only optional typed classifier with strict probability/usage contract and same selector completion."
     },
     {
       "path": "packages/core/test/selection.test.ts",
@@ -184,6 +250,16 @@
       "rationale": "Regression for host-only orchestration provider credentials and network-none task launch."
     },
     {
+      "path": "packages/llm/src/decisions-client.ts",
+      "before": null,
+      "after": {
+        "path": "packages/llm/src/decisions-client.ts",
+        "mode": "100644",
+        "sha256": "7590cb858b6e8cddb507de52fcc736ad5ada160b36e7c07db8ae16ef4102ce70"
+      },
+      "rationale": "Host-only optional typed classifier with strict probability/usage contract and same selector completion. Phase2: direct TypeSafe filtering with separate estimates and shared bounded campaign counters."
+    },
+    {
       "path": "packages/llm/src/deepseek-client.ts",
       "before": null,
       "after": {
@@ -203,9 +279,9 @@
       "after": {
         "path": "packages/llm/src/index.ts",
         "mode": "100644",
-        "sha256": "a65f637125b34f55d62d64e13896e59b584b0774c9a631e2aa7d8072c40813da"
+        "sha256": "f4cd7c230aedc4d5323f276e723480634cea8f33ec95d7f90f52545c6d667c9b"
       },
-      "rationale": "OpenAI sign-in, bounded host-brokered workflow usage and security regressions; fail-fast cancellation where shared with runner/core/server. Follow-up: bounded direct DeepSeek provider with host-only credentials and explicit estimated costs."
+      "rationale": "OpenAI sign-in, bounded host-brokered workflow usage and security regressions; fail-fast cancellation where shared with runner/core/server. Follow-up: bounded direct DeepSeek provider with host-only credentials and explicit estimated costs. Follow-up: host-only optional typed classifier selection, complete cost/fallback evidence."
     },
     {
       "path": "packages/llm/test/chatgpt-auth.test.ts",
@@ -228,6 +304,16 @@
       "rationale": "OpenAI sign-in, bounded host-brokered workflow usage and security regressions; fail-fast cancellation where shared with runner/core/server."
     },
     {
+      "path": "packages/llm/test/decisions-client.test.ts",
+      "before": null,
+      "after": {
+        "path": "packages/llm/test/decisions-client.test.ts",
+        "mode": "100644",
+        "sha256": "e51fc019b3498cbd02ea1efc3e991e036e581bdfc398e7aae7f325ccb8749369"
+      },
+      "rationale": "Host-only optional typed classifier with strict probability/usage contract and same selector completion."
+    },
+    {
       "path": "packages/llm/test/deepseek.test.ts",
       "before": null,
       "after": {
@@ -236,6 +322,16 @@
         "sha256": "5f687f0ea058c4920187bd61be4089232af386d4a5037fd833e6154eb30bf302"
       },
       "rationale": "Bounded direct DeepSeek provider, reasoning continuation and explicit estimated usage/cost regressions."
+    },
+    {
+      "path": "packages/llm/test/typesafe.test.ts",
+      "before": null,
+      "after": {
+        "path": "packages/llm/test/typesafe.test.ts",
+        "mode": "100644",
+        "sha256": "dc90f49f15bd62c9ac1980bd8e8eae7e3da582f8c04c9733ae01c472187817bc"
+      },
+      "rationale": "Direct TypeSafe typed selection contract, separate estimates, fail-fast and shared campaign counter regressions."
     },
     {
       "path": "packages/runner/package.json",
@@ -250,6 +346,20 @@
         "sha256": "0d4727bb178404e26190903a293e35dc01baa2f1edcd95d65508a0c52dae5284"
       },
       "rationale": "OpenAI sign-in, bounded host-brokered workflow usage and security regressions; fail-fast cancellation where shared with runner/core/server."
+    },
+    {
+      "path": "packages/runner/src/accounting.ts",
+      "before": {
+        "path": "packages/runner/src/accounting.ts",
+        "mode": "100644",
+        "sha256": "b4732368acd4e0cd52d587fb3aca8b09bf797680e4ed2ee8a5ae3db5eb7c8458"
+      },
+      "after": {
+        "path": "packages/runner/src/accounting.ts",
+        "mode": "100644",
+        "sha256": "3ea505e3c3322b036b6109fb573a7d8d8df763979bf154ab15720a5463621661"
+      },
+      "rationale": "Host-only optional typed classifier with strict probability/usage contract and same selector completion."
     },
     {
       "path": "packages/runner/src/auth-cli.ts",
@@ -272,6 +382,16 @@
       "rationale": "Stop concurrent work and propagate cancellation after terminal failures, preserving task success requirements."
     },
     {
+      "path": "packages/runner/src/classifier-estimated.ts",
+      "before": null,
+      "after": {
+        "path": "packages/runner/src/classifier-estimated.ts",
+        "mode": "100644",
+        "sha256": "28249df75951a350291f525fc9da4d4816f2fb69f629d8c19e4f44477279730b"
+      },
+      "rationale": "Direct TypeSafe typed selection contract, separate estimates, fail-fast and shared campaign counter regressions."
+    },
+    {
       "path": "packages/runner/src/cli.ts",
       "before": {
         "path": "packages/runner/src/cli.ts",
@@ -281,9 +401,9 @@
       "after": {
         "path": "packages/runner/src/cli.ts",
         "mode": "100755",
-        "sha256": "ae70236b609f48a7568df70860d6e0fbff2016be696fd19930d7fc3304fac7c6"
+        "sha256": "f2640b56e6bf0a798b79e90681799f8999a946183a3494c505b38fb93eabf1e8"
       },
-      "rationale": "OpenAI sign-in, bounded host-brokered workflow usage and security regressions; fail-fast cancellation where shared with runner/core/server. Follow-up: actual runtime provenance gate and immutable observed-image grading. Follow-up: bounded direct DeepSeek provider with host-only credentials and explicit estimated costs."
+      "rationale": "OpenAI sign-in, bounded host-brokered workflow usage and security regressions; fail-fast cancellation where shared with runner/core/server. Follow-up: actual runtime provenance gate and immutable observed-image grading. Follow-up: bounded direct DeepSeek provider with host-only credentials and explicit estimated costs. Follow-up: host-only optional typed classifier selection, complete cost/fallback evidence. Phase2: direct TypeSafe filtering with separate estimates and shared bounded campaign counters."
     },
     {
       "path": "packages/runner/src/combine.ts",
@@ -295,9 +415,9 @@
       "after": {
         "path": "packages/runner/src/combine.ts",
         "mode": "100644",
-        "sha256": "38077abfd415eccfb9e3af31eb88d1d4f483ddbaba780e1fb5ebeac9cf6236a4"
+        "sha256": "c90244cc851072692676957673365dee22add9f95cd34d348edb15827fe4fa16"
       },
-      "rationale": "OpenAI sign-in, bounded host-brokered workflow usage and security regressions; fail-fast cancellation where shared with runner/core/server. Follow-up: actual runtime provenance gate and immutable observed-image grading. Follow-up: bounded direct DeepSeek provider with host-only credentials and explicit estimated costs."
+      "rationale": "OpenAI sign-in, bounded host-brokered workflow usage and security regressions; fail-fast cancellation where shared with runner/core/server. Follow-up: actual runtime provenance gate and immutable observed-image grading. Follow-up: bounded direct DeepSeek provider with host-only credentials and explicit estimated costs. Follow-up: host-only optional typed classifier selection, complete cost/fallback evidence."
     },
     {
       "path": "packages/runner/src/config.ts",
@@ -309,9 +429,9 @@
       "after": {
         "path": "packages/runner/src/config.ts",
         "mode": "100644",
-        "sha256": "3f2da68bb22219876b5010c70a2b81ca70c39ecc0e23d47281583ca6fea38497"
+        "sha256": "ff9e1f4adbc4bcf1f6c27e7135138be699eabc26936f723c23cde5b5a52c8b13"
       },
-      "rationale": "OpenAI sign-in, bounded host-brokered workflow usage and security regressions; fail-fast cancellation where shared with runner/core/server. Follow-up: actual runtime provenance gate and immutable observed-image grading. Follow-up: bounded direct DeepSeek provider with host-only credentials and explicit estimated costs."
+      "rationale": "OpenAI sign-in, bounded host-brokered workflow usage and security regressions; fail-fast cancellation where shared with runner/core/server. Follow-up: actual runtime provenance gate and immutable observed-image grading. Follow-up: bounded direct DeepSeek provider with host-only credentials and explicit estimated costs. Follow-up: host-only optional typed classifier selection, complete cost/fallback evidence. Phase2: direct TypeSafe filtering with separate estimates and shared bounded campaign counters."
     },
     {
       "path": "packages/runner/src/container.ts",
@@ -347,9 +467,9 @@
       "after": {
         "path": "packages/runner/src/framework-launch.ts",
         "mode": "100644",
-        "sha256": "fbd8bae883636ed8e0a3876e897bff12c84809c65860f8db7ca248759084420a"
+        "sha256": "e744fdd57022709c3129bc25928d564d0df8c62c570147616daa5f3381489f67"
       },
-      "rationale": "OpenAI sign-in, bounded host-brokered workflow usage and security regressions; fail-fast cancellation where shared with runner/core/server. Security follow-up: all orchestration credentials/inference stay host-side, typed sanitized provider errors."
+      "rationale": "OpenAI sign-in, bounded host-brokered workflow usage and security regressions; fail-fast cancellation where shared with runner/core/server. Security follow-up: all orchestration credentials/inference stay host-side, typed sanitized provider errors. Follow-up: host-only optional typed classifier selection, complete cost/fallback evidence. Phase2: direct TypeSafe filtering with separate estimates and shared bounded campaign counters."
     },
     {
       "path": "packages/runner/src/grade.ts",
@@ -375,9 +495,9 @@
       "after": {
         "path": "packages/runner/src/job.ts",
         "mode": "100644",
-        "sha256": "ced5fbc88e5fdf53b7796723ad283f0faa584da13ebbe0f5d90c46087e1de4d1"
+        "sha256": "27a98a88e534ff8d23b3628e2aeadfd9d53a8b292c639f6ca1fa2f5ccc9c4c0c"
       },
-      "rationale": "OpenAI sign-in, bounded host-brokered workflow usage and security regressions; fail-fast cancellation where shared with runner/core/server. Follow-up: actual runtime provenance gate and immutable observed-image grading. Security follow-up: reject reverse inference until provenance is persisted; revoke on cleanup. Security follow-up: all orchestration credentials/inference stay host-side, typed sanitized provider errors. Follow-up: bounded direct DeepSeek provider with host-only credentials and explicit estimated costs."
+      "rationale": "OpenAI sign-in, bounded host-brokered workflow usage and security regressions; fail-fast cancellation where shared with runner/core/server. Follow-up: actual runtime provenance gate and immutable observed-image grading. Security follow-up: reject reverse inference until provenance is persisted; revoke on cleanup. Security follow-up: all orchestration credentials/inference stay host-side, typed sanitized provider errors. Follow-up: bounded direct DeepSeek provider with host-only credentials and explicit estimated costs. Follow-up: host-only optional typed classifier selection, complete cost/fallback evidence. Phase2: direct TypeSafe filtering with separate estimates and shared bounded campaign counters."
     },
     {
       "path": "packages/runner/src/llm-broker.ts",
@@ -385,9 +505,9 @@
       "after": {
         "path": "packages/runner/src/llm-broker.ts",
         "mode": "100644",
-        "sha256": "e41e7c29f17695d715f70629241aeef575227b4315b2cad943510573d575d07c"
+        "sha256": "4f674c83714d31428483825f3785344616ce361bb7ec3fa2b45d7a6eb037cbe9"
       },
-      "rationale": "OpenAI sign-in, bounded host-brokered workflow usage and security regressions; fail-fast cancellation where shared with runner/core/server. Security follow-up: reject reverse inference until provenance is persisted; revoke on cleanup. Security follow-up: all orchestration credentials/inference stay host-side, typed sanitized provider errors. Follow-up: bounded direct DeepSeek provider with host-only credentials and explicit estimated costs."
+      "rationale": "OpenAI sign-in, bounded host-brokered workflow usage and security regressions; fail-fast cancellation where shared with runner/core/server. Security follow-up: reject reverse inference until provenance is persisted; revoke on cleanup. Security follow-up: all orchestration credentials/inference stay host-side, typed sanitized provider errors. Follow-up: bounded direct DeepSeek provider with host-only credentials and explicit estimated costs. Follow-up: host-only optional typed classifier selection, complete cost/fallback evidence. Phase2: direct TypeSafe filtering with separate estimates and shared bounded campaign counters."
     },
     {
       "path": "packages/runner/src/loop.ts",
@@ -413,9 +533,9 @@
       "after": {
         "path": "packages/runner/src/mcp.ts",
         "mode": "100644",
-        "sha256": "1ca753eada1b282c98cc1a5296305c7f5d68cbcf2fcb1485b7cb7fc8e3bcbf0b"
+        "sha256": "51eeb92efde585dbfc9629c0e4329044152a484009e3cd80d2bd2742f3617f70"
       },
-      "rationale": "OpenAI sign-in, bounded host-brokered workflow usage and security regressions; fail-fast cancellation where shared with runner/core/server. Follow-up: actual runtime provenance gate and immutable observed-image grading. Security follow-up: reject reverse inference until provenance is persisted; revoke on cleanup."
+      "rationale": "OpenAI sign-in, bounded host-brokered workflow usage and security regressions; fail-fast cancellation where shared with runner/core/server. Follow-up: actual runtime provenance gate and immutable observed-image grading. Security follow-up: reject reverse inference until provenance is persisted; revoke on cleanup. Follow-up: host-only optional typed classifier selection, complete cost/fallback evidence."
     },
     {
       "path": "packages/runner/src/plan.ts",
@@ -437,9 +557,9 @@
       "after": {
         "path": "packages/runner/src/provenance.ts",
         "mode": "100644",
-        "sha256": "e342bad249d8ba122e822e0f22581fe295e8feddd33668a4e53f9a30f3dfea7e"
+        "sha256": "6093584f3a65a5e4e336e2b2f4b33906c21b97fab92a67ed4a4e5bb2c5619c4c"
       },
-      "rationale": "Truthful pre-model provenance gate and provider observations, without fabricated model versions or task completion."
+      "rationale": "Truthful pre-model provenance gate and provider observations, without fabricated model versions or task completion. Follow-up: host-only optional typed classifier selection, complete cost/fallback evidence."
     },
     {
       "path": "packages/runner/src/rundir.ts",
@@ -465,9 +585,9 @@
       "after": {
         "path": "packages/runner/src/scheduler.ts",
         "mode": "100644",
-        "sha256": "b830a231f09e00c01a325afe2b56259dffa7c70becfd7be3544895f5b1213a32"
+        "sha256": "e1581cb0e2f0a9b4802e3e9bf68a137d48dac88caed9345f0a37bd58a9ace3d9"
       },
-      "rationale": "OpenAI sign-in, bounded host-brokered workflow usage and security regressions; fail-fast cancellation where shared with runner/core/server. Follow-up: actual runtime provenance gate and immutable observed-image grading. Follow-up: bounded direct DeepSeek provider with host-only credentials and explicit estimated costs."
+      "rationale": "OpenAI sign-in, bounded host-brokered workflow usage and security regressions; fail-fast cancellation where shared with runner/core/server. Follow-up: actual runtime provenance gate and immutable observed-image grading. Follow-up: bounded direct DeepSeek provider with host-only credentials and explicit estimated costs. Phase2: direct TypeSafe filtering with separate estimates and shared bounded campaign counters."
     },
     {
       "path": "packages/runner/src/subscription.ts",
@@ -489,9 +609,9 @@
       "after": {
         "path": "packages/runner/src/types.ts",
         "mode": "100644",
-        "sha256": "a3b2a0ffcc2fef584175ead4851f837c576777c5350b086be2028bbc3f03b068"
+        "sha256": "c774476795ab75547ca86f41c70f440a8c67b209a8661a1a9b8ba7c35f1630ea"
       },
-      "rationale": "OpenAI sign-in, bounded host-brokered workflow usage and security regressions; fail-fast cancellation where shared with runner/core/server. Follow-up: actual runtime provenance gate and immutable observed-image grading. Follow-up: bounded direct DeepSeek provider with host-only credentials and explicit estimated costs."
+      "rationale": "OpenAI sign-in, bounded host-brokered workflow usage and security regressions; fail-fast cancellation where shared with runner/core/server. Follow-up: actual runtime provenance gate and immutable observed-image grading. Follow-up: bounded direct DeepSeek provider with host-only credentials and explicit estimated costs. Follow-up: host-only optional typed classifier selection, complete cost/fallback evidence. Phase2: direct TypeSafe filtering with separate estimates and shared bounded campaign counters."
     },
     {
       "path": "packages/runner/test/accounting.test.ts",
@@ -538,6 +658,16 @@
       "rationale": "OpenAI sign-in, bounded host-brokered workflow usage and security regressions; fail-fast cancellation where shared with runner/core/server."
     },
     {
+      "path": "packages/runner/test/classifier.test.ts",
+      "before": null,
+      "after": {
+        "path": "packages/runner/test/classifier.test.ts",
+        "mode": "100644",
+        "sha256": "339f6e8e981dd9ea66c719fe5f151a1c8ad4d043c063a1888625006e1bd01ab9"
+      },
+      "rationale": "Host-only optional typed classifier with strict probability/usage contract and same selector completion."
+    },
+    {
       "path": "packages/runner/test/combine.test.ts",
       "before": {
         "path": "packages/runner/test/combine.test.ts",
@@ -547,9 +677,9 @@
       "after": {
         "path": "packages/runner/test/combine.test.ts",
         "mode": "100644",
-        "sha256": "008210862edd628aeecb6035b13b33347b04d211356f029afe3a972dddf3f069"
+        "sha256": "0a253472da7e94f77f56b98f80187baf63738e5bd6c96699acb1a110a6e9528e"
       },
-      "rationale": "OpenAI sign-in, bounded host-brokered workflow usage and security regressions; fail-fast cancellation where shared with runner/core/server. Follow-up: actual runtime provenance gate and immutable observed-image grading. Follow-up: bounded direct DeepSeek provider with host-only credentials and explicit estimated costs."
+      "rationale": "OpenAI sign-in, bounded host-brokered workflow usage and security regressions; fail-fast cancellation where shared with runner/core/server. Follow-up: actual runtime provenance gate and immutable observed-image grading. Follow-up: bounded direct DeepSeek provider with host-only credentials and explicit estimated costs. Phase2: direct TypeSafe filtering with separate estimates and shared bounded campaign counters."
     },
     {
       "path": "packages/runner/test/config.test.ts",
@@ -645,9 +775,9 @@
       "after": {
         "path": "packages/runner/test/provenance.test.ts",
         "mode": "100644",
-        "sha256": "d8a92604e17eff4155c8ef026e9e4c39d47c0797f9c95fb50107e9ec045048c2"
+        "sha256": "9bec96f2b7e346ac2f6ad333be24a523afd022f5fcd158dc9007a705a5b3cca6"
       },
-      "rationale": "Truthful pre-model provenance gate and provider observations, without fabricated model versions or task completion."
+      "rationale": "Truthful pre-model provenance gate and provider observations, without fabricated model versions or task completion. Follow-up: host-only optional typed classifier selection, complete cost/fallback evidence."
     },
     {
       "path": "packages/runner/test/subscription.test.ts",
@@ -658,6 +788,36 @@
         "sha256": "1d6174a8d4374b2a0ec010035c576b8269068c84a8c5bc561c69289ef17ae183"
       },
       "rationale": "OpenAI sign-in, bounded host-brokered workflow usage and security regressions; fail-fast cancellation where shared with runner/core/server. Follow-up: actual runtime provenance gate and immutable observed-image grading. Security follow-up: all orchestration credentials/inference stay host-side, typed sanitized provider errors."
+    },
+    {
+      "path": "packages/runner/test/typesafe-failfast.test.ts",
+      "before": null,
+      "after": {
+        "path": "packages/runner/test/typesafe-failfast.test.ts",
+        "mode": "100644",
+        "sha256": "a7489c20c5a87729d766a3920fa1174f08fee6be4aa00e5e930f62da10438b29"
+      },
+      "rationale": "Direct TypeSafe typed selection contract, separate estimates, fail-fast and shared campaign counter regressions."
+    },
+    {
+      "path": "packages/runner/test/typesafe-hostbroker.test.ts",
+      "before": null,
+      "after": {
+        "path": "packages/runner/test/typesafe-hostbroker.test.ts",
+        "mode": "100644",
+        "sha256": "1fcf1861435c1bcceb1f5e66355e3a18bdc7343a6003e628bee8cec1eba9b596"
+      },
+      "rationale": "Direct TypeSafe typed selection contract, separate estimates, fail-fast and shared campaign counter regressions."
+    },
+    {
+      "path": "packages/runner/test/typesafe.test.ts",
+      "before": null,
+      "after": {
+        "path": "packages/runner/test/typesafe.test.ts",
+        "mode": "100644",
+        "sha256": "040c3412236e008e324291d70f444d060f1560cdb2e438bb05405444e1b1d2e6"
+      },
+      "rationale": "Direct TypeSafe typed selection contract, separate estimates, fail-fast and shared campaign counter regressions."
     },
     {
       "path": "packages/server/build.mjs",
@@ -683,9 +843,9 @@
       "after": {
         "path": "packages/server/dist/aiw-server.mjs",
         "mode": "100755",
-        "sha256": "e36b819e096df4762e20ca6e18b8ff67977aa229cb30954fe0b432465ae8452c"
+        "sha256": "da6ee243d143d5f182ee8f00ed471e0ea8f79648c9aafcc358016f9a7ae5bd08"
       },
-      "rationale": "Rebuild/verify coherent tracked runtime and honor explicit engine selection without silent fallback. Follow-up: verified packaged native/tierL resources and lifecycle integration. Follow-up: awaited graceful sidecar descendant shutdown. Follow-up: actual runtime provenance gate and immutable observed-image grading. Security follow-up: all orchestration credentials/inference stay host-side, typed sanitized provider errors. Follow-up: bounded direct DeepSeek provider with host-only credentials and explicit estimated costs."
+      "rationale": "Rebuild/verify coherent tracked runtime and honor explicit engine selection without silent fallback. Follow-up: verified packaged native/tierL resources and lifecycle integration. Follow-up: awaited graceful sidecar descendant shutdown. Follow-up: actual runtime provenance gate and immutable observed-image grading. Security follow-up: all orchestration credentials/inference stay host-side, typed sanitized provider errors. Follow-up: bounded direct DeepSeek provider with host-only credentials and explicit estimated costs. Phase2: direct TypeSafe filtering with separate estimates and shared bounded campaign counters."
     },
     {
       "path": "packages/server/dist/fixtures/external/ciStatus.json",
@@ -971,9 +1131,19 @@
       "after": {
         "path": "packages/server/src/cli.ts",
         "mode": "100755",
-        "sha256": "a01d836b4eea4a7ba50ab7c0761383dd9a01117835aa3576bab1bc92b0beafbd"
+        "sha256": "940943d825a7be6e591b047bfc7f6b4d6b56e3f8a79a9d7e967de0fd36e76011"
       },
-      "rationale": "OpenAI sign-in, bounded host-brokered workflow usage and security regressions; fail-fast cancellation where shared with runner/core/server. Follow-up: verified packaged native/tierL resources and lifecycle integration."
+      "rationale": "OpenAI sign-in, bounded host-brokered workflow usage and security regressions; fail-fast cancellation where shared with runner/core/server. Follow-up: verified packaged native/tierL resources and lifecycle integration. Follow-up: host-only optional typed classifier selection, complete cost/fallback evidence."
+    },
+    {
+      "path": "packages/server/src/host-classifier.ts",
+      "before": null,
+      "after": {
+        "path": "packages/server/src/host-classifier.ts",
+        "mode": "100644",
+        "sha256": "2571aebef710a1d37063e080c603c1b8a38f34540d0074ded1df5bf16d89c710"
+      },
+      "rationale": "Host-only optional typed classifier with strict probability/usage contract and same selector completion. Phase2: direct TypeSafe filtering with separate estimates and shared bounded campaign counters."
     },
     {
       "path": "packages/server/src/host-client.ts",
@@ -1009,9 +1179,9 @@
       "after": {
         "path": "packages/server/src/server.ts",
         "mode": "100644",
-        "sha256": "8016c194b5359742da87b3ad9a59fb886b0b83f5cea3e37e4f44f53d9c49639f"
+        "sha256": "b16497f1ea2c6cbf0c966f5256fc98d54e7d658b6874251eae0df91f4742771d"
       },
-      "rationale": "OpenAI sign-in, bounded host-brokered workflow usage and security regressions; fail-fast cancellation where shared with runner/core/server. Follow-up: verified packaged native/tierL resources and lifecycle integration. Follow-up: actual runtime provenance gate and immutable observed-image grading."
+      "rationale": "OpenAI sign-in, bounded host-brokered workflow usage and security regressions; fail-fast cancellation where shared with runner/core/server. Follow-up: verified packaged native/tierL resources and lifecycle integration. Follow-up: actual runtime provenance gate and immutable observed-image grading. Follow-up: host-only optional typed classifier selection, complete cost/fallback evidence."
     },
     {
       "path": "packages/server/test/bundle.test.ts",
@@ -1067,9 +1237,9 @@
       "after": {
         "path": "packages/telemetry/src/reporter.ts",
         "mode": "100644",
-        "sha256": "18f48cdc911940b33d8f71090736e6f6aca33ee390e14fd009fb1aeb840ef0c6"
+        "sha256": "b00775913581d684f5b2dc65e415eef914b8d898842f87fc5d47fefcb7d6029e"
       },
-      "rationale": "Truthful pre-model provenance gate and provider observations, without fabricated model versions or task completion. Follow-up: bounded direct DeepSeek provider with host-only credentials and explicit estimated costs."
+      "rationale": "Truthful pre-model provenance gate and provider observations, without fabricated model versions or task completion. Follow-up: bounded direct DeepSeek provider with host-only credentials and explicit estimated costs. Follow-up: host-only optional typed classifier selection, complete cost/fallback evidence. Phase2: direct TypeSafe filtering with separate estimates and shared bounded campaign counters."
     },
     {
       "path": "packages/telemetry/src/schema.ts",
@@ -1081,9 +1251,23 @@
       "after": {
         "path": "packages/telemetry/src/schema.ts",
         "mode": "100644",
-        "sha256": "a7a2b022055954f9903206671d0387e8df8657fdf219b24ffde9834d4bb628f5"
+        "sha256": "62c1d1511d716e7fbd4ed651ada03bbf1b9eff9b1dc9d2f22201e82441c7e66a"
       },
-      "rationale": "Truthful pre-model provenance gate and provider observations, without fabricated model versions or task completion. Follow-up: bounded direct DeepSeek provider with host-only credentials and explicit estimated costs."
+      "rationale": "Truthful pre-model provenance gate and provider observations, without fabricated model versions or task completion. Follow-up: bounded direct DeepSeek provider with host-only credentials and explicit estimated costs. Follow-up: host-only optional typed classifier selection, complete cost/fallback evidence. Phase2: direct TypeSafe filtering with separate estimates and shared bounded campaign counters."
+    },
+    {
+      "path": "packages/telemetry/src/tree.ts",
+      "before": {
+        "path": "packages/telemetry/src/tree.ts",
+        "mode": "100644",
+        "sha256": "5401cb19e9329ad1d2858c92a7af58afedb18caef7e874d4c886566ed747a390"
+      },
+      "after": {
+        "path": "packages/telemetry/src/tree.ts",
+        "mode": "100644",
+        "sha256": "1654f389d68794c679b3d72fd3c185e1ed0fe74796d769e5e82e8f18fca0a40e"
+      },
+      "rationale": "Host-only optional typed classifier with strict probability/usage contract and same selector completion."
     },
     {
       "path": "packages/telemetry/src/wrap.ts",
@@ -1142,6 +1326,34 @@
       "rationale": "Fix independently reviewed graceful CLI/sidecar child lifecycle gap; no auth behavior change."
     },
     {
+      "path": "packages/tools/src/env.ts",
+      "before": {
+        "path": "packages/tools/src/env.ts",
+        "mode": "100644",
+        "sha256": "61483e3b28644263cccaa7896385a1d8f31ec1fb3ef7b1067dc666e5a4f388e5"
+      },
+      "after": {
+        "path": "packages/tools/src/env.ts",
+        "mode": "100644",
+        "sha256": "bd5fc5dbfbc4acbc23d70ddec59d0f287f24765c41d9e99dff0323d8f9c23fe7"
+      },
+      "rationale": "Local tool subprocess environment secret filtering and synthetic-only boundary/descendant regressions."
+    },
+    {
+      "path": "packages/tools/src/search.ts",
+      "before": {
+        "path": "packages/tools/src/search.ts",
+        "mode": "100644",
+        "sha256": "01d937ce5408c25eecdd86048db9bd90b7d6903a604e9fcf5302420239cdbced"
+      },
+      "after": {
+        "path": "packages/tools/src/search.ts",
+        "mode": "100644",
+        "sha256": "00ab9e235d7d9ea542e2aab67ff1cf97c4225ca3aeb69344c18334b5066dc164"
+      },
+      "rationale": "Local tool subprocess environment secret filtering and synthetic-only boundary/descendant regressions."
+    },
+    {
       "path": "packages/tools/src/sidecar.ts",
       "before": {
         "path": "packages/tools/src/sidecar.ts",
@@ -1154,6 +1366,16 @@
         "sha256": "dcca9457442667f3a607010152bdc4d61e71920681acc482a7b9822668b7b9af"
       },
       "rationale": "Fix independently reviewed graceful CLI/sidecar child lifecycle gap; no auth behavior change."
+    },
+    {
+      "path": "packages/tools/test/env-security.test.ts",
+      "before": null,
+      "after": {
+        "path": "packages/tools/test/env-security.test.ts",
+        "mode": "100644",
+        "sha256": "496074b5376d350e14cc0888dd9da1aa5dafe18af2c6462b4d5bef9879610a7a"
+      },
+      "rationale": "Local tool subprocess environment secret filtering and synthetic-only boundary/descendant regressions."
     }
   ],
   "packaging_followup": {
@@ -2443,5 +2665,641 @@
         }
       }
     ]
+  },
+  "classifier_phase1_followup": {
+    "base_commit": "9ed722f2b333a881ae9f3486765dc66ff6042631",
+    "source_commit": "3119aaa8d06242735d4a6cc9540bef4dd841a0e0",
+    "artifactStatus": "pending final phase2 composition/build; not a freshness claim",
+    "changes": [
+      {
+        "path": "packages/core/src/framework/build.ts",
+        "before": {
+          "path": "packages/core/src/framework/build.ts",
+          "mode": "100644",
+          "sha256": "c2436a69358054b0d0cc965feb8eef64995e38a4ee81948904486db092a39b6f"
+        },
+        "after": {
+          "path": "packages/core/src/framework/build.ts",
+          "mode": "100644",
+          "sha256": "8b33bb4bfc7c76614748fadea5665468d7c3862010466c4cd87dfaa01987e8f5"
+        }
+      },
+      {
+        "path": "packages/core/src/framework/types.ts",
+        "before": {
+          "path": "packages/core/src/framework/types.ts",
+          "mode": "100644",
+          "sha256": "d30f50d5f5ddc562a403726ff7e1374f850c13b6f51861c13f920c91a5966eb6"
+        },
+        "after": {
+          "path": "packages/core/src/framework/types.ts",
+          "mode": "100644",
+          "sha256": "d8e42d93a885e56854493fbe01bf2bcea84ec0a3e454c874ba388bc9f430acea"
+        }
+      },
+      {
+        "path": "packages/core/src/framework/variant.ts",
+        "before": {
+          "path": "packages/core/src/framework/variant.ts",
+          "mode": "100644",
+          "sha256": "bea19ff8a4f066812bac3bb05854da9e7ad306f92c8d5b87e2b32d12b7cdf194"
+        },
+        "after": {
+          "path": "packages/core/src/framework/variant.ts",
+          "mode": "100644",
+          "sha256": "1c5b4e31ea1ad217cfd23e430416be80717b283a7d187fe046ddbbbd0409745f"
+        }
+      },
+      {
+        "path": "packages/core/src/orchestrate/selection/classifier.ts",
+        "before": null,
+        "after": {
+          "path": "packages/core/src/orchestrate/selection/classifier.ts",
+          "mode": "100644",
+          "sha256": "be0fd17e9c29cb9ce59fdcd19b2d86d0bb05f14ce889fb2a5b80130982ae19ae"
+        }
+      },
+      {
+        "path": "packages/core/src/orchestrate/selection/index.ts",
+        "before": {
+          "path": "packages/core/src/orchestrate/selection/index.ts",
+          "mode": "100644",
+          "sha256": "5a18769d32386c945fd64a03201597f23c99b01e36bd72de217404c7d5ca903b"
+        },
+        "after": {
+          "path": "packages/core/src/orchestrate/selection/index.ts",
+          "mode": "100644",
+          "sha256": "9b7fcaa6f5951d54134eb923bb0f0fa3760f64410a95ac992b356c0387b46c81"
+        }
+      },
+      {
+        "path": "packages/core/src/orchestrate/selection/rerank.ts",
+        "before": {
+          "path": "packages/core/src/orchestrate/selection/rerank.ts",
+          "mode": "100644",
+          "sha256": "893a4ae61ad070b2191dcda5a43f8ca040fed8b4b33a5db17b86d65de6b5db0a"
+        },
+        "after": {
+          "path": "packages/core/src/orchestrate/selection/rerank.ts",
+          "mode": "100644",
+          "sha256": "1f5b3114f0eb57b2323dc4ab8e9a7e93dde140f20fa076e9fcd84e85ef45721d"
+        }
+      },
+      {
+        "path": "packages/core/test/classifier.test.ts",
+        "before": null,
+        "after": {
+          "path": "packages/core/test/classifier.test.ts",
+          "mode": "100644",
+          "sha256": "b0c016a909f0f9bcd6c47fe318f000dae9bbb09072a11b28de9561ad68cddb60"
+        }
+      },
+      {
+        "path": "packages/llm/src/decisions-client.ts",
+        "before": null,
+        "after": {
+          "path": "packages/llm/src/decisions-client.ts",
+          "mode": "100644",
+          "sha256": "e7a1c671ced1b0acbe47d2e300aff2399dde2cb2c308bd5228153200f09350cb"
+        }
+      },
+      {
+        "path": "packages/llm/src/index.ts",
+        "before": {
+          "path": "packages/llm/src/index.ts",
+          "mode": "100644",
+          "sha256": "a65f637125b34f55d62d64e13896e59b584b0774c9a631e2aa7d8072c40813da"
+        },
+        "after": {
+          "path": "packages/llm/src/index.ts",
+          "mode": "100644",
+          "sha256": "f4cd7c230aedc4d5323f276e723480634cea8f33ec95d7f90f52545c6d667c9b"
+        }
+      },
+      {
+        "path": "packages/llm/test/decisions-client.test.ts",
+        "before": null,
+        "after": {
+          "path": "packages/llm/test/decisions-client.test.ts",
+          "mode": "100644",
+          "sha256": "e51fc019b3498cbd02ea1efc3e991e036e581bdfc398e7aae7f325ccb8749369"
+        }
+      },
+      {
+        "path": "packages/runner/src/accounting.ts",
+        "before": {
+          "path": "packages/runner/src/accounting.ts",
+          "mode": "100644",
+          "sha256": "b4732368acd4e0cd52d587fb3aca8b09bf797680e4ed2ee8a5ae3db5eb7c8458"
+        },
+        "after": {
+          "path": "packages/runner/src/accounting.ts",
+          "mode": "100644",
+          "sha256": "3ea505e3c3322b036b6109fb573a7d8d8df763979bf154ab15720a5463621661"
+        }
+      },
+      {
+        "path": "packages/runner/src/cli.ts",
+        "before": {
+          "path": "packages/runner/src/cli.ts",
+          "mode": "100755",
+          "sha256": "ae70236b609f48a7568df70860d6e0fbff2016be696fd19930d7fc3304fac7c6"
+        },
+        "after": {
+          "path": "packages/runner/src/cli.ts",
+          "mode": "100755",
+          "sha256": "3cc99fb9bf994422797b50a4e19d942c23f498437c6c732378006074723df21f"
+        }
+      },
+      {
+        "path": "packages/runner/src/combine.ts",
+        "before": {
+          "path": "packages/runner/src/combine.ts",
+          "mode": "100644",
+          "sha256": "38077abfd415eccfb9e3af31eb88d1d4f483ddbaba780e1fb5ebeac9cf6236a4"
+        },
+        "after": {
+          "path": "packages/runner/src/combine.ts",
+          "mode": "100644",
+          "sha256": "c90244cc851072692676957673365dee22add9f95cd34d348edb15827fe4fa16"
+        }
+      },
+      {
+        "path": "packages/runner/src/config.ts",
+        "before": {
+          "path": "packages/runner/src/config.ts",
+          "mode": "100644",
+          "sha256": "3f2da68bb22219876b5010c70a2b81ca70c39ecc0e23d47281583ca6fea38497"
+        },
+        "after": {
+          "path": "packages/runner/src/config.ts",
+          "mode": "100644",
+          "sha256": "52bc19ab09c6acbf6ed901e3ce96d596952b0fad44ab09e909dfe7caf103b40e"
+        }
+      },
+      {
+        "path": "packages/runner/src/framework-launch.ts",
+        "before": {
+          "path": "packages/runner/src/framework-launch.ts",
+          "mode": "100644",
+          "sha256": "fbd8bae883636ed8e0a3876e897bff12c84809c65860f8db7ca248759084420a"
+        },
+        "after": {
+          "path": "packages/runner/src/framework-launch.ts",
+          "mode": "100644",
+          "sha256": "b76be4946c4e0cac57eb55f7946b52d00b3143059841c1e01f5b91aa7acd436f"
+        }
+      },
+      {
+        "path": "packages/runner/src/job.ts",
+        "before": {
+          "path": "packages/runner/src/job.ts",
+          "mode": "100644",
+          "sha256": "ced5fbc88e5fdf53b7796723ad283f0faa584da13ebbe0f5d90c46087e1de4d1"
+        },
+        "after": {
+          "path": "packages/runner/src/job.ts",
+          "mode": "100644",
+          "sha256": "9a910061fa0eebae742dc6a00be0b07febf90f227fe9555c6456536039daf595"
+        }
+      },
+      {
+        "path": "packages/runner/src/llm-broker.ts",
+        "before": {
+          "path": "packages/runner/src/llm-broker.ts",
+          "mode": "100644",
+          "sha256": "e41e7c29f17695d715f70629241aeef575227b4315b2cad943510573d575d07c"
+        },
+        "after": {
+          "path": "packages/runner/src/llm-broker.ts",
+          "mode": "100644",
+          "sha256": "6d00fe5ae8a9c56200cc0a8f1160a939312b1626f9495e7f9596084ec1bb6b0a"
+        }
+      },
+      {
+        "path": "packages/runner/src/mcp.ts",
+        "before": {
+          "path": "packages/runner/src/mcp.ts",
+          "mode": "100644",
+          "sha256": "1ca753eada1b282c98cc1a5296305c7f5d68cbcf2fcb1485b7cb7fc8e3bcbf0b"
+        },
+        "after": {
+          "path": "packages/runner/src/mcp.ts",
+          "mode": "100644",
+          "sha256": "51eeb92efde585dbfc9629c0e4329044152a484009e3cd80d2bd2742f3617f70"
+        }
+      },
+      {
+        "path": "packages/runner/src/provenance.ts",
+        "before": {
+          "path": "packages/runner/src/provenance.ts",
+          "mode": "100644",
+          "sha256": "e342bad249d8ba122e822e0f22581fe295e8feddd33668a4e53f9a30f3dfea7e"
+        },
+        "after": {
+          "path": "packages/runner/src/provenance.ts",
+          "mode": "100644",
+          "sha256": "6093584f3a65a5e4e336e2b2f4b33906c21b97fab92a67ed4a4e5bb2c5619c4c"
+        }
+      },
+      {
+        "path": "packages/runner/src/types.ts",
+        "before": {
+          "path": "packages/runner/src/types.ts",
+          "mode": "100644",
+          "sha256": "a3b2a0ffcc2fef584175ead4851f837c576777c5350b086be2028bbc3f03b068"
+        },
+        "after": {
+          "path": "packages/runner/src/types.ts",
+          "mode": "100644",
+          "sha256": "94712593cc69b78ccdf0fc86d07b58883e9cfecb0b210245747383d8a020ce12"
+        }
+      },
+      {
+        "path": "packages/runner/test/classifier.test.ts",
+        "before": null,
+        "after": {
+          "path": "packages/runner/test/classifier.test.ts",
+          "mode": "100644",
+          "sha256": "339f6e8e981dd9ea66c719fe5f151a1c8ad4d043c063a1888625006e1bd01ab9"
+        }
+      },
+      {
+        "path": "packages/runner/test/provenance.test.ts",
+        "before": {
+          "path": "packages/runner/test/provenance.test.ts",
+          "mode": "100644",
+          "sha256": "d8a92604e17eff4155c8ef026e9e4c39d47c0797f9c95fb50107e9ec045048c2"
+        },
+        "after": {
+          "path": "packages/runner/test/provenance.test.ts",
+          "mode": "100644",
+          "sha256": "9bec96f2b7e346ac2f6ad333be24a523afd022f5fcd158dc9007a705a5b3cca6"
+        }
+      },
+      {
+        "path": "packages/server/src/cli.ts",
+        "before": {
+          "path": "packages/server/src/cli.ts",
+          "mode": "100755",
+          "sha256": "a01d836b4eea4a7ba50ab7c0761383dd9a01117835aa3576bab1bc92b0beafbd"
+        },
+        "after": {
+          "path": "packages/server/src/cli.ts",
+          "mode": "100755",
+          "sha256": "940943d825a7be6e591b047bfc7f6b4d6b56e3f8a79a9d7e967de0fd36e76011"
+        }
+      },
+      {
+        "path": "packages/server/src/host-classifier.ts",
+        "before": null,
+        "after": {
+          "path": "packages/server/src/host-classifier.ts",
+          "mode": "100644",
+          "sha256": "d1b5d0f87feef4114ea7f9690e9f1481d235c767dbeb529501ce103c5f7a7ab5"
+        }
+      },
+      {
+        "path": "packages/server/src/server.ts",
+        "before": {
+          "path": "packages/server/src/server.ts",
+          "mode": "100644",
+          "sha256": "8016c194b5359742da87b3ad9a59fb886b0b83f5cea3e37e4f44f53d9c49639f"
+        },
+        "after": {
+          "path": "packages/server/src/server.ts",
+          "mode": "100644",
+          "sha256": "b16497f1ea2c6cbf0c966f5256fc98d54e7d658b6874251eae0df91f4742771d"
+        }
+      },
+      {
+        "path": "packages/telemetry/src/reporter.ts",
+        "before": {
+          "path": "packages/telemetry/src/reporter.ts",
+          "mode": "100644",
+          "sha256": "18f48cdc911940b33d8f71090736e6f6aca33ee390e14fd009fb1aeb840ef0c6"
+        },
+        "after": {
+          "path": "packages/telemetry/src/reporter.ts",
+          "mode": "100644",
+          "sha256": "8a9a29d4849cad57133a80f847eae68959b0ce434c905a44ed015c1dd49c3132"
+        }
+      },
+      {
+        "path": "packages/telemetry/src/schema.ts",
+        "before": {
+          "path": "packages/telemetry/src/schema.ts",
+          "mode": "100644",
+          "sha256": "a7a2b022055954f9903206671d0387e8df8657fdf219b24ffde9834d4bb628f5"
+        },
+        "after": {
+          "path": "packages/telemetry/src/schema.ts",
+          "mode": "100644",
+          "sha256": "c14d07d02e65e75c20f91df7d15b28cd9d79067f9604b1c9289743848643fef8"
+        }
+      },
+      {
+        "path": "packages/telemetry/src/tree.ts",
+        "before": {
+          "path": "packages/telemetry/src/tree.ts",
+          "mode": "100644",
+          "sha256": "5401cb19e9329ad1d2858c92a7af58afedb18caef7e874d4c886566ed747a390"
+        },
+        "after": {
+          "path": "packages/telemetry/src/tree.ts",
+          "mode": "100644",
+          "sha256": "1654f389d68794c679b3d72fd3c185e1ed0fe74796d769e5e82e8f18fca0a40e"
+        }
+      }
+    ]
+  },
+  "classifier_phase2_followup": {
+    "base_commit": "aa87ea777bcf89b9786d4e56f99f6fe9b3bd6603",
+    "source_commit": "18f7aa4c7230f6ff388526c634eb9c38c3198113",
+    "artifactStatus": "rebuilt from composed source; validation recorded in composition log",
+    "changes": [
+      {
+        "path": "packages/core/src/orchestrate/selection/classifier.ts",
+        "before": {
+          "path": "packages/core/src/orchestrate/selection/classifier.ts",
+          "mode": "100644",
+          "sha256": "be0fd17e9c29cb9ce59fdcd19b2d86d0bb05f14ce889fb2a5b80130982ae19ae"
+        },
+        "after": {
+          "path": "packages/core/src/orchestrate/selection/classifier.ts",
+          "mode": "100644",
+          "sha256": "90ec44ac345135d623f331ba9da6df60f989f8459b9dbb1e18eaba4c1cf8b29b"
+        }
+      },
+      {
+        "path": "packages/llm/src/decisions-client.ts",
+        "before": {
+          "path": "packages/llm/src/decisions-client.ts",
+          "mode": "100644",
+          "sha256": "e7a1c671ced1b0acbe47d2e300aff2399dde2cb2c308bd5228153200f09350cb"
+        },
+        "after": {
+          "path": "packages/llm/src/decisions-client.ts",
+          "mode": "100644",
+          "sha256": "7590cb858b6e8cddb507de52fcc736ad5ada160b36e7c07db8ae16ef4102ce70"
+        }
+      },
+      {
+        "path": "packages/llm/test/typesafe.test.ts",
+        "before": null,
+        "after": {
+          "path": "packages/llm/test/typesafe.test.ts",
+          "mode": "100644",
+          "sha256": "dc90f49f15bd62c9ac1980bd8e8eae7e3da582f8c04c9733ae01c472187817bc"
+        }
+      },
+      {
+        "path": "packages/runner/src/classifier-estimated.ts",
+        "before": null,
+        "after": {
+          "path": "packages/runner/src/classifier-estimated.ts",
+          "mode": "100644",
+          "sha256": "28249df75951a350291f525fc9da4d4816f2fb69f629d8c19e4f44477279730b"
+        }
+      },
+      {
+        "path": "packages/runner/src/cli.ts",
+        "before": {
+          "path": "packages/runner/src/cli.ts",
+          "mode": "100755",
+          "sha256": "3cc99fb9bf994422797b50a4e19d942c23f498437c6c732378006074723df21f"
+        },
+        "after": {
+          "path": "packages/runner/src/cli.ts",
+          "mode": "100755",
+          "sha256": "f2640b56e6bf0a798b79e90681799f8999a946183a3494c505b38fb93eabf1e8"
+        }
+      },
+      {
+        "path": "packages/runner/src/config.ts",
+        "before": {
+          "path": "packages/runner/src/config.ts",
+          "mode": "100644",
+          "sha256": "52bc19ab09c6acbf6ed901e3ce96d596952b0fad44ab09e909dfe7caf103b40e"
+        },
+        "after": {
+          "path": "packages/runner/src/config.ts",
+          "mode": "100644",
+          "sha256": "ff9e1f4adbc4bcf1f6c27e7135138be699eabc26936f723c23cde5b5a52c8b13"
+        }
+      },
+      {
+        "path": "packages/runner/src/framework-launch.ts",
+        "before": {
+          "path": "packages/runner/src/framework-launch.ts",
+          "mode": "100644",
+          "sha256": "b76be4946c4e0cac57eb55f7946b52d00b3143059841c1e01f5b91aa7acd436f"
+        },
+        "after": {
+          "path": "packages/runner/src/framework-launch.ts",
+          "mode": "100644",
+          "sha256": "e744fdd57022709c3129bc25928d564d0df8c62c570147616daa5f3381489f67"
+        }
+      },
+      {
+        "path": "packages/runner/src/job.ts",
+        "before": {
+          "path": "packages/runner/src/job.ts",
+          "mode": "100644",
+          "sha256": "9a910061fa0eebae742dc6a00be0b07febf90f227fe9555c6456536039daf595"
+        },
+        "after": {
+          "path": "packages/runner/src/job.ts",
+          "mode": "100644",
+          "sha256": "27a98a88e534ff8d23b3628e2aeadfd9d53a8b292c639f6ca1fa2f5ccc9c4c0c"
+        }
+      },
+      {
+        "path": "packages/runner/src/llm-broker.ts",
+        "before": {
+          "path": "packages/runner/src/llm-broker.ts",
+          "mode": "100644",
+          "sha256": "6d00fe5ae8a9c56200cc0a8f1160a939312b1626f9495e7f9596084ec1bb6b0a"
+        },
+        "after": {
+          "path": "packages/runner/src/llm-broker.ts",
+          "mode": "100644",
+          "sha256": "4f674c83714d31428483825f3785344616ce361bb7ec3fa2b45d7a6eb037cbe9"
+        }
+      },
+      {
+        "path": "packages/runner/src/scheduler.ts",
+        "before": {
+          "path": "packages/runner/src/scheduler.ts",
+          "mode": "100644",
+          "sha256": "b830a231f09e00c01a325afe2b56259dffa7c70becfd7be3544895f5b1213a32"
+        },
+        "after": {
+          "path": "packages/runner/src/scheduler.ts",
+          "mode": "100644",
+          "sha256": "e1581cb0e2f0a9b4802e3e9bf68a137d48dac88caed9345f0a37bd58a9ace3d9"
+        }
+      },
+      {
+        "path": "packages/runner/src/types.ts",
+        "before": {
+          "path": "packages/runner/src/types.ts",
+          "mode": "100644",
+          "sha256": "94712593cc69b78ccdf0fc86d07b58883e9cfecb0b210245747383d8a020ce12"
+        },
+        "after": {
+          "path": "packages/runner/src/types.ts",
+          "mode": "100644",
+          "sha256": "c774476795ab75547ca86f41c70f440a8c67b209a8661a1a9b8ba7c35f1630ea"
+        }
+      },
+      {
+        "path": "packages/runner/test/combine.test.ts",
+        "before": {
+          "path": "packages/runner/test/combine.test.ts",
+          "mode": "100644",
+          "sha256": "008210862edd628aeecb6035b13b33347b04d211356f029afe3a972dddf3f069"
+        },
+        "after": {
+          "path": "packages/runner/test/combine.test.ts",
+          "mode": "100644",
+          "sha256": "0a253472da7e94f77f56b98f80187baf63738e5bd6c96699acb1a110a6e9528e"
+        }
+      },
+      {
+        "path": "packages/runner/test/typesafe-failfast.test.ts",
+        "before": null,
+        "after": {
+          "path": "packages/runner/test/typesafe-failfast.test.ts",
+          "mode": "100644",
+          "sha256": "a7489c20c5a87729d766a3920fa1174f08fee6be4aa00e5e930f62da10438b29"
+        }
+      },
+      {
+        "path": "packages/runner/test/typesafe-hostbroker.test.ts",
+        "before": null,
+        "after": {
+          "path": "packages/runner/test/typesafe-hostbroker.test.ts",
+          "mode": "100644",
+          "sha256": "1fcf1861435c1bcceb1f5e66355e3a18bdc7343a6003e628bee8cec1eba9b596"
+        }
+      },
+      {
+        "path": "packages/runner/test/typesafe.test.ts",
+        "before": null,
+        "after": {
+          "path": "packages/runner/test/typesafe.test.ts",
+          "mode": "100644",
+          "sha256": "040c3412236e008e324291d70f444d060f1560cdb2e438bb05405444e1b1d2e6"
+        }
+      },
+      {
+        "path": "packages/server/dist/aiw-server.mjs",
+        "before": {
+          "path": "packages/server/dist/aiw-server.mjs",
+          "mode": "100755",
+          "sha256": "e36b819e096df4762e20ca6e18b8ff67977aa229cb30954fe0b432465ae8452c"
+        },
+        "after": {
+          "path": "packages/server/dist/aiw-server.mjs",
+          "mode": "100755",
+          "sha256": "e1b5a74de9f49829ed308bb008c66271312dc0ebbd12a1f91c17dd7c48ccd075"
+        }
+      },
+      {
+        "path": "packages/server/src/host-classifier.ts",
+        "before": {
+          "path": "packages/server/src/host-classifier.ts",
+          "mode": "100644",
+          "sha256": "d1b5d0f87feef4114ea7f9690e9f1481d235c767dbeb529501ce103c5f7a7ab5"
+        },
+        "after": {
+          "path": "packages/server/src/host-classifier.ts",
+          "mode": "100644",
+          "sha256": "2571aebef710a1d37063e080c603c1b8a38f34540d0074ded1df5bf16d89c710"
+        }
+      },
+      {
+        "path": "packages/telemetry/src/reporter.ts",
+        "before": {
+          "path": "packages/telemetry/src/reporter.ts",
+          "mode": "100644",
+          "sha256": "8a9a29d4849cad57133a80f847eae68959b0ce434c905a44ed015c1dd49c3132"
+        },
+        "after": {
+          "path": "packages/telemetry/src/reporter.ts",
+          "mode": "100644",
+          "sha256": "b00775913581d684f5b2dc65e415eef914b8d898842f87fc5d47fefcb7d6029e"
+        }
+      },
+      {
+        "path": "packages/telemetry/src/schema.ts",
+        "before": {
+          "path": "packages/telemetry/src/schema.ts",
+          "mode": "100644",
+          "sha256": "c14d07d02e65e75c20f91df7d15b28cd9d79067f9604b1c9289743848643fef8"
+        },
+        "after": {
+          "path": "packages/telemetry/src/schema.ts",
+          "mode": "100644",
+          "sha256": "62c1d1511d716e7fbd4ed651ada03bbf1b9eff9b1dc9d2f22201e82441c7e66a"
+        }
+      }
+    ]
+  },
+  "tool_environment_followup": {
+    "source_commit": "56536b72ce1e74648c35b193c17dd16710dc9489",
+    "changes": [
+      {
+        "path": "packages/tools/src/env.ts",
+        "before": {
+          "path": "packages/tools/src/env.ts",
+          "mode": "100644",
+          "sha256": "61483e3b28644263cccaa7896385a1d8f31ec1fb3ef7b1067dc666e5a4f388e5"
+        },
+        "after": {
+          "path": "packages/tools/src/env.ts",
+          "mode": "100644",
+          "sha256": "bd5fc5dbfbc4acbc23d70ddec59d0f287f24765c41d9e99dff0323d8f9c23fe7"
+        }
+      },
+      {
+        "path": "packages/tools/src/search.ts",
+        "before": {
+          "path": "packages/tools/src/search.ts",
+          "mode": "100644",
+          "sha256": "01d937ce5408c25eecdd86048db9bd90b7d6903a604e9fcf5302420239cdbced"
+        },
+        "after": {
+          "path": "packages/tools/src/search.ts",
+          "mode": "100644",
+          "sha256": "00ab9e235d7d9ea542e2aab67ff1cf97c4225ca3aeb69344c18334b5066dc164"
+        }
+      },
+      {
+        "path": "packages/tools/test/env-security.test.ts",
+        "before": null,
+        "after": {
+          "path": "packages/tools/test/env-security.test.ts",
+          "mode": "100644",
+          "sha256": "496074b5376d350e14cc0888dd9da1aa5dafe18af2c6462b4d5bef9879610a7a"
+        }
+      },
+      {
+        "path": "packages/server/dist/aiw-server.mjs",
+        "before": {
+          "path": "packages/server/dist/aiw-server.mjs",
+          "mode": "100755",
+          "sha256": "e1b5a74de9f49829ed308bb008c66271312dc0ebbd12a1f91c17dd7c48ccd075"
+        },
+        "after": {
+          "path": "packages/server/dist/aiw-server.mjs",
+          "mode": "100755",
+          "sha256": "da6ee243d143d5f182ee8f00ed471e0ea8f79648c9aafcc358016f9a7ae5bd08"
+        }
+      }
+    ],
+    "limits": "Direct/local host environment defense, not a sandbox; no runner key exposure claimed.",
+    "canonical_artifact_commit": "09773499da6e55cb2c0b2419b80fe4b7b08faca0"
   }
 }

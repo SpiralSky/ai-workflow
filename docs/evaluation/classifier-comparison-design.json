@@ -1,0 +1,414 @@
+{
+  "version": 1,
+  "kind": "draft-comparison-design",
+  "readyForLiveCalls": false,
+  "runtimeBase": "9ed722f2b333a881ae9f3486765dc66ff6042631",
+  "fixtureSource": "b1190e39d7568040960754d96f325b0edd0f4224",
+  "fixtureManifestPath": "docs/audits/evidence/2026-11-01-fulfil-matrix.json",
+  "fixtureManifestSHA256": "42f45757faf59150bdc2cf3dae5fb8b79088c3677e7cda768c9c540803273bab",
+  "repetitions": 1,
+  "cells": [
+    {
+      "problem": "02-inventory-feature",
+      "framework": "baseline",
+      "tier": "S",
+      "rep": 0
+    },
+    {
+      "problem": "02-inventory-feature",
+      "framework": "branch-only",
+      "tier": "S",
+      "rep": 0
+    },
+    {
+      "problem": "02-inventory-feature",
+      "framework": "orchestrate",
+      "tier": "S",
+      "rep": 0
+    },
+    {
+      "problem": "02-inventory-feature",
+      "framework": "baseline",
+      "tier": "L",
+      "rep": 0
+    },
+    {
+      "problem": "02-inventory-feature",
+      "framework": "branch-only",
+      "tier": "L",
+      "rep": 0
+    },
+    {
+      "problem": "02-inventory-feature",
+      "framework": "orchestrate",
+      "tier": "L",
+      "rep": 0
+    },
+    {
+      "problem": "05-report-refactor",
+      "framework": "baseline",
+      "tier": "S",
+      "rep": 0
+    },
+    {
+      "problem": "05-report-refactor",
+      "framework": "branch-only",
+      "tier": "S",
+      "rep": 0
+    },
+    {
+      "problem": "05-report-refactor",
+      "framework": "orchestrate",
+      "tier": "S",
+      "rep": 0
+    },
+    {
+      "problem": "05-report-refactor",
+      "framework": "baseline",
+      "tier": "L",
+      "rep": 0
+    },
+    {
+      "problem": "05-report-refactor",
+      "framework": "branch-only",
+      "tier": "L",
+      "rep": 0
+    },
+    {
+      "problem": "05-report-refactor",
+      "framework": "orchestrate",
+      "tier": "L",
+      "rep": 0
+    },
+    {
+      "problem": "07-async-race",
+      "framework": "baseline",
+      "tier": "S",
+      "rep": 0
+    },
+    {
+      "problem": "07-async-race",
+      "framework": "branch-only",
+      "tier": "S",
+      "rep": 0
+    },
+    {
+      "problem": "07-async-race",
+      "framework": "orchestrate",
+      "tier": "S",
+      "rep": 0
+    },
+    {
+      "problem": "07-async-race",
+      "framework": "baseline",
+      "tier": "L",
+      "rep": 0
+    },
+    {
+      "problem": "07-async-race",
+      "framework": "branch-only",
+      "tier": "L",
+      "rep": 0
+    },
+    {
+      "problem": "07-async-race",
+      "framework": "orchestrate",
+      "tier": "L",
+      "rep": 0
+    },
+    {
+      "problem": "08-api-mismatch",
+      "framework": "baseline",
+      "tier": "S",
+      "rep": 0
+    },
+    {
+      "problem": "08-api-mismatch",
+      "framework": "branch-only",
+      "tier": "S",
+      "rep": 0
+    },
+    {
+      "problem": "08-api-mismatch",
+      "framework": "orchestrate",
+      "tier": "S",
+      "rep": 0
+    },
+    {
+      "problem": "08-api-mismatch",
+      "framework": "baseline",
+      "tier": "L",
+      "rep": 0
+    },
+    {
+      "problem": "08-api-mismatch",
+      "framework": "branch-only",
+      "tier": "L",
+      "rep": 0
+    },
+    {
+      "problem": "08-api-mismatch",
+      "framework": "orchestrate",
+      "tier": "L",
+      "rep": 0
+    },
+    {
+      "problem": "09-cache-invalidation",
+      "framework": "baseline",
+      "tier": "S",
+      "rep": 0
+    },
+    {
+      "problem": "09-cache-invalidation",
+      "framework": "branch-only",
+      "tier": "S",
+      "rep": 0
+    },
+    {
+      "problem": "09-cache-invalidation",
+      "framework": "orchestrate",
+      "tier": "S",
+      "rep": 0
+    },
+    {
+      "problem": "09-cache-invalidation",
+      "framework": "baseline",
+      "tier": "L",
+      "rep": 0
+    },
+    {
+      "problem": "09-cache-invalidation",
+      "framework": "branch-only",
+      "tier": "L",
+      "rep": 0
+    },
+    {
+      "problem": "09-cache-invalidation",
+      "framework": "orchestrate",
+      "tier": "L",
+      "rep": 0
+    },
+    {
+      "problem": "L1-rename-sku",
+      "framework": "baseline",
+      "tier": "S",
+      "rep": 0
+    },
+    {
+      "problem": "L1-rename-sku",
+      "framework": "branch-only",
+      "tier": "S",
+      "rep": 0
+    },
+    {
+      "problem": "L1-rename-sku",
+      "framework": "orchestrate",
+      "tier": "S",
+      "rep": 0
+    },
+    {
+      "problem": "L1-rename-sku",
+      "framework": "baseline",
+      "tier": "L",
+      "rep": 0
+    },
+    {
+      "problem": "L1-rename-sku",
+      "framework": "branch-only",
+      "tier": "L",
+      "rep": 0
+    },
+    {
+      "problem": "L1-rename-sku",
+      "framework": "orchestrate",
+      "tier": "L",
+      "rep": 0
+    },
+    {
+      "problem": "L2-split-pricing",
+      "framework": "baseline",
+      "tier": "S",
+      "rep": 0
+    },
+    {
+      "problem": "L2-split-pricing",
+      "framework": "branch-only",
+      "tier": "S",
+      "rep": 0
+    },
+    {
+      "problem": "L2-split-pricing",
+      "framework": "orchestrate",
+      "tier": "S",
+      "rep": 0
+    },
+    {
+      "problem": "L2-split-pricing",
+      "framework": "baseline",
+      "tier": "L",
+      "rep": 0
+    },
+    {
+      "problem": "L2-split-pricing",
+      "framework": "branch-only",
+      "tier": "L",
+      "rep": 0
+    },
+    {
+      "problem": "L2-split-pricing",
+      "framework": "orchestrate",
+      "tier": "L",
+      "rep": 0
+    },
+    {
+      "problem": "L3-import-cycle",
+      "framework": "baseline",
+      "tier": "S",
+      "rep": 0
+    },
+    {
+      "problem": "L3-import-cycle",
+      "framework": "branch-only",
+      "tier": "S",
+      "rep": 0
+    },
+    {
+      "problem": "L3-import-cycle",
+      "framework": "orchestrate",
+      "tier": "S",
+      "rep": 0
+    },
+    {
+      "problem": "L3-import-cycle",
+      "framework": "baseline",
+      "tier": "L",
+      "rep": 0
+    },
+    {
+      "problem": "L3-import-cycle",
+      "framework": "branch-only",
+      "tier": "L",
+      "rep": 0
+    },
+    {
+      "problem": "L3-import-cycle",
+      "framework": "orchestrate",
+      "tier": "L",
+      "rep": 0
+    },
+    {
+      "problem": "L4-currency-param",
+      "framework": "baseline",
+      "tier": "S",
+      "rep": 0
+    },
+    {
+      "problem": "L4-currency-param",
+      "framework": "branch-only",
+      "tier": "S",
+      "rep": 0
+    },
+    {
+      "problem": "L4-currency-param",
+      "framework": "orchestrate",
+      "tier": "S",
+      "rep": 0
+    },
+    {
+      "problem": "L4-currency-param",
+      "framework": "baseline",
+      "tier": "L",
+      "rep": 0
+    },
+    {
+      "problem": "L4-currency-param",
+      "framework": "branch-only",
+      "tier": "L",
+      "rep": 0
+    },
+    {
+      "problem": "L4-currency-param",
+      "framework": "orchestrate",
+      "tier": "L",
+      "rep": 0
+    },
+    {
+      "problem": "L5-refund-double-count",
+      "framework": "baseline",
+      "tier": "S",
+      "rep": 0
+    },
+    {
+      "problem": "L5-refund-double-count",
+      "framework": "branch-only",
+      "tier": "S",
+      "rep": 0
+    },
+    {
+      "problem": "L5-refund-double-count",
+      "framework": "orchestrate",
+      "tier": "S",
+      "rep": 0
+    },
+    {
+      "problem": "L5-refund-double-count",
+      "framework": "baseline",
+      "tier": "L",
+      "rep": 0
+    },
+    {
+      "problem": "L5-refund-double-count",
+      "framework": "branch-only",
+      "tier": "L",
+      "rep": 0
+    },
+    {
+      "problem": "L5-refund-double-count",
+      "framework": "orchestrate",
+      "tier": "L",
+      "rep": 0
+    }
+  ],
+  "arms": [
+    {
+      "id": "llm",
+      "reranker": "llm"
+    },
+    {
+      "id": "none",
+      "reranker": "none"
+    },
+    {
+      "id": "jev114",
+      "reranker": "classifier",
+      "requestedModel": "typesafe/jev-1.14"
+    },
+    {
+      "id": "microsoft-decision-1",
+      "reranker": "classifier",
+      "requestedModel": "microsoft/microsoft-decision-1"
+    },
+    {
+      "id": "perplexity-flash",
+      "reranker": "classifier",
+      "requestedModel": "perplexity/pplx-decider-flash-v1.2"
+    }
+  ],
+  "selector": {
+    "retrievalK": 20,
+    "shortlistN": 6,
+    "completion": "existing one-level requires, same catalog and exclusions",
+    "threshold": null,
+    "thresholdStatus": "choose on separate development examples, freeze before target observations",
+    "policy": "noul-v1"
+  },
+  "fixedAcrossArms": [
+    "main/secondary models, returned identities and provider routes",
+    "source/artifact/prompt/catalog/task/check/image hashes",
+    "branch settings, tool permissions, cache policy",
+    "limits/timeouts, seeds/repetitions and run ordering policy",
+    "retrieval inputs/order/K, shortlistN and completion semantics",
+    "grading tests, quality rubric, task acceptance and failure protocol"
+  ],
+  "results": null
+}

@@ -9,6 +9,7 @@ export interface RerankContext {
   signal?: AbortSignal;
   /** Set by the reranker to true when it could not use the model's answer and kept retrieval order. */
   fallback?: boolean;
+  fallbackReason?: string;
 }
 
 /** Orders and narrows retrieval candidates by fit for the instruction (orchestrate §7.2). */

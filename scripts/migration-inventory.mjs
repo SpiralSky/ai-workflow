@@ -96,7 +96,7 @@ export function applyDevelopmentAllowances(root, inventory, replacements, allowa
   for (const change of allowances.changes) {
     assert.ok(!seen.has(change.path),`Duplicate development allowance: ${change.path}`);seen.add(change.path);
     // Permit only the two explicit image packaging files; benchmark fixtures/permissions remain excluded.
-    assert.match(change.path,/^(packages\/(core|llm|runner|server|telemetry)\/|packages\/tools\/(?:src\/sidecar\.ts|python\/aiw_sidecar\/(?:execution|rpc)\.py)$|package-lock\.json$|experiments\/docker\/aiw-base\/Dockerfile(?:\.dockerignore)?$)/);
+    assert.match(change.path,/^(packages\/(core|llm|runner|server|telemetry)\/|packages\/tools\/(?:src\/(?:sidecar|env|search)\.ts|test\/env-security\.test\.ts|python\/aiw_sidecar\/(?:execution|rpc)\.py)$|package-lock\.json$|experiments\/docker\/aiw-base\/Dockerfile(?:\.dockerignore)?$)/);
     assert.ok(typeof change.rationale === 'string' && change.rationale.trim());
     assert.deepEqual(change.before,expected.get(change.path) ?? null,`Development before-state mismatch: ${change.path}`);
     assert.ok(change.after,'This bounded development scope does not authorize deleting baseline runtime files');
@@ -105,9 +105,9 @@ export function applyDevelopmentAllowances(root, inventory, replacements, allowa
     assert.notDeepEqual(change.before,change.after,`Unnecessary development allowance: ${change.path}`);
     expected.set(change.path,change.after);
   }
-  assert.deepEqual([...allowances.draft_plans].sort(),['plans/2026-11-01-all-provider-host-broker/PLAN.md','plans/2026-11-01-direct-deepseek/PLAN.md','plans/2026-11-01-failfast-campaign/PLAN.md','plans/2026-11-01-openai-plan-signin/PLAN.md','plans/2026-11-01-provenance-readiness/PLAN.md']);
+  assert.deepEqual([...allowances.draft_plans].sort(),['plans/2026-11-01-all-provider-host-broker/PLAN.md','plans/2026-11-01-classifier-evaluation/PLAN.md','plans/2026-11-01-direct-deepseek/PLAN.md','plans/2026-11-01-direct-typesafe-classifier/PLAN.md','plans/2026-11-01-failfast-campaign/PLAN.md','plans/2026-11-01-openai-plan-signin/PLAN.md','plans/2026-11-01-provenance-readiness/PLAN.md','plans/2026-11-01-tool-env-secrets/PLAN.md','plans/2026-11-01-typed-classifier-reranker/PLAN.md']);
   for (const file of allowances.draft_plans) {
-    assert.match(file,/^plans\/2026-11-01-(all-provider-host-broker|direct-deepseek|failfast-campaign|openai-plan-signin|provenance-readiness)\/PLAN\.md$/);
+    assert.match(file,/^plans\/2026-11-01-(all-provider-host-broker|classifier-evaluation|direct-deepseek|direct-typesafe-classifier|failfast-campaign|openai-plan-signin|provenance-readiness|tool-env-secrets|typed-classifier-reranker)\/PLAN\.md$/);
     const text=fs.readFileSync(path.join(root,file),'utf8');
     const frontmatter = /^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/.exec(text);
     assert.ok(frontmatter,`Missing development plan frontmatter: ${file}`);

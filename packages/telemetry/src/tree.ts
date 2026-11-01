@@ -44,6 +44,8 @@ export function buildTree(events: EventRecord[]): TreeNode {
 }
 
 export interface TokenSums {
+  /** Sums are known lower bounds when a turn omitted usage. */
+  incomplete?: true;
   input: number;
   output: number;
   cachedRead?: number;
@@ -101,7 +103,8 @@ export function rollups(
   let cost: number | null = 0;
   for (const t of turns) {
     const s = tokens[t.role];
-    const u: Usage = t.usage;
+    const u = t.usage;
+    if (!u) { s.incomplete = true; cost = null; continue; }
     s.input += u.input;
     s.output += u.output;
     if (u.cachedRead !== undefined) s.cachedRead = (s.cachedRead ?? 0) + u.cachedRead;

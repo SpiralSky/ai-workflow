@@ -55,7 +55,9 @@ export interface OrchestrateOptions {
   /** Workspace root for change tracking and, by default, reading code references. */
   workspaceRoot: string;
   /** Rerank stage: `llm` (default) or `none` (ablation). */
-  rerank?: "llm" | "none";
+  rerank?: "llm" | "none" | "classifier";
+  /** Explicit typed classifier; never a chat-completion adapter. */
+  classifier?: { client: import("@aiw/llm").DecisionsClient; model: string; threshold: number; policy: "noul-v1" };
   /** Model of the LLM reranker; default = `model`. */
   rerankModel?: string;
   /** Reads current code for references; default reads files under `workspaceRoot`. */

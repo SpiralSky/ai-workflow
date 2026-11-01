@@ -27,6 +27,7 @@ export function readAttemptCost(eventsPath: string, extraReasons: string[] = [])
     if (event.kind !== "turn") continue;
     if (ids.has(event.id)) { reasons.add("duplicate-turn-id"); continue; }
     ids.add(event.id);
+    if (!event.usage) reasons.add("missing-turn-usage");
     if (event.costUsd === undefined || !Number.isFinite(event.costUsd) || event.costUsd < 0) {
       reasons.add("missing-or-invalid-turn-cost");
     } else knownCostUsd += event.costUsd;

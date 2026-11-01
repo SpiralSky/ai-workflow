@@ -1,3 +1,4 @@
+import { createHostClassifierClient } from "./host-classifier.ts";
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
@@ -44,6 +45,8 @@ export interface ServerOptions {
   orchestrateWorkspaceRoot?: string;
   /** Orchestrate executor: per-executor turn cap (default 4). */
   secondaryCap?: number;
+  classifierModel?: string;
+  classifierThreshold?: number;
 }
 
 /**
@@ -67,9 +70,11 @@ export async function startServer(opts: ServerOptions): Promise<void> {
       apiKey: opts.orchestrateApiKey!,
       timeoutMs: 300_000,
     });
+    if (opts.variant?.rerank === "classifier" && (opts.orchestrateProvider !== "host" || !opts.classifierModel || opts.classifierThreshold === undefined)) throw new Error("Classifier requires explicit host model/settings");
     orchestrateOpts = {
       client,
       model: opts.orchestrateModel,
+      ...(opts.variant?.rerank === "classifier" ? { classifier: { client: createHostClassifierClient(() => mcpServer), model: opts.classifierModel!, threshold: opts.classifierThreshold!, policy: "noul-v1" as const } } : {}),
       workspaceRoot: opts.orchestrateWorkspaceRoot ?? process.cwd(),
       ...(opts.secondaryCap !== undefined ? { turns: opts.secondaryCap } : {}),
     };
@@ -105,7 +110,7 @@ export async function startServer(opts: ServerOptions): Promise<void> {
 
   // 4. Advertise framework tools via tools/list.
   mcpServer.setRequestHandler(ListToolsRequestSchema, async () => ({
-    _meta: { "aiw/runtimeProvenance": { version: 1, engine, entryHash, prompts, catalogHash: digest(canonicalJSON(hostDecls)), settings: { kind: opts.kind, variant: opts.variant ?? {}, branchContext: opts.branchContext ?? "trace", secondaryCap: opts.secondaryCap ?? 4, secondaryTemperature: orchestrateOpts?.temperature ?? null }, nodeVersion: process.version, runtimePlatform: { platform: process.platform, arch: process.arch, moduleABI: process.versions.modules } } },
+    _meta: { "aiw/runtimeProvenance": { version: 1, engine, entryHash, prompts, catalogHash: digest(canonicalJSON(hostDecls)), settings: { kind: opts.kind, variant: opts.variant ?? {}, branchContext: opts.branchContext ?? "trace", secondaryCap: opts.secondaryCap ?? 4, secondaryTemperature: orchestrateOpts?.temperature ?? null, ...(orchestrateOpts?.classifier ? { classifier: { model: orchestrateOpts.classifier.model, threshold: orchestrateOpts.classifier.threshold, policy: orchestrateOpts.classifier.policy } } : {}) }, nodeVersion: process.version, runtimePlatform: { platform: process.platform, arch: process.arch, moduleABI: process.versions.modules } } },
     tools: framework.tools.map((t) => ({
       name: t.name,
       description: t.description,

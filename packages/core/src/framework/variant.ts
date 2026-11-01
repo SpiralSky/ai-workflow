@@ -4,7 +4,7 @@ import type { FrameworkKind } from "./types.ts";
 export interface FrameworkVariantKeys {
   toolSearch?: boolean;
   catalog?: number;
-  rerank?: "llm" | "none";
+  rerank?: "llm" | "none" | "classifier";
   secondary?: number;
   hotPaths?: boolean;
   executor?: "branch" | "calls";
@@ -33,7 +33,7 @@ export function parseFrameworkVariant(raw: string): { kind: FrameworkKind; varia
     };
     if (key === "catalog") variant.catalog = positiveInt();
     else if (key === "toolSearch" && kind === "branch-only" && value === undefined) variant.toolSearch = true;
-    else if (key === "rerank" && kind === "orchestrate" && (value === "llm" || value === "none")) variant.rerank = value;
+    else if (key === "rerank" && kind === "orchestrate" && (value === "llm" || value === "none" || value === "classifier")) variant.rerank = value;
     else if (key === "secondary" && kind === "orchestrate") variant.secondary = positiveInt();
     else if (key === "executor" && kind === "orchestrate" && value === "branch") variant.executor = value;
     else if (key === "hotPaths" || (key === "executor" && value === "calls")) {
