@@ -184,7 +184,10 @@
     "path": "packages/viewer/package.json",
     "before": "echo 'no viewer tests yet' && exit 0",
     "after": "node --import tsx --test test/*.test.ts",
-    "reason": "Run existing new viewer cost tests through npm test instead of claiming no tests exist. No runtime UI behavior changed."
+    "reason": "Run existing new viewer cost tests through npm test instead of claiming no tests exist. No runtime UI behavior changed.",
+    "before_content": "{\n  \"name\": \"@aiw/viewer\",\n  \"private\": true,\n  \"type\": \"module\",\n  \"scripts\": {\n    \"build:indexer\": \"node indexer/build.mjs\",\n    \"index\": \"node indexer/dist/index.js\",\n    \"index:watch\": \"node indexer/dist/index.js --watch\",\n    \"build\": \"npm run build:indexer && vite build\",\n    \"dev\": \"vite\",\n    \"preview\": \"vite preview\",\n    \"test\": \"echo 'no viewer tests yet' && exit 0\"\n  },\n  \"dependencies\": {\n    \"react\": \"^18.3.1\",\n    \"react-dom\": \"^18.3.1\",\n    \"react-markdown\": \"^9.0.3\",\n    \"shiki\": \"^1.24.4\"\n  },\n  \"devDependencies\": {\n    \"@types/react\": \"^18.3.12\",\n    \"@types/react-dom\": \"^18.3.1\",\n    \"@vitejs/plugin-react\": \"^4.3.4\",\n    \"esbuild\": \"^0.24.0\",\n    \"typescript\": \"^5.6.3\",\n    \"vite\": \"^5.4.11\"\n  }\n}\n",
+    "before_sha256": "ae18a38cac1a26d82a2f3abd530fc4f9f456e3051237bdff0121bbcc2452a57b",
+    "after_sha256": "edb1cc3089e21d8cbcd9fbd2a962a524ecbb97946e54783a668ca2bbf248f290"
   },
   "enhanced_framework": {
     "source_commit": "6ae4e304faa75b7bd5ae1240da7f4693f48d0a4e",
@@ -192,5 +195,7 @@
     "cli_relative_path": "packages/cli/dist/cli.js",
     "skill_path": ".agents/skills/specplane/SKILL.md",
     "skill_sha256": "cc7c62f08578e36d6086ab820925960404f9559025d28b917a7803a21109d07f"
-  }
+  },
+  "migration_runtime_inventory": ".specplane/migration-runtime-inventory.json",
+  "migration_source_inventory": ".specplane/migration-source-inventory.json"
 }

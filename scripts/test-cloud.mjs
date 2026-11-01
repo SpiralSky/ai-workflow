@@ -34,7 +34,8 @@ export function main(root = path.resolve(path.dirname(fileURLToPath(import.meta.
     process.stdout.write(result.stdout ?? ''); process.stderr.write(result.stderr ?? '');
     assertTestResult(result, label);
   };
-  runTests(['scripts/test-cloud.test.mjs'],root,'cloud entry checks');
+  const entryTests = fs.readdirSync(path.join(root,'scripts')).filter(f => f.endsWith('.test.mjs')).sort().map(f => path.join('scripts',f));
+  runTests(entryTests,root,'cloud entry and migration checks');
   for (const name of fs.readdirSync(path.join(root,'packages')).sort()) {
     const cwd = path.join(root,'packages',name);
     const testDir = path.join(cwd,'test');

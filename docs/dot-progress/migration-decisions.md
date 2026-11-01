@@ -147,3 +147,38 @@ Final integrated verification after accounting/overlay prerequisites and viewer 
 entry commit is `4cc85e0`. Enhanced consumer validation and the migration preservation checker
 passed with the documented warnings. No root `npm test` pass is claimed for the other tsx CLI
 wrappers, and no live-model benchmark has been run by this migration task.
+
+## Snapshot-publication portability
+
+The GitHub publication commit has the verified migration tree but not the intermediate local Git
+objects. Preservation must therefore work without hidden source commits. The checker now uses
+committed, self-contained inventories generated from the verified source objects before publication:
+
+- `.specplane/migration-runtime-inventory.json`: all **373** tracked runtime/evaluation paths in
+  the declared scope, each with SHA256 and Git mode, from `6812b66`.
+- `.specplane/migration-source-inventory.json`: **25** original requirement/historical files with
+  hashes and modes, from `b2e781f`.
+- The viewer npm-test exception records the original complete package representation and its hash,
+  the exact permitted script change, and the resulting file hash. All other package fields and
+  runtime files must match; no arbitrary diff exemption exists.
+
+Verification compares the complete current tracked path set, index modes, actual worktree bytes
+and modes, requirement bodies and historical records. Added/removed tracked paths, unstaged
+missing/changed files, executable-mode changes, and unrelated viewer edits fail. Source commit
+IDs remain provenance. When their objects are available, the checker additionally verifies the
+recorded inventories against those objects. When absent, the same mandatory worktree/hash checks
+still run; they are not replaced with skipped checks or fabricated Git refs.
+
+Nine automated regression tests exercise a newly initialized snapshot-only Git repository (no
+source objects/alternates), runtime tampering, extra tracked paths, staged and unstaged missing
+files, mode changes, requirement-body tampering, unrelated viewer metadata, and a removed tracked
+historical record. The configured cloud command discovers all script-level tests automatically.
+
+A separate snapshot-only checkout also passed the **actual enhanced Specplane CLI** preservation,
+validation, spec-resolution and draft-context checks. Its history report explicitly says the source
+objects are unavailable while the self-contained inventory is verified. No production source,
+approval state, runtime requirements, or publication was changed for this portability fix.
+
+Portability verification result: configured cloud command passed **384 package tests + 13
+script-level tests**, zero failures/skips, followed by passing typecheck. Both local-history and
+snapshot-only actual enhanced-CLI checks passed with the same previously documented warnings.
