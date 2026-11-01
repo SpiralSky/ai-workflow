@@ -46,7 +46,7 @@ All PRs are drafts and stacked in the order above. No approvals or merges.
 - Thresholds remain uncalibrated. Candidate recommendations are capability/list-price based, not proven quality or savings. Price/alias snapshots may change. Final-response overshoot and cancellation-not-refund limits explicit.
 - Actual OAuth consent/API credentials and bounded live spending authorization still needed before live evaluation. Do not infer these from code-upload approval. ChatGPT subscription plus paid classifier currently rejected rather than mixing budgets silently.
 - Legacy standalone server credential flags remain outside the safe runner path; do not pass provider secrets to untrusted containers.
-- Codebase Memory0.12.1 installed on Dot's own workspace; CLI version/help verified, graph/index/query blocked by Unix IPC permission restrictions. No valid branch indexes or successful symbol queries. Native MCP unavailable; installing elsewhere would not meet own-computer requirement.
+- Codebase Memory0.12.1 was historically installed and its CLI version/help verified on Dot's own workspace. On 2026-11-01 14:29 UTC recheck, the installation directory is absent; only checkpoint restoration notes/wrappers remain. AF_UNIX socket creation still fails with EPERM before bind. No valid branch indexes or successful symbol queries exist; native MCP is unavailable. TCP OAuth callback binding now succeeds, but that does not resolve Unix IPC or binary persistence. Installing elsewhere would not meet the own-computer requirement.
 
 ## Autonomous decisions
 
@@ -72,3 +72,8 @@ Source `722cf5563ce22bfe309ba19e85fc34992b8dabc7` passed 598 package +24 script 
 Canonical runtime passed actual Node22.15.0 ABI127 relocated native/tier-L Docker validation: https://github.com/SpiralSky/ai-workflow/actions/runs/41315462595. The original dependency-symlink artifact was corrected before publication and independently rechecked.
 
 A subsequent adjacent test-addition conflict was resolved by moving the extra security regression into its own automatically discovered test file. Current PR #4 remote head `67b42ae04153079e84b1fdacdd0082a2e623ffc8`, exact local source `5bec9d36275e3cb34087430e43bd74982df8babd`, tree `d59fbd2a425f36a7738a42e693db82df320ac845`. All 24 script tests/preservation/hygiene passed; runtime and bundle are byte-identical to the Docker-tested source. GitHub verified all four draft PRs clean/mergeable and unmerged at 14:22 UTC. No plan or PR approved, no merge, no live model call or paid inference. Live evaluation and own-computer indexing blockers remain as above.
+
+
+## Sign-in readiness check — 2026-11-01 14:28 UTC
+
+User requested check only, no suite. ai-workflow uses its own ChatGPT OAuth registration/session, never Codex CLI credentials. No app session exists here. CLI loads, ephemeral TCP loopback bind succeeds and browser launcher exists, but no browser consent/auth API/model/quota check was performed. Docker remains absent locally; GitHub Actions Docker evidence above does not imply authorized subscription credentials there. No tests or suite were run for this readiness check.
