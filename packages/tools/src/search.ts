@@ -1,6 +1,7 @@
 import { spawn, spawnSync } from "node:child_process";
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { basename, join, matchesGlob } from "node:path";
+import { toolEnv } from "./env.ts";
 import { relPath } from "./paths.ts";
 
 /** Directory names never searched (both backends). */
@@ -11,7 +12,7 @@ export const LIST_BUDGET_BYTES = 6000;
 let rgOK: boolean | undefined;
 /** Whether `rg` is on PATH (cached). */
 export function hasRg(): boolean {
-  rgOK ??= spawnSync("rg", ["--version"], { stdio: "ignore" }).status === 0;
+  rgOK ??= spawnSync("rg", ["--version"], { env: toolEnv(), stdio: "ignore" }).status === 0;
   return rgOK;
 }
 
@@ -26,7 +27,7 @@ export function globMatch(rel: string, glob: string): boolean {
 /** Runs rg in `root`, returning stdout lines. Exit code 1 (no matches) is not an error. */
 function runRg(root: string, args: string[]): Promise<string[]> {
   return new Promise((resolve, reject) => {
-    const child = spawn("rg", args, { cwd: root, stdio: ["ignore", "pipe", "pipe"] });
+    const child = spawn("rg", args, { cwd: root, env: toolEnv(), stdio: ["ignore", "pipe", "pipe"] });
     let out = "", err = "";
     child.stdout.on("data", (d) => (out += d));
     child.stderr.on("data", (d) => (err += d));

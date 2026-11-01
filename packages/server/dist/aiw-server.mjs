@@ -10971,7 +10971,7 @@ function relPath(root2, abs) {
 }
 
 // packages/tools/src/env.ts
-var SECRET_PREFIXES = ["OPENAI_", "ANTHROPIC_", "OPENROUTER_"];
+var SECRET_PREFIXES = ["OPENAI_", "ANTHROPIC_", "OPENROUTER_", "DEEPSEEK_", "TYPESAFE_", "CHATGPT_"];
 function toolEnv(base = process.env) {
   const extra = new Set((base.AIW_SECRET_NAMES ?? "").split(",").map((s) => s.trim()).filter(Boolean));
   const out = {};
@@ -11084,7 +11084,7 @@ var SKIP_DIRS = /* @__PURE__ */ new Set([".git", "node_modules"]);
 var LIST_BUDGET_BYTES = 6e3;
 var rgOK;
 function hasRg() {
-  rgOK ??= spawnSync("rg", ["--version"], { stdio: "ignore" }).status === 0;
+  rgOK ??= spawnSync("rg", ["--version"], { env: toolEnv(), stdio: "ignore" }).status === 0;
   return rgOK;
 }
 function globMatch(rel, glob) {
@@ -11092,7 +11092,7 @@ function globMatch(rel, glob) {
 }
 function runRg(root2, args) {
   return new Promise((resolve2, reject) => {
-    const child = spawn("rg", args, { cwd: root2, stdio: ["ignore", "pipe", "pipe"] });
+    const child = spawn("rg", args, { cwd: root2, env: toolEnv(), stdio: ["ignore", "pipe", "pipe"] });
     let out = "", err = "";
     child.stdout.on("data", (d2) => out += d2);
     child.stderr.on("data", (d2) => err += d2);

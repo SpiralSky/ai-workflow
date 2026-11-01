@@ -110,3 +110,10 @@ test('runtime hygiene helper cannot be silently weakened',t=>{
   const root=snapshot(t);fs.appendFileSync(path.join(root,'scripts/check-runtime-gitignore.sh'),'\n# unauthorized weakening\n');
   assert.throws(()=>verifyPreservation(root),/Preserved content changed/);
 });
+
+test('local tool secret-filter allowances do not authorize unrelated tool sources',t=>{
+  const root=snapshot(t); const file=path.join(root,'.specplane/development-allowances.json'); const data=JSON.parse(fs.readFileSync(file));
+  data.changes.push({path:'packages/tools/src/unrelated.ts',before:null,after:{path:'packages/tools/src/unrelated.ts',mode:'100644',sha256:'0'.repeat(64)},rationale:'outside exact secret-filter scope'});
+  fs.writeFileSync(file,JSON.stringify(data));
+  assert.throws(()=>verifyPreservation(root),/did not match/);
+});

@@ -2,7 +2,7 @@
   "version": 1,
   "kind": "post-migration-development",
   "base_commit": "75ab542c626bc7276d2ee9575956899c79b6d75d",
-  "verified_development_head": "dbc2b3110638607dcc8e7f131111bc4391095c38",
+  "verified_development_head": "09773499da6e55cb2c0b2419b80fe4b7b08faca0",
   "authorization_kind": "development requests only; final approval and merge remain human-only",
   "user_requests": [
     "Add sign in to open ai support for ai-workflow workflow runs",
@@ -20,14 +20,15 @@
     ".specplane/migration-source-inventory.json": "adaa67f9f48596ea3cb6b63ff6a124a1276936e2f70997bde296d108dd967648"
   },
   "draft_plans": [
+    "plans/2026-11-01-all-provider-host-broker/PLAN.md",
+    "plans/2026-11-01-classifier-evaluation/PLAN.md",
+    "plans/2026-11-01-direct-deepseek/PLAN.md",
+    "plans/2026-11-01-direct-typesafe-classifier/PLAN.md",
     "plans/2026-11-01-failfast-campaign/PLAN.md",
     "plans/2026-11-01-openai-plan-signin/PLAN.md",
     "plans/2026-11-01-provenance-readiness/PLAN.md",
-    "plans/2026-11-01-all-provider-host-broker/PLAN.md",
-    "plans/2026-11-01-direct-deepseek/PLAN.md",
-    "plans/2026-11-01-classifier-evaluation/PLAN.md",
-    "plans/2026-11-01-typed-classifier-reranker/PLAN.md",
-    "plans/2026-11-01-direct-typesafe-classifier/PLAN.md"
+    "plans/2026-11-01-tool-env-secrets/PLAN.md",
+    "plans/2026-11-01-typed-classifier-reranker/PLAN.md"
   ],
   "changes": [
     {
@@ -842,7 +843,7 @@
       "after": {
         "path": "packages/server/dist/aiw-server.mjs",
         "mode": "100755",
-        "sha256": "e1b5a74de9f49829ed308bb008c66271312dc0ebbd12a1f91c17dd7c48ccd075"
+        "sha256": "da6ee243d143d5f182ee8f00ed471e0ea8f79648c9aafcc358016f9a7ae5bd08"
       },
       "rationale": "Rebuild/verify coherent tracked runtime and honor explicit engine selection without silent fallback. Follow-up: verified packaged native/tierL resources and lifecycle integration. Follow-up: awaited graceful sidecar descendant shutdown. Follow-up: actual runtime provenance gate and immutable observed-image grading. Security follow-up: all orchestration credentials/inference stay host-side, typed sanitized provider errors. Follow-up: bounded direct DeepSeek provider with host-only credentials and explicit estimated costs. Phase2: direct TypeSafe filtering with separate estimates and shared bounded campaign counters."
     },
@@ -1325,6 +1326,34 @@
       "rationale": "Fix independently reviewed graceful CLI/sidecar child lifecycle gap; no auth behavior change."
     },
     {
+      "path": "packages/tools/src/env.ts",
+      "before": {
+        "path": "packages/tools/src/env.ts",
+        "mode": "100644",
+        "sha256": "61483e3b28644263cccaa7896385a1d8f31ec1fb3ef7b1067dc666e5a4f388e5"
+      },
+      "after": {
+        "path": "packages/tools/src/env.ts",
+        "mode": "100644",
+        "sha256": "bd5fc5dbfbc4acbc23d70ddec59d0f287f24765c41d9e99dff0323d8f9c23fe7"
+      },
+      "rationale": "Local tool subprocess environment secret filtering and synthetic-only boundary/descendant regressions."
+    },
+    {
+      "path": "packages/tools/src/search.ts",
+      "before": {
+        "path": "packages/tools/src/search.ts",
+        "mode": "100644",
+        "sha256": "01d937ce5408c25eecdd86048db9bd90b7d6903a604e9fcf5302420239cdbced"
+      },
+      "after": {
+        "path": "packages/tools/src/search.ts",
+        "mode": "100644",
+        "sha256": "00ab9e235d7d9ea542e2aab67ff1cf97c4225ca3aeb69344c18334b5066dc164"
+      },
+      "rationale": "Local tool subprocess environment secret filtering and synthetic-only boundary/descendant regressions."
+    },
+    {
       "path": "packages/tools/src/sidecar.ts",
       "before": {
         "path": "packages/tools/src/sidecar.ts",
@@ -1337,6 +1366,16 @@
         "sha256": "dcca9457442667f3a607010152bdc4d61e71920681acc482a7b9822668b7b9af"
       },
       "rationale": "Fix independently reviewed graceful CLI/sidecar child lifecycle gap; no auth behavior change."
+    },
+    {
+      "path": "packages/tools/test/env-security.test.ts",
+      "before": null,
+      "after": {
+        "path": "packages/tools/test/env-security.test.ts",
+        "mode": "100644",
+        "sha256": "496074b5376d350e14cc0888dd9da1aa5dafe18af2c6462b4d5bef9879610a7a"
+      },
+      "rationale": "Local tool subprocess environment secret filtering and synthetic-only boundary/descendant regressions."
     }
   ],
   "packaging_followup": {
@@ -3207,5 +3246,60 @@
         }
       }
     ]
+  },
+  "tool_environment_followup": {
+    "source_commit": "56536b72ce1e74648c35b193c17dd16710dc9489",
+    "changes": [
+      {
+        "path": "packages/tools/src/env.ts",
+        "before": {
+          "path": "packages/tools/src/env.ts",
+          "mode": "100644",
+          "sha256": "61483e3b28644263cccaa7896385a1d8f31ec1fb3ef7b1067dc666e5a4f388e5"
+        },
+        "after": {
+          "path": "packages/tools/src/env.ts",
+          "mode": "100644",
+          "sha256": "bd5fc5dbfbc4acbc23d70ddec59d0f287f24765c41d9e99dff0323d8f9c23fe7"
+        }
+      },
+      {
+        "path": "packages/tools/src/search.ts",
+        "before": {
+          "path": "packages/tools/src/search.ts",
+          "mode": "100644",
+          "sha256": "01d937ce5408c25eecdd86048db9bd90b7d6903a604e9fcf5302420239cdbced"
+        },
+        "after": {
+          "path": "packages/tools/src/search.ts",
+          "mode": "100644",
+          "sha256": "00ab9e235d7d9ea542e2aab67ff1cf97c4225ca3aeb69344c18334b5066dc164"
+        }
+      },
+      {
+        "path": "packages/tools/test/env-security.test.ts",
+        "before": null,
+        "after": {
+          "path": "packages/tools/test/env-security.test.ts",
+          "mode": "100644",
+          "sha256": "496074b5376d350e14cc0888dd9da1aa5dafe18af2c6462b4d5bef9879610a7a"
+        }
+      },
+      {
+        "path": "packages/server/dist/aiw-server.mjs",
+        "before": {
+          "path": "packages/server/dist/aiw-server.mjs",
+          "mode": "100755",
+          "sha256": "e1b5a74de9f49829ed308bb008c66271312dc0ebbd12a1f91c17dd7c48ccd075"
+        },
+        "after": {
+          "path": "packages/server/dist/aiw-server.mjs",
+          "mode": "100755",
+          "sha256": "da6ee243d143d5f182ee8f00ed471e0ea8f79648c9aafcc358016f9a7ae5bd08"
+        }
+      }
+    ],
+    "limits": "Direct/local host environment defense, not a sandbox; no runner key exposure claimed.",
+    "canonical_artifact_commit": "09773499da6e55cb2c0b2419b80fe4b7b08faca0"
   }
 }

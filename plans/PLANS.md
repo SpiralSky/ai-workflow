@@ -14,6 +14,7 @@
 | [2026-11-01-openai-plan-signin](2026-11-01-openai-plan-signin/PLAN.md) | Sign in with ChatGPT for workflow runs | draft | — | architecture/runner, architecture/framework-server, architecture/system-overview, feature/framework-runner |
 | [2026-11-01-provenance-readiness](2026-11-01-provenance-readiness/PLAN.md) | Attest actual evaluation runtime inputs before model work | draft | — | architecture/runner, feature/framework-runner |
 | [2026-11-01-specplane-migration](2026-11-01-specplane-migration/PLAN.md) | Experimental Specplane migration | draft | — | feature/harness-integration, feature/framework-runner |
+| [2026-11-01-tool-env-secrets](2026-11-01-tool-env-secrets/PLAN.md) | Keep direct provider environment secrets out of local tool children | draft | — | architecture/system-overview |
 | [2026-11-01-typed-classifier-reranker](2026-11-01-typed-classifier-reranker/PLAN.md) | Typed classifier tool reranking | draft | — | architecture/orchestrate-engine, feature/orchestrate |
 
 ## Archived plans
@@ -32,6 +33,7 @@ graph TD
     p_2026_11_01_openai_plan_signin[openai-plan-signin]:::draft
     p_2026_11_01_provenance_readiness[provenance-readiness]:::draft
     p_2026_11_01_specplane_migration[specplane-migration]:::draft
+    p_2026_11_01_tool_env_secrets[tool-env-secrets]:::draft
     p_2026_11_01_typed_classifier_reranker[typed-classifier-reranker]:::draft
     classDef draft fill:#f9fafb,color:#374151,stroke:#d1d5db
     classDef ready fill:#22c55e,color:#fff
