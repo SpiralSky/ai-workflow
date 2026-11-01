@@ -8,7 +8,7 @@ import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { createRequire } from "node:module";
-import { DEFAULT_TRACE_LIMITS } from "@aiw/core";
+import { DEFAULT_TRACE_LIMITS, parseFrameworkVariant } from "@aiw/core";
 import type { RunConfig, Provenance, Tier, BranchContext } from "./types.ts";
 
 export { RunConfig, Provenance };
@@ -27,20 +27,7 @@ function runnerVersion(): string {
  * @returns canonical variant string
  */
 export function parseVariant(raw: string): string {
-  const bracket = raw.indexOf("[");
-  if (bracket === -1) return raw.trim();
-  const base = raw.slice(0, bracket).trim();
-  const inner = raw.slice(bracket + 1, raw.endsWith("]") ? raw.length - 1 : raw.length).trim();
-  if (!inner) return base;
-  // Split on commas not inside values (values are simple strings, no commas)
-  const pairs = inner.split(",").map((p) => p.trim()).filter(Boolean);
-  // Sort pairs by key for canonical form
-  pairs.sort((a, b) => {
-    const ka = a.split("=")[0] ?? "";
-    const kb = b.split("=")[0] ?? "";
-    return ka.localeCompare(kb);
-  });
-  return `${base}[${pairs.join(",")}]`;
+  return parseFrameworkVariant(raw).id;
 }
 
 /** The three modes that `compare` expands to. */

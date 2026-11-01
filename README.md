@@ -93,7 +93,7 @@ Related systems with similar ideas include Cloudflare Code Mode, CodeAct, smolag
 
 ## Roadmap
 
-Specs in [docs/specifications/](docs/specifications/features/README.md) are the source of truth; the code is being rebuilt to match them.
+Specs in [docs/specifications/](docs/specifications/features/INFO.md) are the source of truth; the code is being rebuilt to match them.
 
 1. ~~**Final spec check**~~: done 2026-10-24; all feature specs are Final.
 2. **Build to the architecture specs**, in dependency order ([system-overview §2](docs/specifications/architecture/system-overview.md)):

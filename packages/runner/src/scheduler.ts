@@ -1,192 +1,114 @@
-/**
- * Job scheduler: runs jobs with bounded concurrency, tracks budget, handles retries.
- * Runner architecture §7; decided A-15 (interleave frameworks per problem).
- */
-
-import type { Job, JobJSON, AttemptRecord, RunConfig } from "./types.ts";
+/** Job scheduler: all attempts count; unknown spend invalidates monetary-budget runs. */
+import type { Job, JobJSON, AttemptRecord, RunConfig, RunJSON } from "./types.ts";
 import { FORMAT_VERSION } from "./types.ts";
-import { writeJobJSON, writeRunJSON, createAttemptDir } from "./rundir.ts";
-import type { RunJSON } from "./types.ts";
-import type { JobOptions } from "./job.ts";
+import { writeJobJSON, writeRunJSON, createAttemptDir, createJobDir } from "./rundir.ts";
 import { runJobAttempt } from "./job.ts";
+import { join } from "node:path";
+import { readAttemptCost, AttemptFailure, type CostSummary } from "./accounting.ts";
 
-/** Maximum infra-error retries before the run is marked invalid (runner §7). */
 const MAX_RETRIES = 2;
-/** Backoff delays between attempts in ms (runner §7). */
 const RETRY_BACKOFF_MS = [10_000, 60_000] as const;
-
-/** Called after each job completes (pass or fail). */
 export type OnJobDone = (job: Job, result: JobJSON) => void;
-
-/** Options for the scheduler. */
 export interface SchedulerOptions {
-  jobs: Job[];
-  config: RunConfig;
-  runPath: string;
-  repoRoot: string;
-  apiKey: string;
-  baseURL: string;
-  turnLimits: Record<string, number>;
-  problemsDir: string;
-  onJobDone?: OnJobDone;
+  jobs: Job[]; config: RunConfig; runPath: string; repoRoot: string; apiKey: string; baseURL: string;
+  turnLimits: Record<string, number>; problemsDir: string; onJobDone?: OnJobDone;
+  /** Deterministic execution seam; defaults to the real attempt implementation. */
+  runAttempt?: typeof runJobAttempt;
+  /** Deterministic backoff seam; defaults to real timers. */
+  wait?: (ms: number) => Promise<void>;
 }
 
-/** Pauses for `ms` milliseconds. */
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-/**
- * Schedules and runs all jobs with bounded concurrency.
- * Tracks budget across all attempts; cancels in-flight when budget is exhausted.
- * Marks the run invalid after repeated infra errors.
- *
- * @param opts - scheduler options
- * @param runJSON - mutable run.json data (updated in place and written atomically after each job)
- * @returns reason if invalid, or undefined if complete
- */
-export async function runScheduler(
-  opts: SchedulerOptions,
-  runJSON: RunJSON,
-): Promise<string | undefined> {
-  const { jobs, config } = opts;
-  const budgetUsd = config.budgetUsd;
-
-  let totalCostUsd = 0;
-  let pass = 0;
-  let fail = 0;
-  let attempts = 0;
+/** Schedules bounded concurrent jobs and records each attempt's complete cost or lower bound. */
+export async function runScheduler(opts: SchedulerOptions, runJSON: RunJSON): Promise<string | undefined> {
+  const attempt = opts.runAttempt ?? runJobAttempt;
+  const wait = opts.wait ?? ((ms) => new Promise<void>((resolve) => setTimeout(resolve, ms)));
+  const controller = new AbortController();
+  let knownCostUsd = 0;
+  let incomplete = false;
+  let pass = 0, fail = 0, attempts = 0;
   let invalidReason: string | undefined;
-  let stopDispatching = false;
-
-  // AbortController shared across all in-flight jobs for budget cancellation
-  const abortController = new AbortController();
-  const signal = abortController.signal;
-
-  const queue = [...jobs];
-  const inFlight = new Set<Promise<void>>();
-
-  /**
-   * Runs one job through retry loop, updates totals and writes job.json.
-   * @param job - job to run
-   */
-  async function runOne(job: Job): Promise<void> {
-    const attemptRecords: AttemptRecord[] = [];
-    let jobCostUsd = 0;
-
-    for (let n = 0; n <= MAX_RETRIES; n++) {
-      if (n > 0) {
-        const delay = RETRY_BACKOFF_MS[n - 1] ?? 60_000;
-        await sleep(delay);
-      }
-
-      const attemptDir = createAttemptDir(
-        job.dir ?? `${opts.runPath}/${job.problem}.${job.framework}.${job.rep}`,
-        n,
-      );
-      void attemptDir; // used by createAttemptDir internally
-
-      attempts++;
-      let result: Awaited<ReturnType<typeof runJobAttempt>>;
-      let isInfra = false;
-      let infraMsg: string | undefined;
-
-      try {
-        result = await runJobAttempt({
-          job,
-          config,
-          runPath: opts.runPath,
-          repoRoot: opts.repoRoot,
-          apiKey: opts.apiKey,
-          baseURL: opts.baseURL,
-          signal,
-          turnLimits: opts.turnLimits,
-          problemsDir: opts.problemsDir,
-        });
-        jobCostUsd += result.costUsd;
-        totalCostUsd += result.costUsd;
-      } catch (e) {
-        // Treat as infra error for retry
-        isInfra = true;
-        infraMsg = e instanceof Error ? e.message : String(e);
-        attemptRecords.push({ n, infraError: infraMsg, costUsd: 0 });
-
-        if (n < MAX_RETRIES) continue; // retry
-        // Exhausted retries
-        stopDispatching = true;
-        abortController.abort();
-        invalidReason = `job-failed:${job.problem}.${job.framework}.${job.rep}`;
-        const jobJSON: JobJSON = {
-          format: FORMAT_VERSION,
-          problem: job.problem,
-          framework: job.framework,
-          rep: job.rep,
-          outcome: "fail",
-          reason: null,
-          attempts: attemptRecords,
-          costUsdAllAttempts: jobCostUsd,
-          durationMs: 0,
-        };
-        writeJobJSON(job.dir ?? opts.runPath, jobJSON);
-        fail++;
-        opts.onJobDone?.(job, jobJSON);
-        return;
-      }
-
-      if (!isInfra) {
-        attemptRecords.push({ n, final: true });
-        const outcome = result!.outcome;
-        if (outcome === "pass") pass++;
-        else fail++;
-
-        const jobJSON: JobJSON = {
-          format: FORMAT_VERSION,
-          problem: job.problem,
-          framework: job.framework,
-          rep: job.rep,
-          outcome,
-          reason: result!.reason,
-          attempts: attemptRecords,
-          costUsdAllAttempts: jobCostUsd,
-          durationMs: result!.durationMs,
-          rollups: result!.rollups,
-        };
-        writeJobJSON(job.dir ?? opts.runPath, jobJSON);
-        opts.onJobDone?.(job, jobJSON);
-        break;
-      }
-    }
-
-    // Check budget after each job
-    if (totalCostUsd >= budgetUsd && !signal.aborted) {
-      abortController.abort();
-      stopDispatching = true;
-      invalidReason = "budget";
-    }
-
-    // Write updated run.json totals
-    runJSON.totals = { jobs: pass + fail, attempts, costUsd: totalCostUsd, pass, fail };
+  let next = 0;
+  /** Preserves the first causal stop reason; all already-dispatched attempts still settle/account. */
+  function stop(reason: string): void {
+    invalidReason ??= reason;
+    controller.abort();
+  }
+  /** Writes counters after attempts and terminal jobs, including exhausted failures. */
+  function flush(): void {
+    runJSON.totals = { jobs: pass + fail, attempts, costUsd: incomplete ? null : knownCostUsd, knownCostUsd, pass, fail };
     writeRunJSON(opts.runPath, runJSON);
   }
-
-  // Dispatch jobs up to concurrency
-  async function dispatch(): Promise<void> {
-    while (queue.length > 0 && !stopDispatching && inFlight.size < config.concurrency) {
-      const job = queue.shift()!;
-      const p = runOne(job).finally(() => {
-        inFlight.delete(p);
-        // Try to dispatch more when a slot frees up
-        void dispatch();
-      });
-      inFlight.add(p);
+  /** Executes one job and preserves raw retry artifacts before the next attempt. */
+  async function runOne(original: Job): Promise<void> {
+    const job = { ...original, dir: original.dir ?? createJobDir(opts.runPath, original) };
+    const records: AttemptRecord[] = [];
+    let jobKnown = 0;
+    const reasons = new Set<string>();
+    let durationMs = 0;
+    let result: Awaited<ReturnType<typeof runJobAttempt>> | undefined;
+    for (let n = 0; n <= MAX_RETRIES; n++) {
+      if (n > 0) {
+        await wait(RETRY_BACKOFF_MS[n - 1] ?? 60_000);
+        if (controller.signal.aborted) break;
+      }
+      createAttemptDir(job.dir, n);
+      attempts++;
+      let error: unknown;
+      let failed = false;
+      let cost: CostSummary;
+      try {
+        result = await attempt({ ...opts, job, attempt: n, signal: controller.signal });
+        cost = { costUsd: result.costUsd, knownCostUsd: result.knownCostUsd ?? result.costUsd ?? 0,
+          costIncompleteReasons: [...(result.costIncompleteReasons ?? [])] };
+        durationMs += result.durationMs;
+      } catch (e) {
+        error = e;
+        failed = true;
+        cost = e instanceof AttemptFailure
+          ? { ...e.cost, costIncompleteReasons: [...e.cost.costIncompleteReasons] }
+          : readAttemptCost(join(job.dir, "events.jsonl"), ["unaccounted-attempt-failure"]);
+        if (e instanceof AttemptFailure) durationMs += e.durationMs;
+      }
+      if (!Number.isFinite(cost.knownCostUsd) || cost.knownCostUsd < 0) {
+        cost = { costUsd: null, knownCostUsd: 0, costIncompleteReasons: [...cost.costIncompleteReasons, "invalid-known-cost"] };
+      }
+      if (cost.costUsd === null || !Number.isFinite(cost.costUsd) || cost.costUsd < 0 || cost.costIncompleteReasons.length) {
+        incomplete = true;
+        cost.costIncompleteReasons.push("incomplete-attempt-cost");
+        cost.costUsd = null;
+      }
+      jobKnown += cost.knownCostUsd;
+      knownCostUsd += cost.knownCostUsd;
+      cost.costIncompleteReasons.forEach((reason) => reasons.add(reason));
+      records.push({ n, costUsd: cost.costUsd, knownCostUsd: cost.knownCostUsd,
+        ...(cost.costIncompleteReasons.length ? { costIncompleteReasons: [...new Set(cost.costIncompleteReasons)] } : {}),
+        ...(failed ? { infraError: error instanceof Error ? error.message : String(error) } : { final: true as const }) });
+      if (cost.costUsd === null) stop("cost-incomplete");
+      else if (knownCostUsd >= opts.config.budgetUsd) stop("budget");
+      flush();
+      if (!failed || controller.signal.aborted) break;
+      if (n === MAX_RETRIES) stop(`job-failed:${job.problem}.${job.framework}.${job.rep}`);
+    }
+    const outcome = result?.outcome ?? "fail";
+    if (outcome === "pass") pass++; else fail++;
+    const jobJSON: JobJSON = {
+      format: FORMAT_VERSION, problem: job.problem, framework: job.framework, rep: job.rep,
+      outcome, reason: result?.reason ?? null, attempts: records,
+      costUsdAllAttempts: reasons.size ? null : jobKnown, knownCostUsdAllAttempts: jobKnown,
+      ...(reasons.size ? { costIncompleteReasons: [...reasons] } : {}),
+      durationMs, rollups: result?.rollups,
+    };
+    writeJobJSON(job.dir, jobJSON);
+    opts.onJobDone?.(original, jobJSON);
+    flush();
+  }
+  /** Workers claim indices synchronously before awaiting, so no job is dispatched twice. */
+  async function worker(): Promise<void> {
+    while (!controller.signal.aborted && next < opts.jobs.length) {
+      const job = opts.jobs[next++]!;
+      await runOne(job);
     }
   }
-
-  await dispatch();
-  // Wait for all in-flight jobs to finish
-  while (inFlight.size > 0) {
-    await Promise.race(inFlight);
-  }
-
+  await Promise.all(Array.from({ length: Math.max(1, opts.config.concurrency) }, () => worker()));
   return invalidReason;
 }

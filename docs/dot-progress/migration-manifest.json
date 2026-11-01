@@ -1,0 +1,201 @@
+{
+  "base_commit": "b2e781f83976e6807f341debea216dcc56a6ff5d",
+  "framework_reference_commit": "21317cf335a2602f2a7873a929425d7a6b6ef336",
+  "experimental": true,
+  "specs": [
+    {
+      "path": "docs/specifications/features/branching-framework.md",
+      "id": "feature/branching-framework",
+      "body_sha256": "75391d2b18be6c39105d49e0f7f093bc87e44623335fa3922be4011e853eeefb",
+      "source_status": "Final (legacy index)",
+      "implements": []
+    },
+    {
+      "path": "docs/specifications/features/orchestrate.md",
+      "id": "feature/orchestrate",
+      "body_sha256": "dd6c512bab9d60ed1350e8239971033383a8e0c10a7d209e3196ff4aa275c8ad",
+      "source_status": "Final (legacy index)",
+      "implements": []
+    },
+    {
+      "path": "docs/specifications/features/references.md",
+      "id": "feature/references",
+      "body_sha256": "7355b00fbb0c530b1fd9a09b301e1289dbb794792a21039e50e2a2508ff15273",
+      "source_status": "Final (legacy index)",
+      "implements": []
+    },
+    {
+      "path": "docs/specifications/features/framework-runner.md",
+      "id": "feature/framework-runner",
+      "body_sha256": "39d9f830e40a76dcb4fb9ac20fa66cd23838e47a217f56fa355e36b74c8df275",
+      "source_status": "Final (legacy index)",
+      "implements": []
+    },
+    {
+      "path": "docs/specifications/features/tools.md",
+      "id": "feature/tools",
+      "body_sha256": "3c038de9c3059d9b45a878a7f7eb877dff95e094cc1af15eccf5b0716feb40d3",
+      "source_status": "Final (legacy index)",
+      "implements": []
+    },
+    {
+      "path": "docs/specifications/features/problems.md",
+      "id": "feature/problems",
+      "body_sha256": "3331c7fad62d8142bbb24890aedf13c84fcabfb3af13f1a635c4ad9eda9f880f",
+      "source_status": "Final (legacy index)",
+      "implements": []
+    },
+    {
+      "path": "docs/specifications/features/viewer.md",
+      "id": "feature/viewer",
+      "body_sha256": "57f21f66a45953da117ed945d89b7673eeea1222387960de6ada1029435726b9",
+      "source_status": "Final (legacy index)",
+      "implements": []
+    },
+    {
+      "path": "docs/specifications/features/harness-integration.md",
+      "id": "feature/harness-integration",
+      "body_sha256": "2975fcf85bf747de464290a41803e863bcf585b76a79abb2ee2eb334af5085d2",
+      "source_status": "Final (legacy index)",
+      "implements": []
+    },
+    {
+      "path": "docs/specifications/architecture/system-overview.md",
+      "id": "architecture/system-overview",
+      "body_sha256": "fb53643aa75be2398c540226e985df0543e3e95f3f5693bf4cf320f8d692b105",
+      "source_status": "unspecified (legacy architecture index)",
+      "implements": [
+        "feature/branching-framework",
+        "feature/orchestrate",
+        "feature/references",
+        "feature/framework-runner",
+        "feature/tools",
+        "feature/problems",
+        "feature/viewer",
+        "feature/harness-integration"
+      ]
+    },
+    {
+      "path": "docs/specifications/architecture/core-branch.md",
+      "id": "architecture/core-branch",
+      "body_sha256": "f0d20fecb10cc6a0b0668cd7b69f81421f6e0e24a26adb5f5c0de74f87d4cb15",
+      "source_status": "unspecified (legacy architecture index)",
+      "implements": [
+        "feature/branching-framework"
+      ]
+    },
+    {
+      "path": "docs/specifications/architecture/core-tools-and-hosts.md",
+      "id": "architecture/core-tools-and-hosts",
+      "body_sha256": "420921cb104a354defc5f67215c18dab8227e275c7c8d5dd60cd84241b754897",
+      "source_status": "unspecified (legacy architecture index)",
+      "implements": [
+        "feature/branching-framework",
+        "feature/harness-integration",
+        "feature/tools"
+      ]
+    },
+    {
+      "path": "docs/specifications/architecture/orchestrate-engine.md",
+      "id": "architecture/orchestrate-engine",
+      "body_sha256": "236eb18ac122196cc59073df0daaa31dd9d5e60e5dac138c2e15379c6d61cd74",
+      "source_status": "unspecified (legacy architecture index)",
+      "implements": [
+        "feature/orchestrate",
+        "feature/references"
+      ]
+    },
+    {
+      "path": "docs/specifications/architecture/telemetry.md",
+      "id": "architecture/telemetry",
+      "body_sha256": "21c4d9115fe598b728eb3dd854b3af7adc8ca5cf55f963802deff34fb62dd47e",
+      "source_status": "unspecified (legacy architecture index)",
+      "implements": [
+        "feature/framework-runner"
+      ]
+    },
+    {
+      "path": "docs/specifications/architecture/runner.md",
+      "id": "architecture/runner",
+      "body_sha256": "7c6cc680f2b0700e4a0f256717fd0564f1724d1b947568876eef2696eddb79c0",
+      "source_status": "unspecified (legacy architecture index)",
+      "implements": [
+        "feature/framework-runner"
+      ]
+    },
+    {
+      "path": "docs/specifications/architecture/tool-catalog.md",
+      "id": "architecture/tool-catalog",
+      "body_sha256": "cf3ac4b6e7c092c699bd15bdef9f9f3f6688904b80f9519c4f6358b197b23c88",
+      "source_status": "unspecified (legacy architecture index)",
+      "implements": [
+        "feature/tools"
+      ]
+    },
+    {
+      "path": "docs/specifications/architecture/problems.md",
+      "id": "architecture/problems",
+      "body_sha256": "69031242cac01a2fdc0335e36ca8b4b3607d5b70ab10ab3b8ef23baf14da415d",
+      "source_status": "unspecified (legacy architecture index)",
+      "implements": [
+        "feature/problems"
+      ]
+    },
+    {
+      "path": "docs/specifications/architecture/framework-server.md",
+      "id": "architecture/framework-server",
+      "body_sha256": "86780e53e84fb9d6e51e0976f2561116264d1ee2e2f47347318f681819ae1a46",
+      "source_status": "unspecified (legacy architecture index)",
+      "implements": [
+        "feature/harness-integration"
+      ]
+    },
+    {
+      "path": "docs/specifications/architecture/viewer.md",
+      "id": "architecture/viewer",
+      "body_sha256": "eaf098afdf93fadd3c5d711510b59369524d5dc29a8e05110d0fe6c57cbf6b34",
+      "source_status": "unspecified (legacy architecture index)",
+      "implements": [
+        "feature/viewer"
+      ]
+    },
+    {
+      "path": "docs/specifications/architecture/data-formats.md",
+      "id": "architecture/data-formats",
+      "body_sha256": "b9dfa9e1c5fe1c86dd78b6214b9c3ff6dc5c2930d90d689433afe91aedd82304",
+      "source_status": "unspecified (legacy architecture index)",
+      "implements": [
+        "feature/framework-runner",
+        "feature/viewer"
+      ]
+    }
+  ],
+  "preserved_files": {
+    "HANDOFF.md": "18921f7c34a155a561271ccba72cb608589cc9a77679a1ad8d963a516f7fdfb0",
+    ".claude/pending-review/2026-10-27-14-30-orchestrate-dispatch-efficiency.md": "537721e0c3d59b8992caf00d46e7495bcf2989c1a0524b37f8fa9c8f73d61603",
+    ".claude/pending-review/2026-10-27-14-31-llm-edit-tool.md": "47e4ae3523763aeac884feea02abdff7db6c529dc7518a769a5cf50fadcb61be",
+    ".claude/pending-review/2026-10-27-15-00-orchestrate-prompt-wording.md": "29760b8186a1dcb90a6ba21cb34df35d5ff783ddc98355146f92c260987f352e",
+    ".claude/pending-review/2026-10-27-15-10-replace-symbol-tool.md": "4227e76539a61034418f1d09e5316eb93911638829ec58c5c00d47513156842d",
+    ".claude/pending-review/TEMPLATE.md": "60342f47aba9ce30a62c518ce1fd773caf3c06d41c44f6488193787fca083bd3"
+  },
+  "runtime_integrity_reference": "6812b66a71b66a854bef81acce85f57f12d53cc4",
+  "runtime_integrity_reason": "Parent-reviewed variant, accounting and overlay materialization prerequisites replayed individually; source feature bodies still compared against b2e781f.",
+  "test_entry_allowance": {
+    "path": "packages/viewer/package.json",
+    "before": "echo 'no viewer tests yet' && exit 0",
+    "after": "node --import tsx --test test/*.test.ts",
+    "reason": "Run existing new viewer cost tests through npm test instead of claiming no tests exist. No runtime UI behavior changed.",
+    "before_content": "{\n  \"name\": \"@aiw/viewer\",\n  \"private\": true,\n  \"type\": \"module\",\n  \"scripts\": {\n    \"build:indexer\": \"node indexer/build.mjs\",\n    \"index\": \"node indexer/dist/index.js\",\n    \"index:watch\": \"node indexer/dist/index.js --watch\",\n    \"build\": \"npm run build:indexer && vite build\",\n    \"dev\": \"vite\",\n    \"preview\": \"vite preview\",\n    \"test\": \"echo 'no viewer tests yet' && exit 0\"\n  },\n  \"dependencies\": {\n    \"react\": \"^18.3.1\",\n    \"react-dom\": \"^18.3.1\",\n    \"react-markdown\": \"^9.0.3\",\n    \"shiki\": \"^1.24.4\"\n  },\n  \"devDependencies\": {\n    \"@types/react\": \"^18.3.12\",\n    \"@types/react-dom\": \"^18.3.1\",\n    \"@vitejs/plugin-react\": \"^4.3.4\",\n    \"esbuild\": \"^0.24.0\",\n    \"typescript\": \"^5.6.3\",\n    \"vite\": \"^5.4.11\"\n  }\n}\n",
+    "before_sha256": "ae18a38cac1a26d82a2f3abd530fc4f9f456e3051237bdff0121bbcc2452a57b",
+    "after_sha256": "edb1cc3089e21d8cbcd9fbd2a962a524ecbb97946e54783a668ca2bbf248f290"
+  },
+  "enhanced_framework": {
+    "source_commit": "6ae4e304faa75b7bd5ae1240da7f4693f48d0a4e",
+    "source_branch": "dot/codex-integration-20261101",
+    "cli_relative_path": "packages/cli/dist/cli.js",
+    "skill_path": ".agents/skills/specplane/SKILL.md",
+    "skill_sha256": "cc7c62f08578e36d6086ab820925960404f9559025d28b917a7803a21109d07f"
+  },
+  "migration_runtime_inventory": ".specplane/migration-runtime-inventory.json",
+  "migration_source_inventory": ".specplane/migration-source-inventory.json"
+}

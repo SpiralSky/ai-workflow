@@ -1,3 +1,12 @@
+---
+id: "architecture/telemetry"
+title: "Architecture: Telemetry"
+status: "review"
+author: "mixed"
+migration_source_commit: "b2e781f83976e6807f341debea216dcc56a6ff5d"
+migration_source_status: "unspecified (legacy architecture index)"
+implements: ["feature/framework-runner"]
+---
 # Architecture: Telemetry
 
 **Derived from:** [framework-runner.md §4–5, §7](../features/framework-runner.md)  

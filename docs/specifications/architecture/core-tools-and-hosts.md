@@ -1,3 +1,12 @@
+---
+id: "architecture/core-tools-and-hosts"
+title: "Architecture: Tool Registry, Hosts and Wrappers"
+status: "review"
+author: "mixed"
+migration_source_commit: "b2e781f83976e6807f341debea216dcc56a6ff5d"
+migration_source_status: "unspecified (legacy architecture index)"
+implements: ["feature/branching-framework", "feature/harness-integration", "feature/tools"]
+---
 # Architecture: Tool Registry, Hosts and Wrappers
 
 **Derived from:** [branching-framework.md §6](../features/branching-framework.md),

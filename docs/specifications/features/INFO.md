@@ -23,3 +23,10 @@ Architecture specs (in `../architecture/`) follow from these and resolve the how
 
 - **Draft:** under review; may change freely.
 - **Final:** checked; changes are spec changes and need the user's approval.
+
+## Experimental migration status
+
+The table above preserves historical **Final** evidence at b2e781f83976e6807f341debea216dcc56a6ff5d.
+Current Specplane frontmatter is **review**, not a new approval. The user explicitly permits
+experimental development without spec approval; final merge still requires user approval.
+See `docs/dot-progress/migration-decisions.md` for policy and provenance.

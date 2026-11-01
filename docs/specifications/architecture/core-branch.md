@@ -1,3 +1,12 @@
+---
+id: "architecture/core-branch"
+title: "Architecture: Branch Runtime"
+status: "review"
+author: "mixed"
+migration_source_commit: "b2e781f83976e6807f341debea216dcc56a6ff5d"
+migration_source_status: "unspecified (legacy architecture index)"
+implements: ["feature/branching-framework"]
+---
 # Architecture: Branch Runtime
 
 **Derived from:** [branching-framework.md](../features/branching-framework.md)  

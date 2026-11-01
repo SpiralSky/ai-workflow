@@ -1,9 +1,10 @@
 # Architecture Specifications
 
-Architecture specs resolve **how** the features in [`../features/`](../features/README.md) are built:
-components, processes, packages, interfaces and data formats. Feature specs remain the source of
-truth for behaviour; where an architecture spec seems to contradict a feature spec, the feature spec
-wins and the contradiction is a bug in this directory.
+Architecture specs resolve **how** the features in [`../features/`](../features/INFO.md) are built:
+components, processes, packages, interfaces and data formats. For this experimental migration, architecture specs drive implementation detail and feature specs
+remain authoritative for user-visible behaviour. A contradiction blocks the affected behaviour,
+not independent work; record it for resolution rather than silently choosing either side. This
+reversible policy mapping follows Specplane and does not approve any spec or final merge.
 
 Architecture specs describe the target system. They do not describe or depend on the current code.
 

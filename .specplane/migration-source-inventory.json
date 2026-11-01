@@ -1,0 +1,131 @@
+{
+  "version": 1,
+  "source_ref": "b2e781f83976e6807f341debea216dcc56a6ff5d",
+  "files": [
+    {
+      "path": ".claude/pending-review/2026-10-27-14-30-orchestrate-dispatch-efficiency.md",
+      "mode": "100644",
+      "sha256": "537721e0c3d59b8992caf00d46e7495bcf2989c1a0524b37f8fa9c8f73d61603"
+    },
+    {
+      "path": ".claude/pending-review/2026-10-27-14-31-llm-edit-tool.md",
+      "mode": "100644",
+      "sha256": "47e4ae3523763aeac884feea02abdff7db6c529dc7518a769a5cf50fadcb61be"
+    },
+    {
+      "path": ".claude/pending-review/2026-10-27-15-00-orchestrate-prompt-wording.md",
+      "mode": "100644",
+      "sha256": "29760b8186a1dcb90a6ba21cb34df35d5ff783ddc98355146f92c260987f352e"
+    },
+    {
+      "path": ".claude/pending-review/2026-10-27-15-10-replace-symbol-tool.md",
+      "mode": "100644",
+      "sha256": "4227e76539a61034418f1d09e5316eb93911638829ec58c5c00d47513156842d"
+    },
+    {
+      "path": ".claude/pending-review/TEMPLATE.md",
+      "mode": "100644",
+      "sha256": "60342f47aba9ce30a62c518ce1fd773caf3c06d41c44f6488193787fca083bd3"
+    },
+    {
+      "path": "HANDOFF.md",
+      "mode": "100644",
+      "sha256": "18921f7c34a155a561271ccba72cb608589cc9a77679a1ad8d963a516f7fdfb0"
+    },
+    {
+      "path": "docs/specifications/architecture/core-branch.md",
+      "mode": "100644",
+      "sha256": "f0d20fecb10cc6a0b0668cd7b69f81421f6e0e24a26adb5f5c0de74f87d4cb15"
+    },
+    {
+      "path": "docs/specifications/architecture/core-tools-and-hosts.md",
+      "mode": "100644",
+      "sha256": "420921cb104a354defc5f67215c18dab8227e275c7c8d5dd60cd84241b754897"
+    },
+    {
+      "path": "docs/specifications/architecture/data-formats.md",
+      "mode": "100644",
+      "sha256": "b9dfa9e1c5fe1c86dd78b6214b9c3ff6dc5c2930d90d689433afe91aedd82304"
+    },
+    {
+      "path": "docs/specifications/architecture/framework-server.md",
+      "mode": "100644",
+      "sha256": "86780e53e84fb9d6e51e0976f2561116264d1ee2e2f47347318f681819ae1a46"
+    },
+    {
+      "path": "docs/specifications/architecture/orchestrate-engine.md",
+      "mode": "100644",
+      "sha256": "236eb18ac122196cc59073df0daaa31dd9d5e60e5dac138c2e15379c6d61cd74"
+    },
+    {
+      "path": "docs/specifications/architecture/problems.md",
+      "mode": "100644",
+      "sha256": "69031242cac01a2fdc0335e36ca8b4b3607d5b70ab10ab3b8ef23baf14da415d"
+    },
+    {
+      "path": "docs/specifications/architecture/runner.md",
+      "mode": "100644",
+      "sha256": "7c6cc680f2b0700e4a0f256717fd0564f1724d1b947568876eef2696eddb79c0"
+    },
+    {
+      "path": "docs/specifications/architecture/system-overview.md",
+      "mode": "100644",
+      "sha256": "fb53643aa75be2398c540226e985df0543e3e95f3f5693bf4cf320f8d692b105"
+    },
+    {
+      "path": "docs/specifications/architecture/telemetry.md",
+      "mode": "100644",
+      "sha256": "21c4d9115fe598b728eb3dd854b3af7adc8ca5cf55f963802deff34fb62dd47e"
+    },
+    {
+      "path": "docs/specifications/architecture/tool-catalog.md",
+      "mode": "100644",
+      "sha256": "cf3ac4b6e7c092c699bd15bdef9f9f3f6688904b80f9519c4f6358b197b23c88"
+    },
+    {
+      "path": "docs/specifications/architecture/viewer.md",
+      "mode": "100644",
+      "sha256": "eaf098afdf93fadd3c5d711510b59369524d5dc29a8e05110d0fe6c57cbf6b34"
+    },
+    {
+      "path": "docs/specifications/features/branching-framework.md",
+      "mode": "100644",
+      "sha256": "75391d2b18be6c39105d49e0f7f093bc87e44623335fa3922be4011e853eeefb"
+    },
+    {
+      "path": "docs/specifications/features/framework-runner.md",
+      "mode": "100644",
+      "sha256": "39d9f830e40a76dcb4fb9ac20fa66cd23838e47a217f56fa355e36b74c8df275"
+    },
+    {
+      "path": "docs/specifications/features/harness-integration.md",
+      "mode": "100644",
+      "sha256": "2975fcf85bf747de464290a41803e863bcf585b76a79abb2ee2eb334af5085d2"
+    },
+    {
+      "path": "docs/specifications/features/orchestrate.md",
+      "mode": "100644",
+      "sha256": "dd6c512bab9d60ed1350e8239971033383a8e0c10a7d209e3196ff4aa275c8ad"
+    },
+    {
+      "path": "docs/specifications/features/problems.md",
+      "mode": "100644",
+      "sha256": "3331c7fad62d8142bbb24890aedf13c84fcabfb3af13f1a635c4ad9eda9f880f"
+    },
+    {
+      "path": "docs/specifications/features/references.md",
+      "mode": "100644",
+      "sha256": "7355b00fbb0c530b1fd9a09b301e1289dbb794792a21039e50e2a2508ff15273"
+    },
+    {
+      "path": "docs/specifications/features/tools.md",
+      "mode": "100644",
+      "sha256": "3c038de9c3059d9b45a878a7f7eb877dff95e094cc1af15eccf5b0716feb40d3"
+    },
+    {
+      "path": "docs/specifications/features/viewer.md",
+      "mode": "100644",
+      "sha256": "57f21f66a45953da117ed945d89b7673eeea1222387960de6ada1029435726b9"
+    }
+  ]
+}

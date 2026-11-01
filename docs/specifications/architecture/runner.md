@@ -1,3 +1,12 @@
+---
+id: "architecture/runner"
+title: "Architecture: Runner"
+status: "review"
+author: "mixed"
+migration_source_commit: "b2e781f83976e6807f341debea216dcc56a6ff5d"
+migration_source_status: "unspecified (legacy architecture index)"
+implements: ["feature/framework-runner"]
+---
 # Architecture: Runner
 
 **Derived from:** [framework-runner.md](../features/framework-runner.md), [problems.md §7](../features/problems.md)  

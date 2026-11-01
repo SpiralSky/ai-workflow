@@ -60,7 +60,9 @@ export interface Job {
 export interface AttemptRecord {
   n: number;
   infraError?: string;
-  costUsd?: number;
+  costUsd?: number | null;
+  knownCostUsd?: number;
+  costIncompleteReasons?: string[];
   final?: true;
 }
 
@@ -73,7 +75,9 @@ export interface JobJSON {
   outcome: "pass" | "fail";
   reason: null | "checks" | "turn-limit" | "timeout" | "patch-failed" | "context-limit";
   attempts: AttemptRecord[];
-  costUsdAllAttempts: number;
+  costUsdAllAttempts: number | null;
+  knownCostUsdAllAttempts?: number;
+  costIncompleteReasons?: string[];
   unmatchedProxyCostUsd?: number;
   flags?: string[];
   rollups?: Record<string, unknown>;
@@ -87,7 +91,7 @@ export interface RunJSON {
   status: "complete" | "in-progress" | { invalid: string };
   config: RunConfig;
   provenance: Provenance;
-  totals: { jobs: number; attempts: number; costUsd: number; pass: number; fail: number };
+  totals: { jobs: number; attempts: number; costUsd: number | null; knownCostUsd?: number; pass: number; fail: number };
   startedAt: string;
   endedAt?: string;
 }
@@ -96,7 +100,9 @@ export interface RunJSON {
 export interface JobResult {
   outcome: "pass" | "fail";
   reason: JobJSON["reason"];
-  costUsd: number;
+  costUsd: number | null;
+  knownCostUsd?: number;
+  costIncompleteReasons?: string[];
   durationMs: number;
   rollups?: Record<string, unknown>;
   /** Absolute path to the events.jsonl file. */

@@ -1,3 +1,12 @@
+---
+id: "architecture/framework-server"
+title: "Architecture: Framework Server and Harness Plugins"
+status: "review"
+author: "mixed"
+migration_source_commit: "b2e781f83976e6807f341debea216dcc56a6ff5d"
+migration_source_status: "unspecified (legacy architecture index)"
+implements: ["feature/harness-integration"]
+---
 # Architecture: Framework Server and Harness Plugins
 
 **Derived from:** [harness-integration.md](../features/harness-integration.md)  

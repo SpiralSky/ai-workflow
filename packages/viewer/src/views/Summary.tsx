@@ -9,8 +9,8 @@ interface Props {
   framework: string;
 }
 
-function fmtCost(usd: number): string {
-  return `$${usd.toFixed(4)}`;
+function fmtCost(usd: number | null): string {
+  return usd === null ? "unknown" : `$${usd.toFixed(4)}`;
 }
 
 function fmtPct(n: number, d: number): string {
@@ -23,7 +23,7 @@ export function Summary({ run, framework }: Props) {
   const passed = jobs.filter((j) => j.outcome === "pass").length;
   const failed = jobs.filter((j) => j.outcome === "fail").length;
   const total = jobs.length;
-  const totalCost = jobs.reduce((s, j) => s + j.costUsdAllAttempts, 0);
+  const totalCost = jobs.some((j) => j.costUsdAllAttempts == null) ? null : jobs.reduce((s, j) => s + j.costUsdAllAttempts!, 0);
 
   // Failure reasons breakdown
   const reasons = new Map<string, number>();
@@ -35,7 +35,7 @@ export function Summary({ run, framework }: Props) {
 
   const rows: [string, string, string][] = [
     ["Pass rate", `${passed} / ${total}`, fmtPct(passed, total)],
-    ["Total cost", fmtCost(totalCost), total > 0 ? `${fmtCost(totalCost / total)} / job` : "—"],
+    ["Total cost", fmtCost(totalCost), total > 0 && totalCost !== null ? `${fmtCost(totalCost / total)} / job` : "—"],
   ];
 
   return (

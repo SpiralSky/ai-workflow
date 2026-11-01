@@ -11,8 +11,8 @@ test("parseVariant: bare mode name passes through", () => {
 });
 
 test("parseVariant: keys are sorted for canonical form", () => {
-  assert.equal(parseVariant("orchestrate[secondary=2,foo=bar]"), "orchestrate[foo=bar,secondary=2]");
-  assert.equal(parseVariant("branch-only[z=1,a=2]"), "branch-only[a=2,z=1]");
+  assert.equal(parseVariant("orchestrate[secondary=2,rerank=none]"), "orchestrate[rerank=none,secondary=2]");
+  assert.equal(parseVariant("branch-only[toolSearch,catalog=50]"), "branch-only[catalog=50,toolSearch]");
 });
 
 test("parseVariant: single key passes through unchanged", () => {
@@ -49,7 +49,7 @@ test("expandModes: deduplicates", () => {
 });
 
 test("expandModes: variant string is canonicalised", () => {
-  assert.deepEqual(expandModes("orchestrate[z=1,a=2]"), ["orchestrate[a=2,z=1]"]);
+  assert.deepEqual(expandModes("orchestrate[secondary=2,catalog=50]"), ["orchestrate[catalog=50,secondary=2]"]);
 });
 
 // --- validateModel ---

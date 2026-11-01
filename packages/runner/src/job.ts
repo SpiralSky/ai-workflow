@@ -15,10 +15,14 @@ import { openMCPSession, closeMCPSession } from "./mcp.ts";
 import { gradeJob } from "./grade.ts";
 import { runLoop } from "./loop.ts";
 import { createJobDir } from "./rundir.ts";
+import { readAttemptCost, AttemptFailure } from "./accounting.ts";
+import { frameworkLaunch } from "./framework-launch.ts";
 
 /** Options for running a single job attempt. */
 export interface JobOptions {
   job: Job;
+  /** Zero-based retry number for per-attempt telemetry. */
+  attempt?: number;
   config: RunConfig;
   runPath: string;
   repoRoot: string;
@@ -66,14 +70,16 @@ function buildSystemPrompt(frameworkInstructions: string): string {
 export async function runJobAttempt(opts: JobOptions): Promise<JobResult> {
   const { job, config, runPath, repoRoot, apiKey, baseURL, signal, turnLimits, problemsDir } = opts;
 
-  const jobDir = createJobDir(runPath, job);
+  // Validate treatment before creating artifacts or starting any container.
+  const launch = frameworkLaunch(job.framework, config, { apiKey, baseURL });
+  const jobDir = job.dir ?? createJobDir(runPath, job);
   const eventsPath = join(jobDir, "events.jsonl");
   const sink = new FileSink(eventsPath);
   const reporter = createReporter({ sink, writer: "r" });
 
   writeJobStart(reporter, {
     job: `${job.problem}.${job.framework}.${job.rep}`,
-    attempt: 0,
+    attempt: opts.attempt ?? 0,
     framework: job.framework,
     problem: job.problem,
     rep: job.rep,
@@ -82,7 +88,10 @@ export async function runJobAttempt(opts: JobOptions): Promise<JobResult> {
   const startMs = Date.now();
   let outcome: "pass" | "fail" = "fail";
   let reason: JobResult["reason"] = null;
-  let costUsd = 0;
+  let failure: unknown;
+  let failed = false;
+  const costReasons: string[] = [];
+  let modelLoopStarted = false;
 
   const problemDir = join(problemsDir, job.problem);
 
@@ -90,27 +99,23 @@ export async function runJobAttempt(opts: JobOptions): Promise<JobResult> {
     // Build image and start container (stubs in this implementation)
     await buildImage(problemDir, job.problem);
     // orchestrate executor makes LLM calls from inside the container; bridge gives outbound internet access
-    const ctr = await startContainer(job.problem, jobDir, join(repoRoot, "packages", "server", "dist"), job.framework === "orchestrate" ? "bridge" : undefined);
+    const ctr = await startContainer(job.problem, jobDir, join(repoRoot, "packages", "server", "dist"), launch.needsExecutor ? "bridge" : undefined);
 
+    let session: Awaited<ReturnType<typeof openMCPSession>> | undefined;
     try {
       const serverArgs = [
         "--engine", "isolated-vm",
-        "--framework", job.framework,
+        "--framework", launch.id,
         "--tier", config.tier ?? "S",
         "--host", "local",
         "--root", "/work",
         "--events", "/out/events.jsonl",
         "--transcript", "/out/transcript.jsonl",
         "--blobs", "/out/blobs",
-        ...(job.framework === "orchestrate" ? [
-          "--executor-model", config.models.secondary,
-          "--executor-api-key", apiKey,
-          "--executor-base-url", baseURL,
-          "--secondary-cap", String(config.secondaryCap),
-        ] : []),
+        ...launch.executorArgs,
       ];
       const serverDescriptor = await startServer(ctr, serverArgs);
-      const session = await openMCPSession(serverDescriptor);
+      session = await openMCPSession(serverDescriptor);
 
       const taskText = readTaskText(problemsDir, job.problem);
       const systemPrompt = buildSystemPrompt(session.instructions ?? "");
@@ -123,6 +128,7 @@ export async function runJobAttempt(opts: JobOptions): Promise<JobResult> {
         : {};
       const turnLimit = turnLimits[job.problem] ?? taskJson.turnLimit ?? 20;
 
+      modelLoopStarted = true;
       const loopResult = await runLoop({
         client,
         reporter,
@@ -136,9 +142,11 @@ export async function runJobAttempt(opts: JobOptions): Promise<JobResult> {
         signal,
       });
 
-      costUsd += loopResult.metrics.costUsd;
+      modelLoopStarted = false;
+      costReasons.push(...(loopResult.metrics.costIncompleteReasons ?? []));
 
       if (loopResult.outcome === "infra-error") {
+        costReasons.push("unobserved-failed-model-request");
         throw new Error(`infra error: ${loopResult.infraError}`);
       }
       if (loopResult.outcome === "turn-limit") {
@@ -148,6 +156,7 @@ export async function runJobAttempt(opts: JobOptions): Promise<JobResult> {
       } else {
         // Model finished; grade the result
         await closeMCPSession(session);
+        session = undefined;
         const gradeResult = await gradeJob(ctr, problemDir, jobDir);
         if (gradeResult.pass) {
           outcome = "pass";
@@ -157,19 +166,26 @@ export async function runJobAttempt(opts: JobOptions): Promise<JobResult> {
         }
       }
     } finally {
-      await removeContainer(ctr).catch(() => void 0);
+      if (session) {
+        try { await closeMCPSession(session); }
+        catch { costReasons.push("server-close-failed"); }
+      }
+      await removeContainer(ctr).catch(() => { costReasons.push("container-stop-failed"); });
     }
   } catch (e) {
-    // Re-throw for job.ts retry logic
-    throw e;
+    failure = e;
+    failed = true;
+    if (modelLoopStarted) costReasons.push("unobserved-failed-model-request");
+  } finally {
+    writeJobEnd(reporter, { outcome: failed ? "infra-error" : outcome, reason: reason ?? undefined });
+    sink.close();
   }
 
   const durationMs = Date.now() - startMs;
 
-  writeJobEnd(reporter, { outcome, reason: reason ?? undefined });
-  sink.close();
-
-  return { outcome, reason, costUsd, durationMs, eventsPath };
+  const cost = readAttemptCost(eventsPath, costReasons);
+  if (failed) throw new AttemptFailure(failure, cost, eventsPath, durationMs);
+  return { outcome, reason, ...cost, durationMs, eventsPath };
 }
 
 /**

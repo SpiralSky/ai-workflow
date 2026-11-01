@@ -56,7 +56,7 @@ export function JobsMatrix({ run, framework, onJobClick }: Props) {
                 return (
                   <td key={rep} style={{ padding: "6px 12px" }}>
                     <button
-                      title={`$${job.costUsdAllAttempts.toFixed(4)} — ${job.reason ?? job.outcome}`}
+                      title={`${job.costUsdAllAttempts == null ? "unknown" : "$" + job.costUsdAllAttempts.toFixed(4)} — ${job.reason ?? job.outcome}`}
                       onClick={() => onJobClick(job.name)}
                       style={{
                         background: bg,
