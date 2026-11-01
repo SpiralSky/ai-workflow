@@ -42,6 +42,10 @@ jobs:
         timeout-minutes: 5
         working-directory: ${{ runner.temp }}/aiw-verified-source
         run: docker build --progress=plain -t aiw-base:latest experiments/docker/aiw-base
+      - name: Recheck L1 Docker image naming first
+        timeout-minutes: 3
+        working-directory: ${{ runner.temp }}/aiw-verified-source
+        run: node --import tsx scripts/docker-fixture-ci.mjs fixture L1-rename-sku
       - name: Smoke prerequisite (actual Docker grading, no model)
         timeout-minutes: 3
         working-directory: ${{ runner.temp }}/aiw-verified-source

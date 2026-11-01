@@ -9,8 +9,8 @@ import subprocess
 import sys
 import urllib.request
 
-TREE = '833b73e66ef6919f5efb248507d1e133d3044035'
-BLOBS = 821
+TREE = '4fb02bff34675cb62b00aa9e6d1dea9b2bf70842'
+BLOBS = 823
 API = 'https://api.github.com/repos/SpiralSky/ai-workflow/git/'
 MAX_RESPONSE = 8 * 1024 * 1024
 MAX_BLOB = 4 * 1024 * 1024

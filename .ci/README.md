@@ -6,9 +6,9 @@ The user authorized GitHub Actions for Docker. No plan/spec approval or merge is
 
 ## Exact reviewed source
 
-- Tested local source commit: `fe2634ba2ca0d7420472727ac608a99d024f6a58`
-- Immutable source tree: `833b73e66ef6919f5efb248507d1e133d3044035`
-- Expected inventory: 821 regular/executable files; no symlinks or submodules.
+- Tested local source commit: `e301baedd1ece152cf22dd56f656e5761fc2c745`
+- Immutable source tree: `4fb02bff34675cb62b00aa9e6d1dea9b2bf70842`
+- Expected inventory: 823 regular/executable files; no symlinks or submodules.
 
 The source tree and its blobs were already uploaded and verified through GitHub REST.
 The bulk commit service returned an unexplained 422 despite readable objects. Separately,
@@ -56,7 +56,7 @@ existing network-none isolation. No model success or cost reduction is claimed.
 
 Five local unit tests cover verified local reuse, corrupted remote blob, path traversal and
 unsupported modes, unavailable tree, and final root mismatch. Failure cases never materialize
-source files. The exact 821-file reviewed source tree is also reconstructed locally from
+source files. The exact 823-file reviewed source tree is also reconstructed locally from
 verified Git objects without network; final tree equality is required. Workflow YAML checks
 confirm exact trigger/permissions, token scoping, and original command/timeouts parity.
 Actual Docker execution and remote REST transfer still require the Actions run.
