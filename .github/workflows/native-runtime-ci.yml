@@ -1,0 +1,53 @@
+name: Native Node 22 packaged runtime
+on:
+  push:
+    branches: [dot/tool-env-native-ci-20261101]
+permissions:
+  contents: read
+concurrency:
+  group: native-runtime-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  packaged:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    defaults:
+      run:
+        shell: bash --noprofile --norc -euo pipefail {0}
+    env:
+      PYTHONDONTWRITEBYTECODE: '1'
+      PIP_DISABLE_PIP_VERSION_CHECK: '1'
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # official v4 verified 2026-11-01
+        with:
+          persist-credentials: false
+      - name: Verify reviewed source tree and ignore hygiene
+        timeout-minutes: 2
+        run: |
+          export GIT_INDEX_FILE="$RUNNER_TEMP/native-reviewed-source.index"
+          test ! -e "$GIT_INDEX_FILE"
+          git read-tree HEAD
+          git update-index --force-remove .github/workflows/native-runtime-ci.yml
+          test "$(git write-tree)" = '856980178ba7d3858a09ad006020c429c188c107'
+          unset GIT_INDEX_FILE
+          bash scripts/check-gitignore.sh
+          bash -n scripts/test-packaged-docker.sh
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # official v4 verified 2026-11-01
+        with:
+          node-version: '24.22.1'
+      - name: Verify Docker and install locked dependencies without lifecycle scripts
+        timeout-minutes: 5
+        run: |
+          docker version
+          npm ci --ignore-scripts --no-audit --no-fund
+      - name: Reject stale checked-in bundle before any rebuilding
+        timeout-minutes: 2
+        run: node packages/server/build.mjs --check
+      - name: Real native Node 22 and tier L packaged probe (no network or models)
+        timeout-minutes: 10
+        run: bash scripts/test-packaged-docker.sh
+      - name: Record actual target runtime version and ABI
+        timeout-minutes: 1
+        run: >-
+          docker run --rm --network none aiw-base:latest /opt/aiw-node/bin/node
+          -e 'console.log(JSON.stringify({node:process.version,abi:process.versions.modules,platform:process.platform,arch:process.arch})); if(process.versions.node.split(".")[0]!=="22") process.exit(1)'
