@@ -7,6 +7,7 @@
   "user_requests": [
     "Add sign in to open ai support for ai-workflow workflow runs",
     "Additionally, try to approach testing in the future with saving money in mind, for example once hitting an error, stop all other runs and try to fix the error first.",
+    "Keep working on and improving it \u2014 ai-workflow-only separate-branch refinement, strict fixture admission before evaluation work.",
     "Keep working on and improving it"
   ],
   "source_commits": [
@@ -128,6 +129,180 @@
       "rationale": "Stop concurrent work and propagate cancellation after terminal failures, preserving task success requirements."
     },
     {
+      "path": "packages/core/src/orchestrate/hot-paths/catalog.ts",
+      "before": null,
+      "after": {
+        "path": "packages/core/src/orchestrate/hot-paths/catalog.ts",
+        "mode": "100644",
+        "sha256": "b5851ecc7c366f543cad5af42478ada0dd49b36f663b925ddfa10b5eb266c3ad"
+      },
+      "rationale": "Isolated opt-in hot-path prototype: generic bounded snippets, selection/locking integration and mocked deterministic regressions; defaults unchanged."
+    },
+    {
+      "path": "packages/core/src/orchestrate/hot-paths/check-errors-read.ts",
+      "before": null,
+      "after": {
+        "path": "packages/core/src/orchestrate/hot-paths/check-errors-read.ts",
+        "mode": "100644",
+        "sha256": "1867ea25081ef85cf59784063afb68ecca8901375da70d362d9566a97dc63f5c"
+      },
+      "rationale": "Isolated opt-in hot-path prototype: generic bounded snippets, selection/locking integration and mocked deterministic regressions; defaults unchanged."
+    },
+    {
+      "path": "packages/core/src/orchestrate/hot-paths/command-nonzero-summary.ts",
+      "before": null,
+      "after": {
+        "path": "packages/core/src/orchestrate/hot-paths/command-nonzero-summary.ts",
+        "mode": "100644",
+        "sha256": "0b4dae8fa4216b47893cce8eec9142de35dc05dc3d26add5f30b212387665bf0"
+      },
+      "rationale": "Isolated opt-in hot-path prototype: generic bounded snippets, selection/locking integration and mocked deterministic regressions; defaults unchanged."
+    },
+    {
+      "path": "packages/core/src/orchestrate/hot-paths/edit-ambiguous-reread.ts",
+      "before": null,
+      "after": {
+        "path": "packages/core/src/orchestrate/hot-paths/edit-ambiguous-reread.ts",
+        "mode": "100644",
+        "sha256": "417aea50947dea3f61b3767883e5531b4f6bf7270c7db2bb93d2100703de117e"
+      },
+      "rationale": "Isolated opt-in hot-path prototype: generic bounded snippets, selection/locking integration and mocked deterministic regressions; defaults unchanged."
+    },
+    {
+      "path": "packages/core/src/orchestrate/hot-paths/edit-missing-reread.ts",
+      "before": null,
+      "after": {
+        "path": "packages/core/src/orchestrate/hot-paths/edit-missing-reread.ts",
+        "mode": "100644",
+        "sha256": "c378b4d54e05dabfd18a174055f0aacc8967b43f8a19d540ac0b958808d4771d"
+      },
+      "rationale": "Isolated opt-in hot-path prototype: generic bounded snippets, selection/locking integration and mocked deterministic regressions; defaults unchanged."
+    },
+    {
+      "path": "packages/core/src/orchestrate/hot-paths/edit-then-narrow-test.ts",
+      "before": null,
+      "after": {
+        "path": "packages/core/src/orchestrate/hot-paths/edit-then-narrow-test.ts",
+        "mode": "100644",
+        "sha256": "7973d76f1f80c2ff8c7e7b8bc3325ca15fcb25402105193e0794e92dab7be95e"
+      },
+      "rationale": "Isolated opt-in hot-path prototype: generic bounded snippets, selection/locking integration and mocked deterministic regressions; defaults unchanged."
+    },
+    {
+      "path": "packages/core/src/orchestrate/hot-paths/find-files-empty-widen.ts",
+      "before": null,
+      "after": {
+        "path": "packages/core/src/orchestrate/hot-paths/find-files-empty-widen.ts",
+        "mode": "100644",
+        "sha256": "edf44156be9c4ed3f2307dcc5bc69c7a61e0e777577e7cfbfd2bbec962d72156"
+      },
+      "rationale": "Isolated opt-in hot-path prototype: generic bounded snippets, selection/locking integration and mocked deterministic regressions; defaults unchanged."
+    },
+    {
+      "path": "packages/core/src/orchestrate/hot-paths/fingerprint.ts",
+      "before": null,
+      "after": {
+        "path": "packages/core/src/orchestrate/hot-paths/fingerprint.ts",
+        "mode": "100644",
+        "sha256": "73a7b75298c22abe296993ef808382b9a460841c4fc92e178a3ee677af9dddef"
+      },
+      "rationale": "Explicit observed hot-path hidden-prompt fingerprint and deterministic attestation regressions; original baseline unchanged."
+    },
+    {
+      "path": "packages/core/src/orchestrate/hot-paths/grep-empty-widen.ts",
+      "before": null,
+      "after": {
+        "path": "packages/core/src/orchestrate/hot-paths/grep-empty-widen.ts",
+        "mode": "100644",
+        "sha256": "d56b1169f4a0c20eb206c117dda829d82ce7dbca2e86b8aaf061b50a19e6ddfb"
+      },
+      "rationale": "Isolated opt-in hot-path prototype: generic bounded snippets, selection/locking integration and mocked deterministic regressions; defaults unchanged."
+    },
+    {
+      "path": "packages/core/src/orchestrate/hot-paths/index.ts",
+      "before": null,
+      "after": {
+        "path": "packages/core/src/orchestrate/hot-paths/index.ts",
+        "mode": "100644",
+        "sha256": "73dd601a56bd439c5551069fe3f548c7ddec24b36226efc3ef5d8c430b2585dd"
+      },
+      "rationale": "Isolated opt-in hot-path prototype: generic bounded snippets, selection/locking integration and mocked deterministic regressions; defaults unchanged."
+    },
+    {
+      "path": "packages/core/src/orchestrate/hot-paths/move-cycle-diagnose.ts",
+      "before": null,
+      "after": {
+        "path": "packages/core/src/orchestrate/hot-paths/move-cycle-diagnose.ts",
+        "mode": "100644",
+        "sha256": "86ed314721882154ef0d6188d976813d655e89e69bf2868b6f62e27f8c029092"
+      },
+      "rationale": "Isolated opt-in hot-path prototype: generic bounded snippets, selection/locking integration and mocked deterministic regressions; defaults unchanged."
+    },
+    {
+      "path": "packages/core/src/orchestrate/hot-paths/read-not-found-locate.ts",
+      "before": null,
+      "after": {
+        "path": "packages/core/src/orchestrate/hot-paths/read-not-found-locate.ts",
+        "mode": "100644",
+        "sha256": "a5731f9f87ca54b33914efd4d3dd42695da0a17f9dd96e43016e093109ad7f58"
+      },
+      "rationale": "Isolated opt-in hot-path prototype: generic bounded snippets, selection/locking integration and mocked deterministic regressions; defaults unchanged."
+    },
+    {
+      "path": "packages/core/src/orchestrate/hot-paths/read-truncated-range.ts",
+      "before": null,
+      "after": {
+        "path": "packages/core/src/orchestrate/hot-paths/read-truncated-range.ts",
+        "mode": "100644",
+        "sha256": "6af633e022057d976693ae9b8b830624dc0875b387498979173e0bd42cd00c12"
+      },
+      "rationale": "Isolated opt-in hot-path prototype: generic bounded snippets, selection/locking integration and mocked deterministic regressions; defaults unchanged."
+    },
+    {
+      "path": "packages/core/src/orchestrate/hot-paths/rename-zero-references.ts",
+      "before": null,
+      "after": {
+        "path": "packages/core/src/orchestrate/hot-paths/rename-zero-references.ts",
+        "mode": "100644",
+        "sha256": "c43eecaa0c82e3dd5e491f260e4bc7ece92d3183c30106b37b67677e160a4559"
+      },
+      "rationale": "Isolated opt-in hot-path prototype: generic bounded snippets, selection/locking integration and mocked deterministic regressions; defaults unchanged."
+    },
+    {
+      "path": "packages/core/src/orchestrate/hot-paths/test-failure-summary.ts",
+      "before": null,
+      "after": {
+        "path": "packages/core/src/orchestrate/hot-paths/test-failure-summary.ts",
+        "mode": "100644",
+        "sha256": "03496a3cf1cff70a0d527b95a2a7e8f685b10703034310a35f452c34eb0ff0b1"
+      },
+      "rationale": "Isolated opt-in hot-path prototype: generic bounded snippets, selection/locking integration and mocked deterministic regressions; defaults unchanged."
+    },
+    {
+      "path": "packages/core/src/orchestrate/hot-paths/types.ts",
+      "before": null,
+      "after": {
+        "path": "packages/core/src/orchestrate/hot-paths/types.ts",
+        "mode": "100644",
+        "sha256": "c4fbe75fc92f0517301f38e0d07a4f9a48fbd2f761e54e561bb96cdd8dfb4eef"
+      },
+      "rationale": "Isolated opt-in hot-path prototype: generic bounded snippets, selection/locking integration and mocked deterministic regressions; defaults unchanged."
+    },
+    {
+      "path": "packages/core/src/orchestrate/index.ts",
+      "before": {
+        "path": "packages/core/src/orchestrate/index.ts",
+        "mode": "100644",
+        "sha256": "eca706c558d0389ad4031ec3cd86868946b289480f622dbb71198df7bd2366c1"
+      },
+      "after": {
+        "path": "packages/core/src/orchestrate/index.ts",
+        "mode": "100644",
+        "sha256": "c0ec876b1ec3988ef02d422c427070e6798ddb96e83da3b979113d7dcf775bda"
+      },
+      "rationale": "Explicit observed hot-path hidden-prompt fingerprint and deterministic attestation regressions; original baseline unchanged."
+    },
+    {
       "path": "packages/core/src/orchestrate/planner-tools.ts",
       "before": {
         "path": "packages/core/src/orchestrate/planner-tools.ts",
@@ -190,6 +365,54 @@
       "rationale": "Host-only optional typed classifier with strict probability/usage contract and same selector completion."
     },
     {
+      "path": "packages/core/test/executor.test.ts",
+      "before": {
+        "path": "packages/core/test/executor.test.ts",
+        "mode": "100644",
+        "sha256": "d459612d075c408a2f1124a365120d98e60f6a4fb91a2aacb67deb0e3f5c06ba"
+      },
+      "after": {
+        "path": "packages/core/test/executor.test.ts",
+        "mode": "100644",
+        "sha256": "73efd44cd8de4ee8c8beb1b25e30d5f59f1a6f3c6dc475c743fcb90390bcff91"
+      },
+      "rationale": "Isolated opt-in hot-path prototype: generic bounded snippets, selection/locking integration and mocked deterministic regressions; defaults unchanged."
+    },
+    {
+      "path": "packages/core/test/hot-path-index.test.ts",
+      "before": null,
+      "after": {
+        "path": "packages/core/test/hot-path-index.test.ts",
+        "mode": "100644",
+        "sha256": "23892f0a8b06a7658efc0eb0e09eabedda1a6b517f8f118f6c2854c2b5fe449c"
+      },
+      "rationale": "Isolated opt-in hot-path prototype: generic bounded snippets, selection/locking integration and mocked deterministic regressions; defaults unchanged."
+    },
+    {
+      "path": "packages/core/test/hot-path-seeds.test.ts",
+      "before": null,
+      "after": {
+        "path": "packages/core/test/hot-path-seeds.test.ts",
+        "mode": "100644",
+        "sha256": "f0efe1ffceb1414187f1f7035dfc7d366d2951a9c15070bedb89fdad07fff75c"
+      },
+      "rationale": "Isolated opt-in hot-path prototype: generic bounded snippets, selection/locking integration and mocked deterministic regressions; defaults unchanged."
+    },
+    {
+      "path": "packages/core/test/orchestrate.test.ts",
+      "before": {
+        "path": "packages/core/test/orchestrate.test.ts",
+        "mode": "100644",
+        "sha256": "45431d3ac6b46b64f97530fd4665c3390fd5212f30a69dfe41162821e50d8290"
+      },
+      "after": {
+        "path": "packages/core/test/orchestrate.test.ts",
+        "mode": "100644",
+        "sha256": "7d1831b3eef073a51797401a284de5c6cecb5c1af142626b9f2f5f60e8f571c7"
+      },
+      "rationale": "Isolated opt-in hot-path prototype: generic bounded snippets, selection/locking integration and mocked deterministic regressions; defaults unchanged."
+    },
+    {
       "path": "packages/core/test/selection.test.ts",
       "before": {
         "path": "packages/core/test/selection.test.ts",
@@ -202,6 +425,20 @@
         "sha256": "a333f2561d620b69c699a3bd8b0f7ac72473ed11e2b16f7c29dd15521e358280"
       },
       "rationale": "Stop concurrent work and propagate cancellation after terminal failures, preserving task success requirements."
+    },
+    {
+      "path": "packages/core/test/variant.test.ts",
+      "before": {
+        "path": "packages/core/test/variant.test.ts",
+        "mode": "100644",
+        "sha256": "ca6b8b5dbbae8f91f720d8384231883ab6eb92eee69194888fd3a1f5d54538b5"
+      },
+      "after": {
+        "path": "packages/core/test/variant.test.ts",
+        "mode": "100644",
+        "sha256": "60b211e25ca94d43c164342cdb9d2c69376bad2c916cc9c72753826f51c82094"
+      },
+      "rationale": "Isolated opt-in hot-path prototype: generic bounded snippets, selection/locking integration and mocked deterministic regressions; defaults unchanged."
     },
     {
       "path": "packages/llm/package.json",
@@ -374,6 +611,16 @@
       "rationale": "OpenAI sign-in, bounded host-brokered workflow usage and security regressions; fail-fast cancellation where shared with runner/core/server."
     },
     {
+      "path": "packages/runner/src/build-context.ts",
+      "before": null,
+      "after": {
+        "path": "packages/runner/src/build-context.ts",
+        "mode": "100644",
+        "sha256": "d2ccb1b937b6971f89154797a645d75ecc78ad9e726e71f24a053bc527d38e23"
+      },
+      "rationale": "Follow-up source67b42ae: exact workspace-only generated Docker context policy validated independently from canonical task identity before image/provider work; fake-boundary regressions."
+    },
+    {
       "path": "packages/runner/src/cancellation.ts",
       "before": null,
       "after": {
@@ -445,7 +692,7 @@
       "after": {
         "path": "packages/runner/src/container.ts",
         "mode": "100644",
-        "sha256": "91a6e7cd7424403ea2ddbac4687350d9a0d8dd1f4f7bd59a1f84949f2a87ee51"
+        "sha256": "d39f0cb25cce4c4fb29cfd563318cf1a7a846f5b263fbe551557ff24508aa83c"
       },
       "rationale": "Selected verified immutable image identity and case-preserving Docker references; no CI wrapper/fixtures imported. Security follow-up: all orchestration credentials/inference stay host-side, typed sanitized provider errors."
     },
@@ -483,9 +730,9 @@
       "after": {
         "path": "packages/runner/src/grade.ts",
         "mode": "100644",
-        "sha256": "2a6d3afe9bb98f2551cd6f300925fb71bf0d34e94d4334960a09aee89694b1b9"
+        "sha256": "d7345c0f8fa2edb2e6cf7f3ab39fdd51d3fbe470e076b9caaab3aeb40968aba0"
       },
-      "rationale": "Selected verified immutable image identity and case-preserving Docker references; no CI wrapper/fixtures imported. Follow-up: actual runtime provenance gate and immutable observed-image grading."
+      "rationale": "Selected verified immutable image identity and case-preserving Docker references; no CI wrapper/fixtures imported. Follow-up: actual runtime provenance gate and immutable observed-image grading. Follow-up source67b42ae: fixture admission distinguishes completed check exits from Docker infrastructure failures."
     },
     {
       "path": "packages/runner/src/job.ts",
@@ -554,14 +801,28 @@
       "rationale": "OpenAI sign-in, bounded host-brokered workflow usage and security regressions; fail-fast cancellation where shared with runner/core/server. Follow-up: bounded direct DeepSeek provider with host-only credentials and explicit estimated costs."
     },
     {
+      "path": "packages/runner/src/problems/index.ts",
+      "before": {
+        "path": "packages/runner/src/problems/index.ts",
+        "mode": "100644",
+        "sha256": "cc03b0ea48a8ff12518844233e75646af674f09b1b73c3a30638a4310c7b9711"
+      },
+      "after": {
+        "path": "packages/runner/src/problems/index.ts",
+        "mode": "100644",
+        "sha256": "e68c700a76dde4b730f58fd3079a58c33d9ec8b60198b4b633d32f6dd6a07501"
+      },
+      "rationale": "Follow-up source67b42ae: strict fixture admission, mandatory clean-base/missing-workspace gates and deterministic fake-boundary tests; no benchmark fixture changes. Shared-development review: reject incomplete clean-base unittest outcomes; original migration before-state retained."
+    },
+    {
       "path": "packages/runner/src/provenance.ts",
       "before": null,
       "after": {
         "path": "packages/runner/src/provenance.ts",
         "mode": "100644",
-        "sha256": "73afb5f6cd5ef18012af25929b93bf2ec813d0b4015765f4516744c2b7ff5f4e"
+        "sha256": "9eb58eddf42d3bfaea1f3cfdfb8b91993da117d2759c37193a0bd58b1bfe201f"
       },
-      "rationale": "Truthful pre-model provenance gate and provider observations, without fabricated model versions or task completion. Follow-up: host-only optional typed classifier selection, complete cost/fallback evidence."
+      "rationale": "Truthful pre-model provenance gate and provider observations, without fabricated model versions or task completion. Follow-up: host-only optional typed classifier selection, complete cost/fallback evidence. Shared gate composition: Truthful pre-model provenance gate and provider observations, without fabricated model versions or task completion. Follow-up: host-only optional typed classifier selection, complete cost/fallback evidence. Follow-up source67b42ae: strict fixture admission with canonical versioned self-check evidence and fake-boundary regressions."
     },
     {
       "path": "packages/runner/src/rundir.ts",
@@ -703,7 +964,7 @@
       "after": {
         "path": "packages/runner/test/container-image.test.ts",
         "mode": "100644",
-        "sha256": "4a083c6880e53d32dcef05cefcfb4e4688e2a8f412006edc8c698b7f9b01158b"
+        "sha256": "5950782b63bfc66c7f2fb4f7a334a836cafad4808e69815b65dc10cecf89f7e1"
       },
       "rationale": "Selected verified immutable image identity and case-preserving Docker references; no CI wrapper/fixtures imported. Follow-up: actual runtime provenance gate and immutable observed-image grading."
     },
@@ -726,6 +987,16 @@
         "sha256": "4834acd724aeb0fce365c9a1bf5a2762e6ea42ffcf89c124cc6015761ccae299"
       },
       "rationale": "Bounded direct DeepSeek provider, reasoning continuation and explicit estimated usage/cost regressions."
+    },
+    {
+      "path": "packages/runner/test/fixture-admission.test.ts",
+      "before": null,
+      "after": {
+        "path": "packages/runner/test/fixture-admission.test.ts",
+        "mode": "100644",
+        "sha256": "15d0f76b8f2b3972386f99b6112cacae27982bf31b1b78848eaffb06efda0dd5"
+      },
+      "rationale": "Follow-up source67b42ae: strict fixture admission, mandatory clean-base/missing-workspace gates and deterministic fake-boundary tests; no benchmark fixture changes. Shared-development review: reject incomplete clean-base unittest outcomes; original migration before-state retained."
     },
     {
       "path": "packages/runner/test/framework-launch.test.ts",
@@ -777,9 +1048,9 @@
       "after": {
         "path": "packages/runner/test/provenance.test.ts",
         "mode": "100644",
-        "sha256": "8276237bf62c227c2202c5584a09e139ffcf7fe49c47410734c26a647c79063c"
+        "sha256": "174d372b37ed4cabfdcd86ac3d3484f22fde3f14fed1ff147a11495a6c456ea2"
       },
-      "rationale": "Truthful pre-model provenance gate and provider observations, without fabricated model versions or task completion. Follow-up: host-only optional typed classifier selection, complete cost/fallback evidence."
+      "rationale": "Truthful pre-model provenance gate and provider observations, without fabricated model versions or task completion. Follow-up: host-only optional typed classifier selection, complete cost/fallback evidence. Shared gate composition: Truthful pre-model provenance gate and provider observations, without fabricated model versions or task completion. Follow-up: host-only optional typed classifier selection, complete cost/fallback evidence. Follow-up source67b42ae: strict fixture admission with canonical versioned self-check evidence and fake-boundary regressions."
     },
     {
       "path": "packages/runner/test/subscription.test.ts",
@@ -1378,242 +1649,6 @@
         "sha256": "496074b5376d350e14cc0888dd9da1aa5dafe18af2c6462b4d5bef9879610a7a"
       },
       "rationale": "Local tool subprocess environment secret filtering and synthetic-only boundary/descendant regressions."
-    },
-    {
-      "path": "packages/core/src/orchestrate/hot-paths/catalog.ts",
-      "before": null,
-      "after": {
-        "path": "packages/core/src/orchestrate/hot-paths/catalog.ts",
-        "mode": "100644",
-        "sha256": "b5851ecc7c366f543cad5af42478ada0dd49b36f663b925ddfa10b5eb266c3ad"
-      },
-      "rationale": "Isolated opt-in hot-path prototype: generic bounded snippets, selection/locking integration and mocked deterministic regressions; defaults unchanged."
-    },
-    {
-      "path": "packages/core/src/orchestrate/hot-paths/check-errors-read.ts",
-      "before": null,
-      "after": {
-        "path": "packages/core/src/orchestrate/hot-paths/check-errors-read.ts",
-        "mode": "100644",
-        "sha256": "1867ea25081ef85cf59784063afb68ecca8901375da70d362d9566a97dc63f5c"
-      },
-      "rationale": "Isolated opt-in hot-path prototype: generic bounded snippets, selection/locking integration and mocked deterministic regressions; defaults unchanged."
-    },
-    {
-      "path": "packages/core/src/orchestrate/hot-paths/command-nonzero-summary.ts",
-      "before": null,
-      "after": {
-        "path": "packages/core/src/orchestrate/hot-paths/command-nonzero-summary.ts",
-        "mode": "100644",
-        "sha256": "0b4dae8fa4216b47893cce8eec9142de35dc05dc3d26add5f30b212387665bf0"
-      },
-      "rationale": "Isolated opt-in hot-path prototype: generic bounded snippets, selection/locking integration and mocked deterministic regressions; defaults unchanged."
-    },
-    {
-      "path": "packages/core/src/orchestrate/hot-paths/edit-ambiguous-reread.ts",
-      "before": null,
-      "after": {
-        "path": "packages/core/src/orchestrate/hot-paths/edit-ambiguous-reread.ts",
-        "mode": "100644",
-        "sha256": "417aea50947dea3f61b3767883e5531b4f6bf7270c7db2bb93d2100703de117e"
-      },
-      "rationale": "Isolated opt-in hot-path prototype: generic bounded snippets, selection/locking integration and mocked deterministic regressions; defaults unchanged."
-    },
-    {
-      "path": "packages/core/src/orchestrate/hot-paths/edit-missing-reread.ts",
-      "before": null,
-      "after": {
-        "path": "packages/core/src/orchestrate/hot-paths/edit-missing-reread.ts",
-        "mode": "100644",
-        "sha256": "c378b4d54e05dabfd18a174055f0aacc8967b43f8a19d540ac0b958808d4771d"
-      },
-      "rationale": "Isolated opt-in hot-path prototype: generic bounded snippets, selection/locking integration and mocked deterministic regressions; defaults unchanged."
-    },
-    {
-      "path": "packages/core/src/orchestrate/hot-paths/edit-then-narrow-test.ts",
-      "before": null,
-      "after": {
-        "path": "packages/core/src/orchestrate/hot-paths/edit-then-narrow-test.ts",
-        "mode": "100644",
-        "sha256": "7973d76f1f80c2ff8c7e7b8bc3325ca15fcb25402105193e0794e92dab7be95e"
-      },
-      "rationale": "Isolated opt-in hot-path prototype: generic bounded snippets, selection/locking integration and mocked deterministic regressions; defaults unchanged."
-    },
-    {
-      "path": "packages/core/src/orchestrate/hot-paths/find-files-empty-widen.ts",
-      "before": null,
-      "after": {
-        "path": "packages/core/src/orchestrate/hot-paths/find-files-empty-widen.ts",
-        "mode": "100644",
-        "sha256": "edf44156be9c4ed3f2307dcc5bc69c7a61e0e777577e7cfbfd2bbec962d72156"
-      },
-      "rationale": "Isolated opt-in hot-path prototype: generic bounded snippets, selection/locking integration and mocked deterministic regressions; defaults unchanged."
-    },
-    {
-      "path": "packages/core/src/orchestrate/hot-paths/grep-empty-widen.ts",
-      "before": null,
-      "after": {
-        "path": "packages/core/src/orchestrate/hot-paths/grep-empty-widen.ts",
-        "mode": "100644",
-        "sha256": "d56b1169f4a0c20eb206c117dda829d82ce7dbca2e86b8aaf061b50a19e6ddfb"
-      },
-      "rationale": "Isolated opt-in hot-path prototype: generic bounded snippets, selection/locking integration and mocked deterministic regressions; defaults unchanged."
-    },
-    {
-      "path": "packages/core/src/orchestrate/hot-paths/index.ts",
-      "before": null,
-      "after": {
-        "path": "packages/core/src/orchestrate/hot-paths/index.ts",
-        "mode": "100644",
-        "sha256": "73dd601a56bd439c5551069fe3f548c7ddec24b36226efc3ef5d8c430b2585dd"
-      },
-      "rationale": "Isolated opt-in hot-path prototype: generic bounded snippets, selection/locking integration and mocked deterministic regressions; defaults unchanged."
-    },
-    {
-      "path": "packages/core/src/orchestrate/hot-paths/move-cycle-diagnose.ts",
-      "before": null,
-      "after": {
-        "path": "packages/core/src/orchestrate/hot-paths/move-cycle-diagnose.ts",
-        "mode": "100644",
-        "sha256": "86ed314721882154ef0d6188d976813d655e89e69bf2868b6f62e27f8c029092"
-      },
-      "rationale": "Isolated opt-in hot-path prototype: generic bounded snippets, selection/locking integration and mocked deterministic regressions; defaults unchanged."
-    },
-    {
-      "path": "packages/core/src/orchestrate/hot-paths/read-not-found-locate.ts",
-      "before": null,
-      "after": {
-        "path": "packages/core/src/orchestrate/hot-paths/read-not-found-locate.ts",
-        "mode": "100644",
-        "sha256": "a5731f9f87ca54b33914efd4d3dd42695da0a17f9dd96e43016e093109ad7f58"
-      },
-      "rationale": "Isolated opt-in hot-path prototype: generic bounded snippets, selection/locking integration and mocked deterministic regressions; defaults unchanged."
-    },
-    {
-      "path": "packages/core/src/orchestrate/hot-paths/read-truncated-range.ts",
-      "before": null,
-      "after": {
-        "path": "packages/core/src/orchestrate/hot-paths/read-truncated-range.ts",
-        "mode": "100644",
-        "sha256": "6af633e022057d976693ae9b8b830624dc0875b387498979173e0bd42cd00c12"
-      },
-      "rationale": "Isolated opt-in hot-path prototype: generic bounded snippets, selection/locking integration and mocked deterministic regressions; defaults unchanged."
-    },
-    {
-      "path": "packages/core/src/orchestrate/hot-paths/rename-zero-references.ts",
-      "before": null,
-      "after": {
-        "path": "packages/core/src/orchestrate/hot-paths/rename-zero-references.ts",
-        "mode": "100644",
-        "sha256": "c43eecaa0c82e3dd5e491f260e4bc7ece92d3183c30106b37b67677e160a4559"
-      },
-      "rationale": "Isolated opt-in hot-path prototype: generic bounded snippets, selection/locking integration and mocked deterministic regressions; defaults unchanged."
-    },
-    {
-      "path": "packages/core/src/orchestrate/hot-paths/test-failure-summary.ts",
-      "before": null,
-      "after": {
-        "path": "packages/core/src/orchestrate/hot-paths/test-failure-summary.ts",
-        "mode": "100644",
-        "sha256": "03496a3cf1cff70a0d527b95a2a7e8f685b10703034310a35f452c34eb0ff0b1"
-      },
-      "rationale": "Isolated opt-in hot-path prototype: generic bounded snippets, selection/locking integration and mocked deterministic regressions; defaults unchanged."
-    },
-    {
-      "path": "packages/core/src/orchestrate/hot-paths/types.ts",
-      "before": null,
-      "after": {
-        "path": "packages/core/src/orchestrate/hot-paths/types.ts",
-        "mode": "100644",
-        "sha256": "c4fbe75fc92f0517301f38e0d07a4f9a48fbd2f761e54e561bb96cdd8dfb4eef"
-      },
-      "rationale": "Isolated opt-in hot-path prototype: generic bounded snippets, selection/locking integration and mocked deterministic regressions; defaults unchanged."
-    },
-    {
-      "path": "packages/core/test/executor.test.ts",
-      "before": {
-        "path": "packages/core/test/executor.test.ts",
-        "mode": "100644",
-        "sha256": "d459612d075c408a2f1124a365120d98e60f6a4fb91a2aacb67deb0e3f5c06ba"
-      },
-      "after": {
-        "path": "packages/core/test/executor.test.ts",
-        "mode": "100644",
-        "sha256": "73efd44cd8de4ee8c8beb1b25e30d5f59f1a6f3c6dc475c743fcb90390bcff91"
-      },
-      "rationale": "Isolated opt-in hot-path prototype: generic bounded snippets, selection/locking integration and mocked deterministic regressions; defaults unchanged."
-    },
-    {
-      "path": "packages/core/test/hot-path-index.test.ts",
-      "before": null,
-      "after": {
-        "path": "packages/core/test/hot-path-index.test.ts",
-        "mode": "100644",
-        "sha256": "23892f0a8b06a7658efc0eb0e09eabedda1a6b517f8f118f6c2854c2b5fe449c"
-      },
-      "rationale": "Isolated opt-in hot-path prototype: generic bounded snippets, selection/locking integration and mocked deterministic regressions; defaults unchanged."
-    },
-    {
-      "path": "packages/core/test/hot-path-seeds.test.ts",
-      "before": null,
-      "after": {
-        "path": "packages/core/test/hot-path-seeds.test.ts",
-        "mode": "100644",
-        "sha256": "f0efe1ffceb1414187f1f7035dfc7d366d2951a9c15070bedb89fdad07fff75c"
-      },
-      "rationale": "Isolated opt-in hot-path prototype: generic bounded snippets, selection/locking integration and mocked deterministic regressions; defaults unchanged."
-    },
-    {
-      "path": "packages/core/test/orchestrate.test.ts",
-      "before": {
-        "path": "packages/core/test/orchestrate.test.ts",
-        "mode": "100644",
-        "sha256": "45431d3ac6b46b64f97530fd4665c3390fd5212f30a69dfe41162821e50d8290"
-      },
-      "after": {
-        "path": "packages/core/test/orchestrate.test.ts",
-        "mode": "100644",
-        "sha256": "7d1831b3eef073a51797401a284de5c6cecb5c1af142626b9f2f5f60e8f571c7"
-      },
-      "rationale": "Isolated opt-in hot-path prototype: generic bounded snippets, selection/locking integration and mocked deterministic regressions; defaults unchanged."
-    },
-    {
-      "path": "packages/core/test/variant.test.ts",
-      "before": {
-        "path": "packages/core/test/variant.test.ts",
-        "mode": "100644",
-        "sha256": "ca6b8b5dbbae8f91f720d8384231883ab6eb92eee69194888fd3a1f5d54538b5"
-      },
-      "after": {
-        "path": "packages/core/test/variant.test.ts",
-        "mode": "100644",
-        "sha256": "60b211e25ca94d43c164342cdb9d2c69376bad2c916cc9c72753826f51c82094"
-      },
-      "rationale": "Isolated opt-in hot-path prototype: generic bounded snippets, selection/locking integration and mocked deterministic regressions; defaults unchanged."
-    },
-    {
-      "path": "packages/core/src/orchestrate/hot-paths/fingerprint.ts",
-      "before": null,
-      "after": {
-        "path": "packages/core/src/orchestrate/hot-paths/fingerprint.ts",
-        "mode": "100644",
-        "sha256": "73a7b75298c22abe296993ef808382b9a460841c4fc92e178a3ee677af9dddef"
-      },
-      "rationale": "Explicit observed hot-path hidden-prompt fingerprint and deterministic attestation regressions; original baseline unchanged."
-    },
-    {
-      "path": "packages/core/src/orchestrate/index.ts",
-      "before": {
-        "path": "packages/core/src/orchestrate/index.ts",
-        "mode": "100644",
-        "sha256": "eca706c558d0389ad4031ec3cd86868946b289480f622dbb71198df7bd2366c1"
-      },
-      "after": {
-        "path": "packages/core/src/orchestrate/index.ts",
-        "mode": "100644",
-        "sha256": "c0ec876b1ec3988ef02d422c427070e6798ddb96e83da3b979113d7dcf775bda"
-      },
-      "rationale": "Explicit observed hot-path hidden-prompt fingerprint and deterministic attestation regressions; original baseline unchanged."
     }
   ],
   "packaging_followup": {
@@ -3540,6 +3575,251 @@
     "limits": "Direct/local host environment defense, not a sandbox; no runner key exposure claimed.",
     "canonical_artifact_commit": "09773499da6e55cb2c0b2419b80fe4b7b08faca0"
   },
+  "fixture_admission_followup": {
+    "source_commit": "67b42ae04153079e84b1fdacdd0082a2e623ffc8",
+    "draft_plan": "plans/2026-11-02-fixture-admission/PLAN.md",
+    "changes": [
+      {
+        "path": "packages/runner/src/problems/index.ts",
+        "before": {
+          "path": "packages/runner/src/problems/index.ts",
+          "mode": "100644",
+          "sha256": "cc03b0ea48a8ff12518844233e75646af674f09b1b73c3a30638a4310c7b9711"
+        },
+        "after": {
+          "path": "packages/runner/src/problems/index.ts",
+          "mode": "100644",
+          "sha256": "ff2f4680ee096b87d9791df1d5419bf80026b22ce75e638e7e272132a0b3a470"
+        }
+      },
+      {
+        "path": "packages/runner/src/provenance.ts",
+        "before": {
+          "path": "packages/runner/src/provenance.ts",
+          "mode": "100644",
+          "sha256": "6093584f3a65a5e4e336e2b2f4b33906c21b97fab92a67ed4a4e5bb2c5619c4c"
+        },
+        "after": {
+          "path": "packages/runner/src/provenance.ts",
+          "mode": "100644",
+          "sha256": "5da90dddeda8ad1ed4b5403f555a1e014e658649fc59ecd445c38cad53171fe0"
+        }
+      },
+      {
+        "path": "packages/runner/test/provenance.test.ts",
+        "before": {
+          "path": "packages/runner/test/provenance.test.ts",
+          "mode": "100644",
+          "sha256": "9bec96f2b7e346ac2f6ad333be24a523afd022f5fcd158dc9007a705a5b3cca6"
+        },
+        "after": {
+          "path": "packages/runner/test/provenance.test.ts",
+          "mode": "100644",
+          "sha256": "1670658f044f922fdd861043b27c3611e5655890c6c607156e2f3d390f774596"
+        }
+      },
+      {
+        "path": "packages/runner/test/fixture-admission.test.ts",
+        "before": null,
+        "after": {
+          "path": "packages/runner/test/fixture-admission.test.ts",
+          "mode": "100644",
+          "sha256": "28a8f3ff024c6c24b8c0aefdf1752553673c16e640755f709b08b2cb13420819"
+        }
+      },
+      {
+        "path": "packages/runner/src/grade.ts",
+        "before": {
+          "path": "packages/runner/src/grade.ts",
+          "mode": "100644",
+          "sha256": "2a6d3afe9bb98f2551cd6f300925fb71bf0d34e94d4334960a09aee89694b1b9"
+        },
+        "after": {
+          "path": "packages/runner/src/grade.ts",
+          "mode": "100644",
+          "sha256": "d7345c0f8fa2edb2e6cf7f3ab39fdd51d3fbe470e076b9caaab3aeb40968aba0"
+        }
+      },
+      {
+        "path": "packages/runner/src/build-context.ts",
+        "before": null,
+        "after": {
+          "path": "packages/runner/src/build-context.ts",
+          "mode": "100644",
+          "sha256": "d2ccb1b937b6971f89154797a645d75ecc78ad9e726e71f24a053bc527d38e23"
+        }
+      },
+      {
+        "path": "packages/runner/src/container.ts",
+        "before": {
+          "path": "packages/runner/src/container.ts",
+          "mode": "100644",
+          "sha256": "91a6e7cd7424403ea2ddbac4687350d9a0d8dd1f4f7bd59a1f84949f2a87ee51"
+        },
+        "after": {
+          "path": "packages/runner/src/container.ts",
+          "mode": "100644",
+          "sha256": "d39f0cb25cce4c4fb29cfd563318cf1a7a846f5b263fbe551557ff24508aa83c"
+        }
+      },
+      {
+        "path": "packages/runner/test/container-image.test.ts",
+        "before": {
+          "path": "packages/runner/test/container-image.test.ts",
+          "mode": "100644",
+          "sha256": "4a083c6880e53d32dcef05cefcfb4e4688e2a8f412006edc8c698b7f9b01158b"
+        },
+        "after": {
+          "path": "packages/runner/test/container-image.test.ts",
+          "mode": "100644",
+          "sha256": "5950782b63bfc66c7f2fb4f7a334a836cafad4808e69815b65dc10cecf89f7e1"
+        }
+      }
+    ],
+    "limits": "Experimental draft only. No real self-check stamps, Docker/provider/model work, approvals, commits or merge; parent owns final composed bundle and full suite.",
+    "review_corrections": "Exact generated build-context validation remains separate from canonical taskHash; require initial solved pass plus five stability repetitions (six solved grades). No spec approval or real fixture stamps."
+  },
+  "shared_framework_integration": {
+    "base_commit": "67b42ae04153079e84b1fdacdd0082a2e623ffc8",
+    "composed_parent_commit": "41efc6b1e91f107ece4ae97f4b9f219f8a5f7e78",
+    "authorization": "Yes, this authorizes merges between the development branches only.",
+    "merge_commits": [
+      {
+        "commit": "e54f50885b9c9a1d444680961f27ef0da4525685",
+        "parents": [
+          "67b42ae04153079e84b1fdacdd0082a2e623ffc8",
+          "a572d66d4891a2bcd87f29f20112fc66bcb36494"
+        ]
+      },
+      {
+        "commit": "163bfc087472ab972f263667fd522ec964cfe523",
+        "parents": [
+          "e54f50885b9c9a1d444680961f27ef0da4525685",
+          "7bd10f3de551cef18390eee8a69352fc8b2d9dbd"
+        ]
+      },
+      {
+        "commit": "b291d95ab75de679057387de8bb75c1e68147608",
+        "parents": [
+          "163bfc087472ab972f263667fd522ec964cfe523",
+          "1039f358dfce62978316c2ee610c38acff331ee7"
+        ]
+      },
+      {
+        "commit": "359cfd528abf1c2ec7072fa1af017c469ae3c6b8",
+        "parents": [
+          "b291d95ab75de679057387de8bb75c1e68147608",
+          "f2061ca7971158713b8784699aafbacba5c171d8"
+        ]
+      },
+      {
+        "commit": "41efc6b1e91f107ece4ae97f4b9f219f8a5f7e78",
+        "parents": [
+          "359cfd528abf1c2ec7072fa1af017c469ae3c6b8",
+          "8b3c5f16b7f4b85bd30c4aee464904bafd52b115"
+        ]
+      }
+    ],
+    "excluded_treatments": [
+      "dot/selector-reuse-20261102",
+      "dot/hotpath-prototype-20261102"
+    ],
+    "scope": "Shared development gates only. No approval, default merge, live model/provider call, Docker/CI run, or measured savings.",
+    "additional_source_changes": [
+      {
+        "path": "scripts/evaluation/check_classifier_design.py",
+        "before": {
+          "path": "scripts/evaluation/check_classifier_design.py",
+          "mode": "100644",
+          "sha256": "520ba88fb5740f006dc45a1a08098f27cd29994c31eaf1fb206b3cc3b85e8ea6"
+        },
+        "after": {
+          "path": "scripts/evaluation/check_classifier_design.py",
+          "mode": "100644",
+          "sha256": "1f6a3ec6bf32e99a800d7b461a713b057a8b605a7454fa1507cefa1ce88725e4"
+        },
+        "rationale": "Compose previously omitted Python and nested native gates with strict complete-coverage checks; preserve existing package tests, serial option, and final typecheck."
+      },
+      {
+        "path": "scripts/evaluation/test_classifier_design.py",
+        "before": {
+          "path": "scripts/evaluation/test_classifier_design.py",
+          "mode": "100644",
+          "sha256": "7b2c66c7adfca1ba264e827b77287739c6fee812ef1f2f5e536ca00cca64e324"
+        },
+        "after": {
+          "path": "scripts/evaluation/test_classifier_design.py",
+          "mode": "100644",
+          "sha256": "e91143c873d95431a86ee98e19ca7e8a1bbcb271073d2065563c82415e693710"
+        },
+        "rationale": "Compose previously omitted Python and nested native gates with strict complete-coverage checks; preserve existing package tests, serial option, and final typecheck."
+      },
+      {
+        "path": "scripts/test-cloud.mjs",
+        "before": {
+          "path": "scripts/test-cloud.mjs",
+          "mode": "100644",
+          "sha256": "5957ff77dd30affe27bdabfe4c6ecebe337fb189661748876fa820aa034e1de5"
+        },
+        "after": {
+          "path": "scripts/test-cloud.mjs",
+          "mode": "100644",
+          "sha256": "0b172b338aa133631913d80c87b38df4d3e5fc9166b1a77330343fbe9fd111f3"
+        },
+        "rationale": "Compose previously omitted Python and nested native gates with strict complete-coverage checks; preserve existing package tests, serial option, and final typecheck."
+      },
+      {
+        "path": "scripts/test-cloud.test.mjs",
+        "before": {
+          "path": "scripts/test-cloud.test.mjs",
+          "mode": "100644",
+          "sha256": "905d7491d9522d99c4b144ad5b42ba0414a0b4f8eaae9d0d544fc95b79402bf3"
+        },
+        "after": {
+          "path": "scripts/test-cloud.test.mjs",
+          "mode": "100644",
+          "sha256": "99abd0ccb9c054772c4b540c52a79e2c2dfac31110d7dc3bdcfe67b8bcc5fcb5"
+        },
+        "rationale": "Compose previously omitted Python and nested native gates with strict complete-coverage checks; preserve existing package tests, serial option, and final typecheck."
+      },
+      {
+        "path": "packages/runner/src/problems/index.ts",
+        "before": {
+          "path": "packages/runner/src/problems/index.ts",
+          "mode": "100644",
+          "sha256": "ff2f4680ee096b87d9791df1d5419bf80026b22ce75e638e7e272132a0b3a470"
+        },
+        "after": {
+          "path": "packages/runner/src/problems/index.ts",
+          "mode": "100644",
+          "sha256": "e68c700a76dde4b730f58fd3079a58c33d9ec8b60198b4b633d32f6dd6a07501"
+        },
+        "rationale": "Reject skipped, expected-failure, unexpected-success and incomplete clean-codebase validation before overlay; local synthetic Python regression at fake Docker boundary."
+      },
+      {
+        "path": "packages/runner/test/fixture-admission.test.ts",
+        "before": {
+          "path": "packages/runner/test/fixture-admission.test.ts",
+          "mode": "100644",
+          "sha256": "28a8f3ff024c6c24b8c0aefdf1752553673c16e640755f709b08b2cb13420819"
+        },
+        "after": {
+          "path": "packages/runner/test/fixture-admission.test.ts",
+          "mode": "100644",
+          "sha256": "15d0f76b8f2b3972386f99b6112cacae27982bf31b1b78848eaffb06efda0dd5"
+        },
+        "rationale": "Reject skipped, expected-failure, unexpected-success and incomplete clean-codebase validation before overlay; local synthetic Python regression at fake Docker boundary."
+      }
+    ],
+    "review_corrections": {
+      "previous_integration_commit": "ae9c532e21aefda9a1a5bbc287d0f170d1deda01",
+      "findings": [
+        "Legacy TAP gate accepted zero/TODO/file-only coverage; require strict complete summaries and actual test names.",
+        "Clean-codebase unittest.wasSuccessful() accepted skips/expected failures; require every discovered case to run without incomplete outcomes."
+      ],
+      "local_regressions": "28 strict harness tests; 93 fixture-admission tests including eight actual local Python cases at a fake Docker boundary."
+    }
+  },
   "hotpaths_experimental_followup": {
     "source_base": "67b42ae04153079e84b1fdacdd0082a2e623ffc8",
     "draft_plan": "plans/2026-11-02-hotpath-prototype/PLAN.md",
@@ -3825,7 +4105,7 @@
         "after": {
           "path": "packages/runner/test/provenance.test.ts",
           "mode": "100644",
-          "sha256": "8276237bf62c227c2202c5584a09e139ffcf7fe49c47410734c26a647c79063c"
+          "sha256": "174d372b37ed4cabfdcd86ac3d3484f22fde3f14fed1ff147a11495a6c456ea2"
         }
       },
       {
@@ -3886,10 +4166,57 @@
         "after": {
           "path": "packages/runner/src/provenance.ts",
           "mode": "100644",
-          "sha256": "73afb5f6cd5ef18012af25929b93bf2ec813d0b4015765f4516744c2b7ff5f4e"
+          "sha256": "9eb58eddf42d3bfaea1f3cfdfb8b91993da117d2759c37193a0bd58b1bfe201f"
         }
       }
     ],
     "limits": "Opt-in generic pattern ablation; no model task success, cost saving or default promotion measured"
+  },
+  "candidate_shared_integration": {
+    "authorization": "Yes, this authorizes merges between the development branches only.",
+    "candidate_parent": "7826468308e94add7f668a897a7a74f398c5e117",
+    "shared_parent": "7b4980f3806db5ad2a7cf7ba28ab11c303caad08",
+    "merge_base": "67b42ae04153079e84b1fdacdd0082a2e623ffc8",
+    "scope": "Independent candidate composition only; all plans remain draft, no treatment mixing, default merge, live provider/native assignment, Docker, or efficacy claim.",
+    "overlapping_runtime_changes": [
+      {
+        "path": "packages/runner/src/provenance.ts",
+        "candidate_before_composition": {
+          "path": "packages/runner/src/provenance.ts",
+          "mode": "100644",
+          "sha256": "73afb5f6cd5ef18012af25929b93bf2ec813d0b4015765f4516744c2b7ff5f4e"
+        },
+        "shared_before_composition": {
+          "path": "packages/runner/src/provenance.ts",
+          "mode": "100644",
+          "sha256": "5da90dddeda8ad1ed4b5403f555a1e014e658649fc59ecd445c38cad53171fe0"
+        },
+        "after": {
+          "path": "packages/runner/src/provenance.ts",
+          "mode": "100644",
+          "sha256": "9eb58eddf42d3bfaea1f3cfdfb8b91993da117d2759c37193a0bd58b1bfe201f"
+        }
+      },
+      {
+        "path": "packages/runner/test/provenance.test.ts",
+        "candidate_before_composition": {
+          "path": "packages/runner/test/provenance.test.ts",
+          "mode": "100644",
+          "sha256": "8276237bf62c227c2202c5584a09e139ffcf7fe49c47410734c26a647c79063c"
+        },
+        "shared_before_composition": {
+          "path": "packages/runner/test/provenance.test.ts",
+          "mode": "100644",
+          "sha256": "1670658f044f922fdd861043b27c3611e5655890c6c607156e2f3d390f774596"
+        },
+        "after": {
+          "path": "packages/runner/test/provenance.test.ts",
+          "mode": "100644",
+          "sha256": "174d372b37ed4cabfdcd86ac3d3484f22fde3f14fed1ff147a11495a6c456ea2"
+        }
+      }
+    ],
+    "verification_status": "Composed serial aggregate passed: 857 Node tests, 12 normal + 12 optimized Python tests, both typechecks, zero incomplete outcomes; no live-model benchmark.",
+    "aggregate_log_sha256": "a4c90a8f229d96f3cb85efb248f12c41317c727a80845246f785a869742fe617"
   }
 }

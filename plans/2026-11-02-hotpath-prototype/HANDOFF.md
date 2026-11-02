@@ -45,3 +45,14 @@ enabled hot paths reject missing/mismatched hashes, even if both maps agree on b
 Mutation/source-attestation checks pass 23/23 and typecheck passes. Parent rebuilds the
 bundle before the new compiled-server no-model listTools test and broad rerun. Runtime
 allowance after states updated in both sets; original before states retained.
+
+## 2026-11-02 shared-gate development integration
+
+The later user authorization permits development-branch merges only. The independent candidate
+now composes shared parent `7b4980f3806db5ad2a7cf7ba28ab11c303caad08` without selector-reuse
+treatment changes. Catalog/index/fingerprint/seeds and the packaged server remain exact prior
+candidate bytes; provenance admission and catalog attestation are both retained. Full composed
+verification: 857 Node + 12 normal/12 optimized Python tests, both typechecks, zero incomplete
+outcomes. Exact parent identities, conflict decisions, review fingerprint and evidence are in
+`docs/dot-progress/hotpath-shared-integration.md`. Plan remains draft; no default promotion,
+model efficacy or native assignment evidence is claimed.
