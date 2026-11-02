@@ -5,6 +5,7 @@
 
 import { execFile as _execFile } from "node:child_process";
 import { promisify } from "node:util";
+import { assertProblemBuildContext } from "./build-context.ts";
 
 const execFile = promisify(_execFile);
 
@@ -48,6 +49,7 @@ export async function buildImage(
   run: DockerImageCommand = (command, args, options) => execFile(command, args, options),
 ): Promise<string> {
   const tag = problemImageRef(problem);
+  assertProblemBuildContext(problemDir);
   const options = { maxBuffer: 10 * 1024 * 1024 };
   await run("docker", ["build", "-t", tag, problemDir], options);
   const { stdout } = await run("docker", ["image", "inspect", tag], options);

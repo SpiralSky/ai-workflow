@@ -5,11 +5,17 @@
 
 import { execFile as _execFile } from "node:child_process";
 import { promisify } from "node:util";
-import { readdir, readFile, access, rm, stat, writeFile, lstat, cp } from "node:fs/promises";
+import { readdir, readFile, access, rm, writeFile, lstat, cp, mkdtemp } from "node:fs/promises";
 import { join, resolve, relative, isAbsolute, sep } from "node:path";
-import { createHash } from "node:crypto";
+import { tmpdir } from "node:os";
+import { hashTree, problemHash, selfcheckInputHash, problemDirectory, requireRealDirectory } from "../provenance.ts";
+
+import { PROBLEM_DOCKERIGNORE } from "../build-context.ts";
 
 const execFile = promisify(_execFile);
+
+/** Injectable process boundary for offline tests; production always uses execFile. */
+export type ProblemCommand = (command: string, args: string[], options?: { maxBuffer?: number }) => Promise<{ stdout: string; stderr: string }>;
 
 /** Shape of task.json in each problem directory. */
 interface TaskJson {
@@ -27,13 +33,15 @@ async function allProblemIds(problemsDir: string): Promise<string[]> {
   const entries = await readdir(problemsDir, { withFileTypes: true });
   const ids: string[] = [];
   for (const e of entries) {
+    if (e.isSymbolicLink()) throw new Error("problem entries must not be symbolic links");
     if (!e.isDirectory()) continue;
     const taskPath = join(problemsDir, e.name, "task.json");
     try {
       await access(taskPath);
       ids.push(e.name);
-    } catch {
-      // no task.json — skip
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+      // Non-problem support directories have no task.json.
     }
   }
   return ids;
@@ -43,8 +51,30 @@ async function allProblemIds(problemsDir: string): Promise<string[]> {
  * Reads and parses task.json for a given problem.
  */
 async function readTaskJson(problemsDir: string, id: string): Promise<TaskJson> {
-  const raw = await readFile(join(problemsDir, id, "task.json"), "utf8");
+  const path = join(problemsDir, id, "task.json");
+  if (!(await lstat(path)).isFile()) throw new Error(`problem ${id}: task.json must be a regular file`);
+  const raw = await readFile(path, "utf8");
   return JSON.parse(raw) as TaskJson;
+}
+
+/** Resolve all selected owned inputs before a command can invalidate stamps or replace workspaces. */
+async function problemInputs(ids: string[], problemsDir: string) {
+  const directories = ids.map(id => ({ id, problemDir: problemDirectory(problemsDir, id) }));
+  return Promise.all(directories.map(async ({ id, problemDir }) => {
+    const task = await readTaskJson(problemsDir, id);
+    const codebaseDir = task.size === "large" ? problemDirectory(join(problemsDir, "_codebases"), task.codebase!) : undefined;
+    for (const name of [".dockerignore", ".selfcheck.json", "workspace"]) {
+      try {
+        const entry = await lstat(join(problemDir, name));
+        if (name === "workspace" ? !entry.isDirectory() : !entry.isFile()) {
+          throw new Error(`problem ${id}: ${name} must not be a symbolic link or special file`);
+        }
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+      }
+    }
+    return { id, problemDir, task, codebaseDir };
+  }));
 }
 
 /** Reject links along an existing path so copy/delete cannot traverse outside the workspace. */
@@ -121,96 +151,67 @@ export async function applyProblemOverlay(overlayDir: string, workspaceDir: stri
  * @param problemIds - problem ids to build (empty = all)
  * @param problemsDir - path to experiments/problems/
  */
-export async function buildProblems(problemIds: string[], problemsDir: string): Promise<void> {
+export async function buildProblems(problemIds: string[], problemsDir: string, run: ProblemCommand = execFile): Promise<void> {
+  requireRealDirectory(problemsDir);
   const ids = problemIds.length > 0 ? problemIds : await allProblemIds(problemsDir);
+  if (!ids.length) throw new Error("no problem fixtures selected");
 
-  for (const id of ids) {
+  const inputs = await problemInputs(ids, problemsDir);
+  for (const { id, problemDir, codebaseDir } of inputs) {
     process.stderr.write(`[problems] building ${id}...\n`);
-    const task = await readTaskJson(problemsDir, id);
-    const problemDir = join(problemsDir, id);
+    await rm(join(problemDir, ".selfcheck.json"), { force: true });
 
-    if (task.size === "large") {
-      const cb = task.codebase;
-      if (!cb) throw new Error(`problem ${id}: task.json has size=large but no codebase field`);
+    if (codebaseDir) {
+      const codebaseHash = hashTree(codebaseDir);
 
-      const codebaseDir = join(problemsDir, "_codebases", cb);
-
-      // Verify codebase tests (best-effort — skip if base image is missing)
+      // Clean-base validation is mandatory: missing Docker/image and failing tests all block.
       try {
-        await execFile("docker", [
-          "run",
-          "--rm",
-          "-v",
-          `${codebaseDir}:/work`,
-          "-w",
-          "/work",
-          "aiw-base:latest",
-          "python",
-          "-m",
-          "unittest",
-          "discover",
-        ], { maxBuffer: 10 * 1024 * 1024 });
-      } catch (err: unknown) {
-        const e = err as Error & { stderr?: string };
-        if (typeof e.message === "string" && e.message.includes("No such image")) {
-          process.stderr.write(`[problems] warning: aiw-base:latest not found, skipping codebase test for ${id}\n`);
-        } else {
-          process.stderr.write(`[problems] warning: codebase tests failed for ${id}: ${e.message}\n`);
-        }
+        await run("docker", ["run", "--rm", "--network", "none", "-v", `${codebaseDir}:/work:ro`,
+          "-w", "/work", "aiw-base:latest", "python", "-B", "-c",
+          "import sys, unittest; suite = unittest.defaultTestLoader.discover('.'); " +
+          "count = suite.countTestCases(); " +
+          "sys.exit(2) if count == 0 else None; " +
+          "result = unittest.TextTestRunner(verbosity=2).run(suite); " +
+          "sys.exit(not (result.wasSuccessful() and result.testsRun == count and " +
+          "not (result.skipped or result.expectedFailures or result.unexpectedSuccesses)))"],
+          { maxBuffer: 10 * 1024 * 1024 });
+      } catch (error) {
+        throw new Error(`problem ${id}: clean codebase tests failed; workspace was not rebuilt: ${error instanceof Error ? error.message : String(error)}`, { cause: error });
       }
+
+      if (hashTree(codebaseDir) !== codebaseHash) throw new Error(`problem ${id}: clean codebase changed during validation`);
 
       // Copy codebase → workspace/
       const workspaceDir = join(problemDir, "workspace");
       await rm(workspaceDir, { recursive: true, force: true });
-      await execFile("cp", ["-r", codebaseDir + "/.", workspaceDir]);
+      await run("cp", ["-r", codebaseDir + "/.", workspaceDir]);
+      if (hashTree(codebaseDir) !== codebaseHash || hashTree(workspaceDir) !== codebaseHash) {
+        throw new Error(`problem ${id}: clean codebase changed during materialization`);
+      }
 
       await applyProblemOverlay(join(problemDir, "overlay"), workspaceDir);
 
       // Strip .git/ and __pycache__/
       await rm(join(workspaceDir, ".git"), { recursive: true, force: true });
-      await execFile("find", [workspaceDir, "-name", "__pycache__", "-type", "d", "-exec", "rm", "-rf", "{}", "+"])
+      await run("find", [workspaceDir, "-name", "__pycache__", "-type", "d", "-exec", "rm", "-rf", "{}", "+"])
         .catch(() => void 0);
     }
 
     // Generate .dockerignore
     const dockerIgnorePath = join(problemDir, ".dockerignore");
-    await writeFile(dockerIgnorePath, "*\n!workspace/\n");
+    await writeFile(dockerIgnorePath, PROBLEM_DOCKERIGNORE);
 
     process.stderr.write(`[problems] built ${id}\n`);
   }
 }
 
-/**
- * Computes sha256 over sorted file list + contents of the task folder,
- * excluding reference/ and .selfcheck.json.
- */
-async function hashTaskFolder(problemDir: string): Promise<string> {
-  const hash = createHash("sha256");
-
-  async function addDir(dir: string, prefix: string): Promise<void> {
-    let entries: string[];
-    try {
-      entries = (await readdir(dir)).sort();
-    } catch {
-      return;
-    }
-    for (const name of entries) {
-      if (name === "reference" && prefix === "") continue;
-      if (name === ".selfcheck.json" && prefix === "") continue;
-      const fullPath = join(dir, name);
-      const s = await stat(fullPath);
-      const relPath = prefix ? `${prefix}/${name}` : name;
-      if (s.isDirectory()) {
-        await addDir(fullPath, relPath);
-      } else {
-        hash.update(relPath);
-        hash.update(await readFile(fullPath));
-      }
-    }
-  }
-
-  await addDir(problemDir, "");
-  return hash.digest("hex");
+/** Narrow fakeable boundaries; tests cannot bypass validation logic or stamp creation. */
+export interface SelfcheckDependencies {
+  run?: ProblemCommand;
+  buildImage?: typeof import("../container.ts").buildImage;
+  startContainer?: typeof import("../container.ts").startContainer;
+  removeContainer?: typeof import("../container.ts").removeContainer;
+  gradeJob?: typeof import("../grade.ts").gradeJob;
 }
 
 /**
@@ -219,37 +220,50 @@ async function hashTaskFolder(problemDir: string): Promise<string> {
  * @param problemIds - problem ids to check (empty = all)
  * @param problemsDir - path to experiments/problems/
  */
-export async function checkProblems(problemIds: string[], problemsDir: string): Promise<void> {
-  const { buildImage, startContainer, removeContainer } = await import("../container.ts");
-  const { gradeJob } = await import("../grade.ts");
+export async function checkProblems(problemIds: string[], problemsDir: string, deps: SelfcheckDependencies = {}): Promise<void> {
+  const container = await import("../container.ts");
+  const grading = await import("../grade.ts");
+  const { buildImage = container.buildImage, startContainer = container.startContainer,
+    removeContainer = container.removeContainer, gradeJob = grading.gradeJob, run = execFile } = deps;
 
+  requireRealDirectory(problemsDir);
   const ids = problemIds.length > 0 ? problemIds : await allProblemIds(problemsDir);
+  if (!ids.length) throw new Error("no problem fixtures selected");
+  await problemInputs(ids, problemsDir);
   const failures: string[] = [];
+  // Check every required workspace before starting any image/container operation.
+  for (const id of ids) {
+    try {
+      if (!(await lstat(join(problemsDir, id, "workspace"))).isDirectory()) throw new Error("not a directory");
+    } catch (error) {
+      await rm(join(problemsDir, id, ".selfcheck.json"), { force: true });
+      throw new Error(`checkProblems failed for ${id}: required workspace missing or invalid`, { cause: error });
+    }
+  }
 
   for (const id of ids) {
     process.stderr.write(`[problems] checking ${id}...\n`);
     const problemDir = join(problemsDir, id);
 
-    // Warn if workspace is missing
+    let outputDir: string | undefined;
     try {
-      await access(join(problemDir, "workspace"));
-    } catch {
-      process.stderr.write(`[problems] warning: workspace missing for ${id}, skipping\n`);
-      continue;
-    }
-
-    try {
+      // Invalidate previous success even if this attempt fails before any grade.
+      await rm(join(problemDir, ".selfcheck.json"), { force: true });
+      if (!(await lstat(join(problemDir, "workspace"))).isDirectory()) throw new Error(`${id}: workspace must be a directory`);
+      await buildProblems([id], problemsDir, run);
       const checkStart = Date.now();
+      const inputHash = selfcheckInputHash(problemDir);
+      outputDir = await mkdtemp(join(tmpdir(), "aiw-selfcheck-"));
 
       // Build image
       await buildImage(problemDir, id);
 
       // Step 2: empty diff — expect fail
-      const ctr2 = await startContainer(id, problemDir, problemDir);
+      const ctr2 = await startContainer(id, outputDir, outputDir);
       try {
-        const emptyResult = await gradeJob(ctr2, problemDir, problemDir);
-        if (emptyResult.pass) {
-          throw new Error(`${id}: empty diff unexpectedly passed`);
+        const emptyResult = await gradeJob(ctr2, problemDir, outputDir);
+        if (emptyResult.pass || emptyResult.reason !== "checks" || emptyResult.checksCompleted !== true) {
+          throw new Error(`${id}: empty diff must fail its checks, not pass or fail patch application`);
         }
       } finally {
         await removeContainer(ctr2).catch(() => void 0);
@@ -259,18 +273,18 @@ export async function checkProblems(problemIds: string[], problemsDir: string): 
       const solutionPatch = join(problemDir, "reference", "solution.patch");
       const step3Start = Date.now();
 
-      const ctr3 = await startContainer(id, problemDir, problemDir);
+      const ctr3 = await startContainer(id, outputDir, outputDir);
       try {
-        await execFile("docker", ["cp", solutionPatch, `${ctr3.id}:/tmp/solution.patch`]);
-        await execFile("docker", [
+        await run("docker", ["cp", solutionPatch, `${ctr3.id}:/tmp/solution.patch`]);
+        await run("docker", [
           "exec",
           ctr3.id,
           "sh",
           "-c",
           "cd /work && git apply --binary /tmp/solution.patch",
         ]);
-        const sol3Result = await gradeJob(ctr3, problemDir, problemDir);
-        if (!sol3Result.pass) {
+        const sol3Result = await gradeJob(ctr3, problemDir, outputDir);
+        if (!sol3Result.pass || sol3Result.checksCompleted !== true) {
           throw new Error(`${id}: solution.patch failed to produce a passing grade`);
         }
       } finally {
@@ -278,26 +292,26 @@ export async function checkProblems(problemIds: string[], problemsDir: string): 
       }
 
       const step3DurationMs = Date.now() - step3Start;
-      if (step3DurationMs > 30_000) {
-        throw new Error(`${id}: step 3 took ${step3DurationMs}ms (> 30 s)`);
-      } else if (step3DurationMs > 20_000) {
-        process.stderr.write(`[problems] warning: ${id} step 3 took ${step3DurationMs}ms (> 20 s)\n`);
+      if (step3DurationMs >= 30_000) {
+        throw new Error(`${id}: step 3 took ${step3DurationMs}ms (>= 30 s)`);
+      } else if (step3DurationMs >= 20_000) {
+        process.stderr.write(`[problems] warning: ${id} step 3 took ${step3DurationMs}ms (>= 20 s)\n`);
       }
 
-      // Step 4: stability — 4 more runs of solution.patch
-      for (let i = 0; i < 4; i++) {
-        const ctrN = await startContainer(id, problemDir, problemDir);
+      // Step 4: stability — five repetitions after the initial solved grade.
+      for (let i = 0; i < 5; i++) {
+        const ctrN = await startContainer(id, outputDir, outputDir);
         try {
-          await execFile("docker", ["cp", solutionPatch, `${ctrN.id}:/tmp/solution.patch`]);
-          await execFile("docker", [
+          await run("docker", ["cp", solutionPatch, `${ctrN.id}:/tmp/solution.patch`]);
+          await run("docker", [
             "exec",
             ctrN.id,
             "sh",
             "-c",
             "cd /work && git apply --binary /tmp/solution.patch",
           ]);
-          const stabResult = await gradeJob(ctrN, problemDir, problemDir);
-          if (!stabResult.pass) {
+          const stabResult = await gradeJob(ctrN, problemDir, outputDir);
+          if (!stabResult.pass || stabResult.checksCompleted !== true) {
             throw new Error(`${id}: stability run ${i + 2} failed`);
           }
         } finally {
@@ -306,41 +320,33 @@ export async function checkProblems(problemIds: string[], problemsDir: string): 
       }
 
       // Step 5: fixWords check
-      const notesPath = join(problemDir, "reference", "notes.md");
-      try {
-        const notesRaw = await readFile(notesPath, "utf8");
-        // Parse front-matter for fixWords: [...]
-        const fmMatch = notesRaw.match(/^---\n([\s\S]*?)\n---/);
-        if (fmMatch) {
-          const fm = fmMatch[1];
-          const fwMatch = fm.match(/fixWords:\s*\[([^\]]*)\]/);
-          if (fwMatch) {
-            const fixWords = fwMatch[1]
-              .split(",")
-              .map((w) => w.trim().replace(/^["']|["']$/g, ""))
-              .filter(Boolean);
-            const taskMd = await readFile(join(problemDir, "task.md"), "utf8").catch(() => "");
-            for (const word of fixWords) {
-              const re = new RegExp(`\\b${word}\\b`, "i");
-              if (re.test(taskMd)) {
-                throw new Error(`${id}: fixWord "${word}" found in task.md`);
-              }
-            }
-          }
-        }
-      } catch (err: unknown) {
-        const e = err as NodeJS.ErrnoException;
-        if (e.code !== "ENOENT") throw err;
-        // no notes.md — skip fixWords check
+      const notesRaw = await readFile(join(problemDir, "reference", "notes.md"), "utf8");
+      const fmMatch = notesRaw.match(/^---\r?\n([\s\S]*?)\r?\n---/);
+      const declarations = fmMatch?.[1].split(/\r?\n/).filter(line => /^fixWords\s*:/.test(line)) ?? [];
+      const fwMatch = declarations.length === 1 ? declarations[0].match(/^fixWords:\s*\[([^\]]*)\]\s*$/) : null;
+      if (!fwMatch) throw new Error(`${id}: notes.md must declare exactly one fixWords: [...] front matter field`);
+      const fixWords = fwMatch[1].trim() === "" ? [] : fwMatch[1].split(",").map((value) => {
+        const word = value.trim();
+        if (/^"(?:[^"\\]|\\.)*"$/.test(word)) return JSON.parse(word) as string;
+        if (/^'(?:[^']|'')*'$/.test(word)) return word.slice(1, -1).replace(/''/g, "'");
+        if (!word || /["'\[\]#:]/.test(word)) throw new Error(`${id}: malformed inline fixWords list`);
+        return word;
+      });
+      if (fixWords.some(word => !word.trim())) throw new Error(`${id}: empty fixWord is invalid`);
+      const taskMd = await readFile(join(problemDir, "task.md"), "utf8");
+      for (const word of fixWords) {
+        const escaped = word.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+        if (new RegExp(`\\b${escaped}\\b`, "i").test(taskMd)) throw new Error(`${id}: fixWord "${word}" found in task.md`);
       }
 
       // Step 6: Write .selfcheck.json
       const checkDurationMs = Date.now() - checkStart;
-      const taskHash = await hashTaskFolder(problemDir);
+      const taskHash = problemHash(problemDir);
+      if (selfcheckInputHash(problemDir) !== inputHash) throw new Error(`${id}: self-check inputs changed during validation`);
       await writeFile(
         join(problemDir, ".selfcheck.json"),
         JSON.stringify(
-          { pass: true, taskHash, checkedAt: new Date().toISOString(), checkDurationMs },
+          { version: 1, pass: true, taskHash, inputHash, checkedAt: new Date().toISOString(), checkDurationMs },
           null,
           2,
         ),
@@ -351,6 +357,9 @@ export async function checkProblems(problemIds: string[], problemsDir: string): 
       const e = err as Error;
       process.stderr.write(`[problems] ${id}: FAIL — ${e.message}\n`);
       failures.push(id);
+      break;
+    } finally {
+      if (outputDir) await rm(outputDir, { recursive: true, force: true });
     }
   }
 
