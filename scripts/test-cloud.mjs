@@ -104,6 +104,13 @@ export function main(root = path.resolve(path.dirname(fileURLToPath(import.meta.
     'scripts/dot-native/method.ts', 'scripts/dot-native/cli.ts', 'scripts/dot-native/method.test.ts'], {cwd:root,env,stdio:'inherit'});
   if (nativeTypes.error) throw nativeTypes.error;
   if (nativeTypes.status !== 0) throw new Error(`dot-native typecheck failed (exit ${nativeTypes.status})`);
+  runTests(['scripts/native-comparison/method.test.ts'], root, 'native-comparison local contract');
+  const comparisonTypes = spawn(process.execPath, [path.join(root,'node_modules/typescript/bin/tsc'),
+    '--ignoreConfig', '--noEmit', '--module', 'nodenext', '--target', 'es2022', '--strict',
+    '--allowImportingTsExtensions', '--skipLibCheck', '--types', 'node',
+    'scripts/native-comparison/method.ts', 'scripts/native-comparison/cli.ts', 'scripts/native-comparison/method.test.ts'], {cwd:root,env,stdio:'inherit'});
+  if (comparisonTypes.error) throw comparisonTypes.error;
+  if (comparisonTypes.status !== 0) throw new Error(`native-comparison typecheck failed (exit ${comparisonTypes.status})`);
   for (const name of fs.readdirSync(path.join(root,'packages')).sort()) {
     const cwd = path.join(root,'packages',name);
     const testDir = path.join(cwd,'test');
