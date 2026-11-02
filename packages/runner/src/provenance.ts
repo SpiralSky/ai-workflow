@@ -2,10 +2,11 @@
 import { createHash } from "node:crypto";
 import { execFile, execFileSync } from "node:child_process";
 import { promisify } from "node:util";
-import { readFileSync, readdirSync, lstatSync } from "node:fs";
-import { join, resolve, relative, isAbsolute, sep } from "node:path";
+import { readFileSync, readdirSync, lstatSync, openSync, closeSync, fstatSync, readSync, constants, realpathSync } from "node:fs";
+import { join, resolve } from "node:path";
 import { parseFrameworkVariant, DEFAULT_TRACE_LIMITS } from "@aiw/core";
 import { canonicalJSON } from "@aiw/telemetry";
+import { assertProblemBuildContext } from "./build-context.ts";
 import { gitProvenance } from "./config.ts";
 import type { MCPSession } from "./mcp.ts";
 import type { Provenance, RunConfig } from "./types.ts";
@@ -31,11 +32,17 @@ export function hashTree(root: string, exclude: (relativePath: string) => boolea
   visit(root, "");
   return hash.digest("hex");
 }
-/** Resolve selected identifiers without permitting access outside their repository directory. */
-function child(root: string, id: string): string {
-  const path = resolve(root, id), rel = relative(resolve(root), path);
-  if (!rel || isAbsolute(id) || rel === ".." || rel.startsWith(`..${sep}`)) throw new Error(`unsafe provenance identifier: ${id}`);
-  return path;
+/** Require an owned real directory; neither it nor its ancestors may redirect through links. */
+export function requireRealDirectory(path: string): string {
+  const full = resolve(path);
+  if (!lstatSync(full).isDirectory() || realpathSync(full) !== full) throw new Error("fixture directory must be real and not traverse symbolic links");
+  return full;
+}
+/** Resolve one simple fixture/codebase identifier before any read, mutation or process operation. */
+export function problemDirectory(root: string, id: string): string {
+  if (typeof id !== "string" || !/^[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}$/.test(id)) throw new Error("unsafe fixture identifier");
+  try { return requireRealDirectory(join(requireRealDirectory(root), id)); }
+  catch (cause) { throw new Error(`fixture directory unavailable or unsafe for identifier ${id}`, { cause }); }
 }
 /** Hash declared tracked runtime inputs; never scan credential stores or arbitrary untracked files. */
 export function sourceHash(root: string): string {
@@ -59,6 +66,73 @@ export function bundleHash(root: string): string { return hashTree(join(root, "p
 export function problemHash(dir: string): string {
   return hashTree(dir, (p) => p === "reference" || p === ".selfcheck.json" || p === ".dockerignore" || p.split("/").includes("__pycache__") || p.endsWith(".pyc"));
 }
+/** Inputs to validation, distinct from source provenance and its reference-excluding task hash. */
+export function selfcheckInputHash(problemDir: string): string {
+  requireRealDirectory(problemDir);
+  assertProblemBuildContext(problemDir);
+  for (const name of ["workspace", "checks", "reference"]) {
+    if (!lstatSync(join(problemDir, name)).isDirectory()) throw new Error(`self-check requires ${name} directory`);
+  }
+  for (const name of ["task.md", "task.json", "Dockerfile", "checks/check.sh", "reference/solution.patch", "reference/notes.md"]) {
+    if (!lstatSync(join(problemDir, name)).isFile()) throw new Error(`self-check requires ${name} regular file`);
+  }
+  const task = JSON.parse(readFileSync(join(problemDir, "task.json"), "utf8"));
+  const codebase = task.size === "large"
+    ? hashTree(problemDirectory(join(problemDir, "..", "_codebases"), task.codebase))
+    : null;
+  return hashText(canonicalJSON({ taskHash: problemHash(problemDir), reference: hashTree(join(problemDir, "reference")), codebase }));
+}
+/** Bounded no-follow regular-file reader. Errors never echo untrusted stamp contents. */
+function readSelfcheckStamp(path: string): unknown {
+  const maxBytes = 4096;
+  const fd = openSync(path, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK);
+  try {
+    const stat = fstatSync(fd);
+    if (!stat.isFile() || stat.size > maxBytes) throw new Error("invalid stamp file");
+    const buffer = Buffer.alloc(maxBytes + 1);
+    let size = 0;
+    while (size < buffer.length) {
+      const count = readSync(fd, buffer, size, buffer.length - size, null);
+      if (count === 0) break;
+      size += count;
+    }
+    if (size > maxBytes) throw new Error("oversized stamp");
+    const raw = new TextDecoder("utf-8", { fatal: true }).decode(buffer.subarray(0, size));
+    const value: unknown = JSON.parse(raw);
+    // JSON.parse silently accepts repeated object keys. Scan valid JSON tokens before accepting it.
+    const seen = new Set<string>();
+    let depth = 0;
+    for (const token of raw.matchAll(/"(?:\\.|[^"\\])*"|[{}\[\]]/g)) {
+      if (token[0] === "{" || token[0] === "[") depth++;
+      else if (token[0] === "}" || token[0] === "]") depth--;
+      else if (depth === 1 && /^\s*:/.test(raw.slice(token.index! + token[0].length))) {
+        const key = JSON.parse(token[0]) as string;
+        if (seen.has(key)) throw new Error("duplicate stamp field");
+        seen.add(key);
+      }
+    }
+    return value;
+  } finally { closeSync(fd); }
+}
+/** Reject absent, malformed, failed or stale checks; legacy producer hashes are not interchangeable. */
+export function assertProblemSelfcheck(problemDir: string): string {
+  requireRealDirectory(problemDir);
+  assertProblemBuildContext(problemDir);
+  const fail = (detail: string): never => { throw new Error(`self-check admission failed for ${problemDir}: ${detail}; run aiw problems check`); };
+  let stamp: unknown;
+  try {
+    stamp = readSelfcheckStamp(join(problemDir, ".selfcheck.json"));
+  } catch { fail("missing or malformed stamp"); }
+  if (!stamp || typeof stamp !== "object" || Array.isArray(stamp)) fail("malformed stamp");
+  const record = stamp as Record<string, unknown>;
+  if (Object.keys(record).sort().join(",") !== "checkDurationMs,checkedAt,inputHash,pass,taskHash,version" || record.version !== 1 || record.pass !== true || typeof record.taskHash !== "string" || !HASH.test(record.taskHash) ||
+      typeof record.inputHash !== "string" || !HASH.test(record.inputHash) || typeof record.checkedAt !== "string" ||
+      !Number.isFinite(Date.parse(record.checkedAt)) || new Date(record.checkedAt).toISOString() !== record.checkedAt || typeof record.checkDurationMs !== "number" ||
+      !Number.isFinite(record.checkDurationMs) || record.checkDurationMs < 0) fail("unrecognized or unsuccessful stamp");
+  const taskHash = problemHash(problemDir);
+  if (record.taskHash !== taskHash || record.inputHash !== selfcheckInputHash(problemDir)) fail("stale inputs changed since validation");
+  return taskHash;
+}
 /** Require the packaged portable artifact to match source before any evaluation may start. */
 export function checkBundleFreshness(root: string): void {
   execFileSync(process.execPath, [join(root, "packages/server/build.mjs"), "--check"], { cwd: root, encoding: "utf8", maxBuffer: 8 * 1024 * 1024 });
@@ -68,6 +142,8 @@ export function collectStaticProvenance(root: string, config: RunConfig, base: O
   freshness: (root: string) => void = checkBundleFreshness): Provenance {
   if (!/^[a-f0-9]{40,64}$/.test(base.commit)) throw new Error("git commit identity is unavailable");
   if (config.branch.timeoutMs !== 120_000 || canonicalJSON(config.branch.limits) !== canonicalJSON(DEFAULT_TRACE_LIMITS)) throw new Error("nondefault branch limits are not yet implemented by the server; refusing misleading provenance");
+  // Admit every fixture before bundle subprocesses, provider discovery or job work.
+  for (const id of config.problems) assertProblemSelfcheck(problemDirectory(join(root, "experiments/problems"), id));
   freshness(root);
   const promptDir = join(root, "packages/server/dist/prompts");
   const promptHashes = Object.fromEntries(readdirSync(promptDir).filter((name) => name.endsWith(".md")).sort()
@@ -75,7 +151,7 @@ export function collectStaticProvenance(root: string, config: RunConfig, base: O
   if (promptHashes.base !== base.basePrompt) throw new Error("host and bundled base prompts differ");
   const problems: Provenance["problems"] = Object.create(null);
   for (const id of config.problems) {
-    const dir = child(join(root, "experiments/problems"), id);
+    const dir = problemDirectory(join(root, "experiments/problems"), id);
     const task = JSON.parse(readFileSync(join(dir, "task.json"), "utf8"));
     if (!Number.isSafeInteger(task.turnLimit) || task.turnLimit < 1) throw new Error(`missing/invalid turnLimit: ${id}`);
     readFileSync(join(dir, "task.md"));
@@ -88,12 +164,13 @@ export function collectStaticProvenance(root: string, config: RunConfig, base: O
 }
 /** Refuse drift between static preflight and a job's first model request. */
 export function verifyStaticProvenance(root: string, config: RunConfig, provenance: Provenance, problem: string): void {
+  assertProblemSelfcheck(problemDirectory(join(root, "experiments/problems"), problem));
   const currentGit = gitProvenance(root);
   if (currentGit.commit !== provenance.commit || currentGit.dirty !== provenance.dirty) throw new Error("git state changed after provenance preflight");
   const integrity = provenance.integrity;
   if (!integrity || integrity.version !== 1) throw new Error("run lacks static provenance preflight");
   if (integrity.configHash !== hashText(canonicalJSON(config)) || integrity.sourceHash !== sourceHash(root) || integrity.bundleHash !== bundleHash(root)) throw new Error("source, configuration or mounted bundle changed after provenance preflight");
-  if (provenance.problems[problem]?.taskHash !== problemHash(child(join(root, "experiments/problems"), problem))) throw new Error("problem changed after provenance preflight");
+  if (provenance.problems[problem]?.taskHash !== problemHash(problemDirectory(join(root, "experiments/problems"), problem))) throw new Error("problem changed after provenance preflight");
 }
 /** Read the immutable image ID actually used by this container, never a mutable tag. */
 export async function inspectContainerImage(containerId: string): Promise<string> {

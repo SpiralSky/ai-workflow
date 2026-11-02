@@ -1,5 +1,17 @@
 import assert from 'node:assert/strict';
-import { test } from 'node:test';
+import { test, type TestContext } from 'node:test';
+import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
+import { join } from 'node:path';
+import { tmpdir } from 'node:os';
+import { PROBLEM_DOCKERIGNORE } from '../src/build-context.ts';
+
+/** Synthetic local context; Docker remains a fake command boundary. */
+function context(t: TestContext): string {
+  const dir = mkdtempSync(join(tmpdir(), 'aiw-context-'));
+  writeFileSync(join(dir, '.dockerignore'), PROBLEM_DOCKERIGNORE);
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  return dir;
+}
 import { buildImage, startContainer, problemImageRef, type DockerImageCommand } from '../src/container.ts';
 
 import { gradingContainerArgs } from '../src/grade.ts';
@@ -18,16 +30,18 @@ function fakeDocker(stdout: string) {
   return { calls, run };
 }
 
-test('local build uses immutable configuration ID when RepoDigests is empty', async () => {
+test('local build uses immutable configuration ID when RepoDigests is empty', async t => {
+    const dir = context(t);
   const { run, calls } = fakeDocker(JSON.stringify([{ Id: id, RepoDigests: [] }]));
-  assert.equal(await buildImage('/fixture', 'smoke', run), id);
-  assert.deepEqual(calls, [['build', '-t', 'aiw-problem:smoke', '/fixture'],
+  assert.equal(await buildImage(dir, 'smoke', run), id);
+  assert.deepEqual(calls, [['build', '-t', 'aiw-problem:smoke', dir],
     ['image', 'inspect', 'aiw-problem:smoke']]);
 });
 
-test('registry-backed image retains repository manifest digest', async () => {
+test('registry-backed image retains repository manifest digest', async t => {
+    const dir = context(t);
   const { run } = fakeDocker(JSON.stringify([{ Id: id, RepoDigests: [digest] }]));
-  assert.equal(await buildImage('/fixture', 'smoke', run), digest);
+  assert.equal(await buildImage(dir, 'smoke', run), digest);
 });
 
 for (const [name, value] of Object.entries({
@@ -42,18 +56,21 @@ for (const [name, value] of Object.entries({
   'non-object image': ['bad'],
   'non-array inspection': { Id: id, RepoDigests: [] },
 })) {
-  test(`rejects ${name}; never returns mutable tag fallback`, async () => {
+  test(`rejects ${name}; never returns mutable tag fallback`, async t => {
+    const dir = context(t);
     const { run } = fakeDocker(JSON.stringify(value));
-    await assert.rejects(buildImage('/fixture', 'smoke', run));
+    await assert.rejects(buildImage(dir, 'smoke', run));
   });
 }
 
-test('malformed inspection JSON fails closed', async () => {
-  await assert.rejects(buildImage('/fixture', 'smoke', fakeDocker('{').run), SyntaxError);
+test('malformed inspection JSON fails closed', async t => {
+    const dir = context(t);
+  await assert.rejects(buildImage(dir, 'smoke', fakeDocker('{').run), SyntaxError);
 });
 
 for (const failure of ['build', 'image']) {
-  test(`${failure} command failure propagates without retry or fallback`, async () => {
+  test(`${failure} command failure propagates without retry or fallback`, async t => {
+    const dir = context(t);
     const calls: string[] = [];
     const error = new Error(`${failure} failed`);
     const run: DockerImageCommand = async (_command, args) => {
@@ -61,17 +78,18 @@ for (const failure of ['build', 'image']) {
       if (args[0] === failure) throw error;
       return { stdout: '' };
     };
-    await assert.rejects(buildImage('/fixture', 'smoke', run), actual => actual === error);
+    await assert.rejects(buildImage(dir, 'smoke', run), actual => actual === error);
     assert.deepEqual(calls, failure === 'build' ? ['build'] : ['build', 'image']);
   });
 }
 
 for (const task of ['01-chunk-off-by-one', 'L1-rename-sku', 'L2-split-pricing',
   'L3-import-cycle', 'L4-currency-param', 'L5-refund-double-count']) {
-  test(`build, candidate run, and grading use the same case-preserving image: ${task}`, async () => {
+  test(`build, candidate run, and grading use the same case-preserving image: ${task}`, async t => {
+    const dir = context(t);
     const ref = `aiw-problem:${task}`;
     const { run, calls } = fakeDocker(JSON.stringify([{ Id: id, RepoDigests: [] }]));
-    await buildImage('/fixture', task, run);
+    await buildImage(dir, task, run);
     const ctr = await startContainer(task, '/out', '/bundle', undefined, run);
     assert.equal(problemImageRef(task), ref);
     assert.equal(calls[0][2], ref);
@@ -89,11 +107,12 @@ test('case-distinct task IDs cannot collide; valid maximum tag length retained',
 
 for (const bad of ['', '../task', '/task', 'task/path', 'task\\path', '--privileged',
   '.hidden', 'name:tag', 'name@digest', 'task space', 'task\n', 'A'.repeat(129)]) {
-  test(`unsafe/invalid task ID rejected before Docker: ${JSON.stringify(bad)}`, async () => {
+  test(`unsafe/invalid task ID rejected before Docker: ${JSON.stringify(bad)}`, async t => {
+    const dir = context(t);
     const { run, calls } = fakeDocker('');
     assert.throws(() => problemImageRef(bad), /Invalid problem ID/);
     assert.throws(() => gradingContainerArgs(bad), /Invalid problem ID/);
-    await assert.rejects(buildImage('/fixture', bad, run), /Invalid problem ID/);
+    await assert.rejects(buildImage(dir, bad, run), /Invalid problem ID/);
     await assert.rejects(startContainer(bad, '/out', '/bundle', undefined, run), /Invalid problem ID/);
     assert.deepEqual(calls, []);
   });
