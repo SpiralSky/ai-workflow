@@ -56,3 +56,12 @@ verification: 857 Node + 12 normal/12 optimized Python tests, both typechecks, z
 outcomes. Exact parent identities, conflict decisions, review fingerprint and evidence are in
 `docs/dot-progress/hotpath-shared-integration.md`. Plan remains draft; no default promotion,
 model efficacy or native assignment evidence is claimed.
+
+## Corrected native-comparison harness propagation
+
+Shared central `972fb81e419b948f0ff5ae9ff128132ae64c7d89` is independently composed after an
+intermediate merge retaining the earlier 54/55 focused timeout. Corrected focused58 and full887
+Node + 24 Python tests pass with all three typechecks and zero incomplete outcomes. Candidate
+runtime/allowances/specs remain unchanged. Exact history and limitations are in
+`docs/dot-progress/hotpath-native-harness-integration.md`. Plan stays draft; the parent owns the
+postcommit clean-HEAD freeze and any native pilot/publication, not this local acceptance record.
