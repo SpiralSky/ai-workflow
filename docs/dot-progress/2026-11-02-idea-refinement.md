@@ -17,7 +17,7 @@ open/draft/unmerged. Protected/default branches were not edited.
 | dot/design-contract-hardening-20261102 | a572d66d4891a2bcd87f29f20112fc66bcb36494 | bde693c72086a4a7f7676dbf3259c9482b8d524e | Reviewed offline validator correction |
 | dot/test-resource-isolation-20261102 | 7bd10f3de551cef18390eee8a69352fc8b2d9dbd | 9cd1381c0ac200c76a42fb0dcc1be891bc7c4767 | Explicit serial test-file scheduling, default unchanged |
 | dot/selector-reuse-20261102 | c7255baa50b7b6644c7fb5036264033e97ef299b | 3a0d2cf0c4df25c3c035f4db24904a5ec8299c61 | Opt-in library prototype, not Task/runner wired or promoted |
-| dot/hotpath-prototype-20261102 | In progress from common base | Not published | Separate generic recovery-snippet ablation |
+| dot/hotpath-prototype-20261102 | 7826468308e94add7f668a897a7a74f398c5e117 | c58faeeb966ed1046d2cc73388d647bce9138351 | Reviewed opt-in generic recovery snippets; 696 package +28 script tests |
 | dot/idea-refinement-progress-20261102 | This record | Publication tracked separately | Research, comparisons and decision record |
 
 GitHub-created publication commits differ from local commits; exact source trees
@@ -88,14 +88,40 @@ ToolRet/OpenAI/Anthropic references and existing-mechanism distinctions. Lazy
 tool exposure, recovery, reference passing and BM25 index caching already exist;
 they are not new improvements in this work.
 
-The hot-path variant is a genuine unfinished specified feature: executor prompt
-slots exist, but parser/framework currently reject it. A separate opt-in candidate
-is being implemented with generic bounded seeds, declared tool dependencies,
+The hot-path variant implements a genuinely unfinished specified feature. Its separate
+opt-in candidate includes 12 generic bounded seeds, declared tool dependencies,
 pre-execution lock integration, compile/mock execution tests and unchanged default
-cross-mode comparison. Its limits/override choices are proposed design decisions,
-not user approvals. No performance benefit is assumed.
+cross-mode comparison. Catalog fingerprints bind hidden snippet text to the treatment.
+Full serial verification passed 696 package +28 script tests, no skips, typecheck,
+bundle freshness and local native/tier-L probes. Published tree:
+`5a70bb4179253fdaf810e408bd144c7ad4cdb622`. No model benefit is measured.
+
+Two additional independent common-base branches passed review and were published:
+- `dot/fixture-admission-20261102`: rejects missing/stale checks, unsafe build contexts,
+  missing workspaces and failed transport; initial plus five solved repetitions.
+  Common serial harness passed 683 package +24 script tests, zero skips/typecheck.
+  No real Docker fixture checking was performed locally.
+- `dot/dot-native-experiments-20261102`: one-way manual native coding assignment and
+  bounded local QuickJS artifact grading. 16 focused tests/typecheck plus a synthetic
+  CLI smoke (3/3 checks) passed. No solver pilot, model API adapter or automatic agent
+  dispatch. Native-worker billing/quota pool is unknown, not guaranteed dot-only.
+
+These choices are autonomous reversible development decisions, not user approvals.
 
 Full10-task×3-framework×2-tier model success and cost comparison remains unrun.
 No candidate is ranked by cost or promoted ahead of that quality gate. Live
 provider credentials and a separately bounded spending authorization remain
 unresolved; code publication is not spending or authentication permission.
+
+## Additional publication verification
+
+- Fixture admission: local `1039f358dfce62978316c2ee610c38acff331ee7`, remote
+  `1efe046a6855b404d956db2490acead0f04f568f`, exact tree
+  `12b749fdaf774d1a286e6d340802c7aef16d1d29`.
+- Dot-native method: local `f2061ca7971158713b8784699aafbacba5c171d8`, remote
+  `6b560f428b0452d4e9710c12156729d8c7cb2995`, exact tree
+  `8cca807253b8ad9e5e3d84090e41c2d425dd1618`.
+- Independent method review identified input validation before reservation allowed
+  same-ID retry after malformed input. Fixed reservation order and added regressions;
+  parent reran all 16 tests/typecheck successfully. No native solver pilot ran.
+- Run artifacts are ignored. All plans remain draft, branches unmerged.
