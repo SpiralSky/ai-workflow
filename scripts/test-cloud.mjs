@@ -20,17 +20,29 @@ export function assertTestResult(result, label) {
   if (Number(summaries[0][1]) !== 0) throw new Error(`${label}: skipped tests are not a full-suite pass`);
 }
 
+/** Validate optional test-file scheduling without silently accepting malformed configuration. */
+export function testConcurrencyArgs(value) {
+  if (value === undefined) return [];
+  if (typeof value !== 'string' || !/^[1-9][0-9]*$/.test(value) || !Number.isSafeInteger(Number(value))) {
+    throw new Error('AIW_TEST_CONCURRENCY must be a positive safe integer (for serial local acceptance use 1); unset it to retain Node defaults. No tests were counted as passed.');
+  }
+  return [`--test-concurrency=${value}`];
+}
+
 /** Run unchanged workspace test files in their own workspace, then the project's typecheck. */
-export function main(root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')) {
-  const venv = findVenv(root);
+export function main(root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..'), {env: inputEnv = process.env, spawn = spawnSync} = {}) {
+  // Validate before venv discovery, cache setup, or any child execution.
+  const concurrencyArgs = testConcurrencyArgs(inputEnv.AIW_TEST_CONCURRENCY);
+  const venv = findVenv(root, inputEnv);
   if (!venv) throw new Error('Python tool venv missing. Set AIW_VENV to a verified venv or prepare packages/tools/.venv using its documented dependencies. No tests were counted as passed.');
   // Inherited XDG_CACHE_HOME can exist but be read-only in cloud sandboxes.
   // An isolated per-run cache also avoids previous test state affecting results.
   const cache = fs.mkdtempSync(path.join(os.tmpdir(), 'aiw-cloud-test-cache-'));
   fs.mkdirSync(cache, {recursive:true});
-  const env = {...process.env, AIW_VENV:venv, XDG_CACHE_HOME:cache};
+  const env = {...inputEnv, AIW_VENV:venv, XDG_CACHE_HOME:cache};
+  console.log(`# Test-file concurrency: ${inputEnv.AIW_TEST_CONCURRENCY ?? 'Node default'}`);
   const runTests = (args, cwd, label) => {
-    const result = spawnSync(process.execPath, ['--import','tsx','--test','--test-reporter=tap',...args], {cwd,env,encoding:'utf8',maxBuffer:32*1024*1024});
+    const result = spawn(process.execPath, ['--import','tsx','--test','--test-reporter=tap',...concurrencyArgs,...args], {cwd,env,encoding:'utf8',maxBuffer:32*1024*1024});
     process.stdout.write(result.stdout ?? ''); process.stderr.write(result.stderr ?? '');
     assertTestResult(result, label);
   };
@@ -44,7 +56,7 @@ export function main(root = path.resolve(path.dirname(fileURLToPath(import.meta.
     if (!files.length) throw new Error(`${name}: test directory exists but no expected .test.ts files found`);
     runTests(files,cwd,name);
   }
-  const check = spawnSync(process.execPath, [path.join(root,'node_modules/typescript/bin/tsc'),'-p','tsconfig.json'], {cwd:root,env,stdio:'inherit'});
+  const check = spawn(process.execPath, [path.join(root,'node_modules/typescript/bin/tsc'),'-p','tsconfig.json'], {cwd:root,env,stdio:'inherit'});
   if (check.error) throw check.error;
   if (check.status !== 0) throw new Error(`typecheck failed (exit ${check.status})`);
   console.log('Cloud package tests and typecheck passed. This is not a live-model benchmark.');
