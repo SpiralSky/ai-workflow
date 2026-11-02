@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { execFileSync } from "node:child_process";
 import { DEFAULT_BRANCH_CONFIG, gitProvenance } from "../src/config.ts";
-import { collectStaticProvenance, verifyStaticProvenance, hashText, hashTree, problemHash, attestJob, assertCompleteProvenance, inspectContainerImage } from "../src/provenance.ts";
+import { collectStaticProvenance, verifyStaticProvenance, hashText, hashTree, problemHash, selfcheckInputHash, attestJob, assertCompleteProvenance, inspectContainerImage } from "../src/provenance.ts";
 import { gradeJob } from "../src/grade.ts";
 import type { RunConfig, Provenance } from "../src/types.ts";
 import type { MCPSession } from "../src/mcp.ts";
@@ -26,6 +26,14 @@ function fixture(t: TestContext) {
   put("experiments/problems/p/task.md", "task prompt");
   put("experiments/problems/p/workspace/main.py", "source");
   put("experiments/problems/p/checks/check.sh", "hidden-check-contents");
+  put("experiments/problems/p/.dockerignore", "*\n!workspace/\n");
+  put("experiments/problems/p/Dockerfile", "FROM fixture-only");
+  put("experiments/problems/p/reference/solution.patch", "synthetic reference");
+  put("experiments/problems/p/reference/notes.md", "---\nfixWords: []\n---\n");
+  // Explicit synthetic evidence for this isolated mock fixture, not a real self-check.
+  const problemDir = join(root, "experiments/problems/p");
+  put("experiments/problems/p/.selfcheck.json", JSON.stringify({ version: 1, pass: true,
+    taskHash: problemHash(problemDir), inputHash: selfcheckInputHash(problemDir), checkedAt: "2026-11-02T00:00:00.000Z", checkDurationMs: 1 }));
   execFileSync("git", ["init", "-q"], { cwd: root });
   execFileSync("git", ["add", "."], { cwd: root });
   execFileSync("git", ["-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit", "-qm", "fixture"], { cwd: root });
@@ -132,7 +140,7 @@ test("Docker inspection records actual immutable ID and grading pins it (stub ex
   const log = join(root, "docker-arguments.jsonl");
   const bin = join(root, "bin"); mkdirSync(bin);
   const stub = join(bin, "docker");
-  writeFileSync(stub, `#!${process.execPath}\nconst fs = require('node:fs'); const a = process.argv.slice(2); fs.appendFileSync(${JSON.stringify(log)}, JSON.stringify(a)+'\\n'); if(a[0]==='inspect') console.log(${JSON.stringify(image)}); else if(a[0]==='run') console.log('grading-fixture'); else if(a[0]==='cp' && a[1].endsWith(':/work')) { fs.mkdirSync(a[2], {recursive:true}); fs.writeFileSync(require('node:path').join(a[2],'main.py'),'source'); }`, { mode: 0o755 });
+  writeFileSync(stub, `#!${process.execPath}\nconst fs = require('node:fs'); const a = process.argv.slice(2); fs.appendFileSync(${JSON.stringify(log)}, JSON.stringify(a)+'\\n'); if(a[0]==='inspect') console.log(${JSON.stringify(image)}); else if(a[0]==='run') console.log('grading-fixture'); else if(a[0]==='exec' && a.at(-1).includes('AIW_CHECK_EXIT_')) { const marker=a.at(-1).match(/AIW_CHECK_EXIT_[a-f0-9-]+/)[0]; process.stderr.write('\\n'+marker+':0\\n'); } else if(a[0]==='cp' && a[1].endsWith(':/work')) { fs.mkdirSync(a[2], {recursive:true}); fs.writeFileSync(require('node:path').join(a[2],'main.py'),'source'); }`, { mode: 0o755 });
   const before = process.env.PATH; process.env.PATH = `${bin}:${before}`;
   try {
     assert.equal(await inspectContainerImage("container-fixture"), image);

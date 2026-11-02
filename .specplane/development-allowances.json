@@ -6,7 +6,8 @@
   "authorization_kind": "development requests only; final approval and merge remain human-only",
   "user_requests": [
     "Add sign in to open ai support for ai-workflow workflow runs",
-    "Additionally, try to approach testing in the future with saving money in mind, for example once hitting an error, stop all other runs and try to fix the error first."
+    "Additionally, try to approach testing in the future with saving money in mind, for example once hitting an error, stop all other runs and try to fix the error first.",
+    "Keep working on and improving it \u2014 ai-workflow-only separate-branch refinement, strict fixture admission before evaluation work."
   ],
   "source_commits": [
     "1e133031b939d91d50b4502f8f624f506a15ef21",
@@ -178,6 +179,26 @@
       "rationale": "Stop concurrent work and propagate cancellation after terminal failures, preserving task success requirements. Follow-up: host-only optional typed classifier selection, complete cost/fallback evidence."
     },
     {
+      "path": "packages/core/src/orchestrate/selection/reuse-proof.ts",
+      "before": null,
+      "after": {
+        "path": "packages/core/src/orchestrate/selection/reuse-proof.ts",
+        "mode": "100644",
+        "sha256": "90f2cd482f44cbbd36b707e8f85f9ac7306affe4d67652d23e2891d99af56929"
+      },
+      "rationale": "Experimental task-scoped selection decision reuse; trusted classifier admission, explicit task/revision/treatment identity, bounded memory and offline safety regressions. Defaults and fixed60 full-success gate unchanged."
+    },
+    {
+      "path": "packages/core/src/orchestrate/selection/task-reuse.ts",
+      "before": null,
+      "after": {
+        "path": "packages/core/src/orchestrate/selection/task-reuse.ts",
+        "mode": "100644",
+        "sha256": "affd1865f27d33f6512aaaf51e63c262d8b77ba977d241141506c81f5f5c0f1b"
+      },
+      "rationale": "Experimental task-scoped selection decision reuse; trusted classifier admission, explicit task/revision/treatment identity, bounded memory and offline safety regressions. Defaults and fixed60 full-success gate unchanged."
+    },
+    {
       "path": "packages/core/test/classifier.test.ts",
       "before": null,
       "after": {
@@ -186,6 +207,16 @@
         "sha256": "b0c016a909f0f9bcd6c47fe318f000dae9bbb09072a11b28de9561ad68cddb60"
       },
       "rationale": "Host-only optional typed classifier with strict probability/usage contract and same selector completion."
+    },
+    {
+      "path": "packages/core/test/selection-reuse.test.ts",
+      "before": null,
+      "after": {
+        "path": "packages/core/test/selection-reuse.test.ts",
+        "mode": "100644",
+        "sha256": "ebb6375dcb4de1f38c2ed5779bc7ec1bc205db33687dbe064e788a7a52e7678a"
+      },
+      "rationale": "Experimental task-scoped selection decision reuse; trusted classifier admission, explicit task/revision/treatment identity, bounded memory and offline safety regressions. Defaults and fixed60 full-success gate unchanged."
     },
     {
       "path": "packages/core/test/selection.test.ts",
@@ -372,6 +403,16 @@
       "rationale": "OpenAI sign-in, bounded host-brokered workflow usage and security regressions; fail-fast cancellation where shared with runner/core/server."
     },
     {
+      "path": "packages/runner/src/build-context.ts",
+      "before": null,
+      "after": {
+        "path": "packages/runner/src/build-context.ts",
+        "mode": "100644",
+        "sha256": "d2ccb1b937b6971f89154797a645d75ecc78ad9e726e71f24a053bc527d38e23"
+      },
+      "rationale": "Follow-up source67b42ae: exact workspace-only generated Docker context policy validated independently from canonical task identity before image/provider work; fake-boundary regressions."
+    },
+    {
       "path": "packages/runner/src/cancellation.ts",
       "before": null,
       "after": {
@@ -443,7 +484,7 @@
       "after": {
         "path": "packages/runner/src/container.ts",
         "mode": "100644",
-        "sha256": "91a6e7cd7424403ea2ddbac4687350d9a0d8dd1f4f7bd59a1f84949f2a87ee51"
+        "sha256": "d39f0cb25cce4c4fb29cfd563318cf1a7a846f5b263fbe551557ff24508aa83c"
       },
       "rationale": "Selected verified immutable image identity and case-preserving Docker references; no CI wrapper/fixtures imported. Security follow-up: all orchestration credentials/inference stay host-side, typed sanitized provider errors."
     },
@@ -481,9 +522,9 @@
       "after": {
         "path": "packages/runner/src/grade.ts",
         "mode": "100644",
-        "sha256": "2a6d3afe9bb98f2551cd6f300925fb71bf0d34e94d4334960a09aee89694b1b9"
+        "sha256": "d7345c0f8fa2edb2e6cf7f3ab39fdd51d3fbe470e076b9caaab3aeb40968aba0"
       },
-      "rationale": "Selected verified immutable image identity and case-preserving Docker references; no CI wrapper/fixtures imported. Follow-up: actual runtime provenance gate and immutable observed-image grading."
+      "rationale": "Selected verified immutable image identity and case-preserving Docker references; no CI wrapper/fixtures imported. Follow-up: actual runtime provenance gate and immutable observed-image grading. Follow-up source67b42ae: fixture admission distinguishes completed check exits from Docker infrastructure failures."
     },
     {
       "path": "packages/runner/src/job.ts",
@@ -552,14 +593,28 @@
       "rationale": "OpenAI sign-in, bounded host-brokered workflow usage and security regressions; fail-fast cancellation where shared with runner/core/server. Follow-up: bounded direct DeepSeek provider with host-only credentials and explicit estimated costs."
     },
     {
+      "path": "packages/runner/src/problems/index.ts",
+      "before": {
+        "path": "packages/runner/src/problems/index.ts",
+        "mode": "100644",
+        "sha256": "cc03b0ea48a8ff12518844233e75646af674f09b1b73c3a30638a4310c7b9711"
+      },
+      "after": {
+        "path": "packages/runner/src/problems/index.ts",
+        "mode": "100644",
+        "sha256": "e68c700a76dde4b730f58fd3079a58c33d9ec8b60198b4b633d32f6dd6a07501"
+      },
+      "rationale": "Follow-up source67b42ae: strict fixture admission, mandatory clean-base/missing-workspace gates and deterministic fake-boundary tests; no benchmark fixture changes. Shared-development review: reject incomplete clean-base unittest outcomes; original migration before-state retained."
+    },
+    {
       "path": "packages/runner/src/provenance.ts",
       "before": null,
       "after": {
         "path": "packages/runner/src/provenance.ts",
         "mode": "100644",
-        "sha256": "6093584f3a65a5e4e336e2b2f4b33906c21b97fab92a67ed4a4e5bb2c5619c4c"
+        "sha256": "5da90dddeda8ad1ed4b5403f555a1e014e658649fc59ecd445c38cad53171fe0"
       },
-      "rationale": "Truthful pre-model provenance gate and provider observations, without fabricated model versions or task completion. Follow-up: host-only optional typed classifier selection, complete cost/fallback evidence."
+      "rationale": "Truthful pre-model provenance gate and provider observations, without fabricated model versions or task completion. Follow-up: host-only optional typed classifier selection, complete cost/fallback evidence. Follow-up source67b42ae: strict fixture admission with canonical versioned self-check evidence and fake-boundary regressions."
     },
     {
       "path": "packages/runner/src/rundir.ts",
@@ -701,7 +756,7 @@
       "after": {
         "path": "packages/runner/test/container-image.test.ts",
         "mode": "100644",
-        "sha256": "4a083c6880e53d32dcef05cefcfb4e4688e2a8f412006edc8c698b7f9b01158b"
+        "sha256": "5950782b63bfc66c7f2fb4f7a334a836cafad4808e69815b65dc10cecf89f7e1"
       },
       "rationale": "Selected verified immutable image identity and case-preserving Docker references; no CI wrapper/fixtures imported. Follow-up: actual runtime provenance gate and immutable observed-image grading."
     },
@@ -724,6 +779,16 @@
         "sha256": "4834acd724aeb0fce365c9a1bf5a2762e6ea42ffcf89c124cc6015761ccae299"
       },
       "rationale": "Bounded direct DeepSeek provider, reasoning continuation and explicit estimated usage/cost regressions."
+    },
+    {
+      "path": "packages/runner/test/fixture-admission.test.ts",
+      "before": null,
+      "after": {
+        "path": "packages/runner/test/fixture-admission.test.ts",
+        "mode": "100644",
+        "sha256": "15d0f76b8f2b3972386f99b6112cacae27982bf31b1b78848eaffb06efda0dd5"
+      },
+      "rationale": "Follow-up source67b42ae: strict fixture admission, mandatory clean-base/missing-workspace gates and deterministic fake-boundary tests; no benchmark fixture changes. Shared-development review: reject incomplete clean-base unittest outcomes; original migration before-state retained."
     },
     {
       "path": "packages/runner/test/framework-launch.test.ts",
@@ -775,9 +840,9 @@
       "after": {
         "path": "packages/runner/test/provenance.test.ts",
         "mode": "100644",
-        "sha256": "9bec96f2b7e346ac2f6ad333be24a523afd022f5fcd158dc9007a705a5b3cca6"
+        "sha256": "1670658f044f922fdd861043b27c3611e5655890c6c607156e2f3d390f774596"
       },
-      "rationale": "Truthful pre-model provenance gate and provider observations, without fabricated model versions or task completion. Follow-up: host-only optional typed classifier selection, complete cost/fallback evidence."
+      "rationale": "Truthful pre-model provenance gate and provider observations, without fabricated model versions or task completion. Follow-up: host-only optional typed classifier selection, complete cost/fallback evidence. Follow-up source67b42ae: strict fixture admission with canonical versioned self-check evidence and fake-boundary regressions."
     },
     {
       "path": "packages/runner/test/subscription.test.ts",
@@ -1376,36 +1441,6 @@
         "sha256": "496074b5376d350e14cc0888dd9da1aa5dafe18af2c6462b4d5bef9879610a7a"
       },
       "rationale": "Local tool subprocess environment secret filtering and synthetic-only boundary/descendant regressions."
-    },
-    {
-      "path": "packages/core/src/orchestrate/selection/reuse-proof.ts",
-      "before": null,
-      "after": {
-        "path": "packages/core/src/orchestrate/selection/reuse-proof.ts",
-        "mode": "100644",
-        "sha256": "90f2cd482f44cbbd36b707e8f85f9ac7306affe4d67652d23e2891d99af56929"
-      },
-      "rationale": "Experimental task-scoped selection decision reuse; trusted classifier admission, explicit task/revision/treatment identity, bounded memory and offline safety regressions. Defaults and fixed60 full-success gate unchanged."
-    },
-    {
-      "path": "packages/core/src/orchestrate/selection/task-reuse.ts",
-      "before": null,
-      "after": {
-        "path": "packages/core/src/orchestrate/selection/task-reuse.ts",
-        "mode": "100644",
-        "sha256": "affd1865f27d33f6512aaaf51e63c262d8b77ba977d241141506c81f5f5c0f1b"
-      },
-      "rationale": "Experimental task-scoped selection decision reuse; trusted classifier admission, explicit task/revision/treatment identity, bounded memory and offline safety regressions. Defaults and fixed60 full-success gate unchanged."
-    },
-    {
-      "path": "packages/core/test/selection-reuse.test.ts",
-      "before": null,
-      "after": {
-        "path": "packages/core/test/selection-reuse.test.ts",
-        "mode": "100644",
-        "sha256": "ebb6375dcb4de1f38c2ed5779bc7ec1bc205db33687dbe064e788a7a52e7678a"
-      },
-      "rationale": "Experimental task-scoped selection decision reuse; trusted classifier admission, explicit task/revision/treatment identity, bounded memory and offline safety regressions. Defaults and fixed60 full-success gate unchanged."
     }
   ],
   "packaging_followup": {
@@ -3332,6 +3367,251 @@
     "limits": "Direct/local host environment defense, not a sandbox; no runner key exposure claimed.",
     "canonical_artifact_commit": "09773499da6e55cb2c0b2419b80fe4b7b08faca0"
   },
+  "fixture_admission_followup": {
+    "source_commit": "67b42ae04153079e84b1fdacdd0082a2e623ffc8",
+    "draft_plan": "plans/2026-11-02-fixture-admission/PLAN.md",
+    "changes": [
+      {
+        "path": "packages/runner/src/problems/index.ts",
+        "before": {
+          "path": "packages/runner/src/problems/index.ts",
+          "mode": "100644",
+          "sha256": "cc03b0ea48a8ff12518844233e75646af674f09b1b73c3a30638a4310c7b9711"
+        },
+        "after": {
+          "path": "packages/runner/src/problems/index.ts",
+          "mode": "100644",
+          "sha256": "ff2f4680ee096b87d9791df1d5419bf80026b22ce75e638e7e272132a0b3a470"
+        }
+      },
+      {
+        "path": "packages/runner/src/provenance.ts",
+        "before": {
+          "path": "packages/runner/src/provenance.ts",
+          "mode": "100644",
+          "sha256": "6093584f3a65a5e4e336e2b2f4b33906c21b97fab92a67ed4a4e5bb2c5619c4c"
+        },
+        "after": {
+          "path": "packages/runner/src/provenance.ts",
+          "mode": "100644",
+          "sha256": "5da90dddeda8ad1ed4b5403f555a1e014e658649fc59ecd445c38cad53171fe0"
+        }
+      },
+      {
+        "path": "packages/runner/test/provenance.test.ts",
+        "before": {
+          "path": "packages/runner/test/provenance.test.ts",
+          "mode": "100644",
+          "sha256": "9bec96f2b7e346ac2f6ad333be24a523afd022f5fcd158dc9007a705a5b3cca6"
+        },
+        "after": {
+          "path": "packages/runner/test/provenance.test.ts",
+          "mode": "100644",
+          "sha256": "1670658f044f922fdd861043b27c3611e5655890c6c607156e2f3d390f774596"
+        }
+      },
+      {
+        "path": "packages/runner/test/fixture-admission.test.ts",
+        "before": null,
+        "after": {
+          "path": "packages/runner/test/fixture-admission.test.ts",
+          "mode": "100644",
+          "sha256": "28a8f3ff024c6c24b8c0aefdf1752553673c16e640755f709b08b2cb13420819"
+        }
+      },
+      {
+        "path": "packages/runner/src/grade.ts",
+        "before": {
+          "path": "packages/runner/src/grade.ts",
+          "mode": "100644",
+          "sha256": "2a6d3afe9bb98f2551cd6f300925fb71bf0d34e94d4334960a09aee89694b1b9"
+        },
+        "after": {
+          "path": "packages/runner/src/grade.ts",
+          "mode": "100644",
+          "sha256": "d7345c0f8fa2edb2e6cf7f3ab39fdd51d3fbe470e076b9caaab3aeb40968aba0"
+        }
+      },
+      {
+        "path": "packages/runner/src/build-context.ts",
+        "before": null,
+        "after": {
+          "path": "packages/runner/src/build-context.ts",
+          "mode": "100644",
+          "sha256": "d2ccb1b937b6971f89154797a645d75ecc78ad9e726e71f24a053bc527d38e23"
+        }
+      },
+      {
+        "path": "packages/runner/src/container.ts",
+        "before": {
+          "path": "packages/runner/src/container.ts",
+          "mode": "100644",
+          "sha256": "91a6e7cd7424403ea2ddbac4687350d9a0d8dd1f4f7bd59a1f84949f2a87ee51"
+        },
+        "after": {
+          "path": "packages/runner/src/container.ts",
+          "mode": "100644",
+          "sha256": "d39f0cb25cce4c4fb29cfd563318cf1a7a846f5b263fbe551557ff24508aa83c"
+        }
+      },
+      {
+        "path": "packages/runner/test/container-image.test.ts",
+        "before": {
+          "path": "packages/runner/test/container-image.test.ts",
+          "mode": "100644",
+          "sha256": "4a083c6880e53d32dcef05cefcfb4e4688e2a8f412006edc8c698b7f9b01158b"
+        },
+        "after": {
+          "path": "packages/runner/test/container-image.test.ts",
+          "mode": "100644",
+          "sha256": "5950782b63bfc66c7f2fb4f7a334a836cafad4808e69815b65dc10cecf89f7e1"
+        }
+      }
+    ],
+    "limits": "Experimental draft only. No real self-check stamps, Docker/provider/model work, approvals, commits or merge; parent owns final composed bundle and full suite.",
+    "review_corrections": "Exact generated build-context validation remains separate from canonical taskHash; require initial solved pass plus five stability repetitions (six solved grades). No spec approval or real fixture stamps."
+  },
+  "shared_framework_integration": {
+    "base_commit": "67b42ae04153079e84b1fdacdd0082a2e623ffc8",
+    "composed_parent_commit": "41efc6b1e91f107ece4ae97f4b9f219f8a5f7e78",
+    "authorization": "Yes, this authorizes merges between the development branches only.",
+    "merge_commits": [
+      {
+        "commit": "e54f50885b9c9a1d444680961f27ef0da4525685",
+        "parents": [
+          "67b42ae04153079e84b1fdacdd0082a2e623ffc8",
+          "a572d66d4891a2bcd87f29f20112fc66bcb36494"
+        ]
+      },
+      {
+        "commit": "163bfc087472ab972f263667fd522ec964cfe523",
+        "parents": [
+          "e54f50885b9c9a1d444680961f27ef0da4525685",
+          "7bd10f3de551cef18390eee8a69352fc8b2d9dbd"
+        ]
+      },
+      {
+        "commit": "b291d95ab75de679057387de8bb75c1e68147608",
+        "parents": [
+          "163bfc087472ab972f263667fd522ec964cfe523",
+          "1039f358dfce62978316c2ee610c38acff331ee7"
+        ]
+      },
+      {
+        "commit": "359cfd528abf1c2ec7072fa1af017c469ae3c6b8",
+        "parents": [
+          "b291d95ab75de679057387de8bb75c1e68147608",
+          "f2061ca7971158713b8784699aafbacba5c171d8"
+        ]
+      },
+      {
+        "commit": "41efc6b1e91f107ece4ae97f4b9f219f8a5f7e78",
+        "parents": [
+          "359cfd528abf1c2ec7072fa1af017c469ae3c6b8",
+          "8b3c5f16b7f4b85bd30c4aee464904bafd52b115"
+        ]
+      }
+    ],
+    "excluded_treatments": [
+      "dot/selector-reuse-20261102",
+      "dot/hotpath-prototype-20261102"
+    ],
+    "scope": "Shared development gates only. No approval, default merge, live model/provider call, Docker/CI run, or measured savings.",
+    "additional_source_changes": [
+      {
+        "path": "scripts/evaluation/check_classifier_design.py",
+        "before": {
+          "path": "scripts/evaluation/check_classifier_design.py",
+          "mode": "100644",
+          "sha256": "520ba88fb5740f006dc45a1a08098f27cd29994c31eaf1fb206b3cc3b85e8ea6"
+        },
+        "after": {
+          "path": "scripts/evaluation/check_classifier_design.py",
+          "mode": "100644",
+          "sha256": "1f6a3ec6bf32e99a800d7b461a713b057a8b605a7454fa1507cefa1ce88725e4"
+        },
+        "rationale": "Compose previously omitted Python and nested native gates with strict complete-coverage checks; preserve existing package tests, serial option, and final typecheck."
+      },
+      {
+        "path": "scripts/evaluation/test_classifier_design.py",
+        "before": {
+          "path": "scripts/evaluation/test_classifier_design.py",
+          "mode": "100644",
+          "sha256": "7b2c66c7adfca1ba264e827b77287739c6fee812ef1f2f5e536ca00cca64e324"
+        },
+        "after": {
+          "path": "scripts/evaluation/test_classifier_design.py",
+          "mode": "100644",
+          "sha256": "e91143c873d95431a86ee98e19ca7e8a1bbcb271073d2065563c82415e693710"
+        },
+        "rationale": "Compose previously omitted Python and nested native gates with strict complete-coverage checks; preserve existing package tests, serial option, and final typecheck."
+      },
+      {
+        "path": "scripts/test-cloud.mjs",
+        "before": {
+          "path": "scripts/test-cloud.mjs",
+          "mode": "100644",
+          "sha256": "5957ff77dd30affe27bdabfe4c6ecebe337fb189661748876fa820aa034e1de5"
+        },
+        "after": {
+          "path": "scripts/test-cloud.mjs",
+          "mode": "100644",
+          "sha256": "0b172b338aa133631913d80c87b38df4d3e5fc9166b1a77330343fbe9fd111f3"
+        },
+        "rationale": "Compose previously omitted Python and nested native gates with strict complete-coverage checks; preserve existing package tests, serial option, and final typecheck."
+      },
+      {
+        "path": "scripts/test-cloud.test.mjs",
+        "before": {
+          "path": "scripts/test-cloud.test.mjs",
+          "mode": "100644",
+          "sha256": "905d7491d9522d99c4b144ad5b42ba0414a0b4f8eaae9d0d544fc95b79402bf3"
+        },
+        "after": {
+          "path": "scripts/test-cloud.test.mjs",
+          "mode": "100644",
+          "sha256": "99abd0ccb9c054772c4b540c52a79e2c2dfac31110d7dc3bdcfe67b8bcc5fcb5"
+        },
+        "rationale": "Compose previously omitted Python and nested native gates with strict complete-coverage checks; preserve existing package tests, serial option, and final typecheck."
+      },
+      {
+        "path": "packages/runner/src/problems/index.ts",
+        "before": {
+          "path": "packages/runner/src/problems/index.ts",
+          "mode": "100644",
+          "sha256": "ff2f4680ee096b87d9791df1d5419bf80026b22ce75e638e7e272132a0b3a470"
+        },
+        "after": {
+          "path": "packages/runner/src/problems/index.ts",
+          "mode": "100644",
+          "sha256": "e68c700a76dde4b730f58fd3079a58c33d9ec8b60198b4b633d32f6dd6a07501"
+        },
+        "rationale": "Reject skipped, expected-failure, unexpected-success and incomplete clean-codebase validation before overlay; local synthetic Python regression at fake Docker boundary."
+      },
+      {
+        "path": "packages/runner/test/fixture-admission.test.ts",
+        "before": {
+          "path": "packages/runner/test/fixture-admission.test.ts",
+          "mode": "100644",
+          "sha256": "28a8f3ff024c6c24b8c0aefdf1752553673c16e640755f709b08b2cb13420819"
+        },
+        "after": {
+          "path": "packages/runner/test/fixture-admission.test.ts",
+          "mode": "100644",
+          "sha256": "15d0f76b8f2b3972386f99b6112cacae27982bf31b1b78848eaffb06efda0dd5"
+        },
+        "rationale": "Reject skipped, expected-failure, unexpected-success and incomplete clean-codebase validation before overlay; local synthetic Python regression at fake Docker boundary."
+      }
+    ],
+    "review_corrections": {
+      "previous_integration_commit": "ae9c532e21aefda9a1a5bbc287d0f170d1deda01",
+      "findings": [
+        "Legacy TAP gate accepted zero/TODO/file-only coverage; require strict complete summaries and actual test names.",
+        "Clean-codebase unittest.wasSuccessful() accepted skips/expected failures; require every discovered case to run without incomplete outcomes."
+      ],
+      "local_regressions": "28 strict harness tests; 93 fixture-admission tests including eight actual local Python cases at a fake Docker boundary."
+    }
+  },
   "selector_reuse_followup": {
     "base_commit": "67b42ae04153079e84b1fdacdd0082a2e623ffc8",
     "user_request": "For now, work on ai-workflow only, continuing the previous progress of using branches to work on ideas. You will now refine and improve the ideas, search up references to compare the ideas on for improvement, etc.",
@@ -3407,5 +3687,15 @@
         }
       }
     ]
+  },
+  "candidate_shared_integration": {
+    "authorization": "Yes, this authorizes merges between the development branches only.",
+    "candidate_parent": "c7255baa50b7b6644c7fb5036264033e97ef299b",
+    "shared_parent": "7b4980f3806db5ad2a7cf7ba28ab11c303caad08",
+    "merge_base": "67b42ae04153079e84b1fdacdd0082a2e623ffc8",
+    "scope": "Independent candidate composition only; all plans remain draft, no treatment mixing, default merge, live provider/native assignment, Docker, or efficacy claim.",
+    "overlapping_runtime_changes": [],
+    "verification_status": "Composed serial aggregate passed: 775 Node tests, 12 normal + 12 optimized Python tests, both typechecks, zero incomplete outcomes; no live-model benchmark.",
+    "aggregate_log_sha256": "eb20574a963c5b9098c0ee6cfc6a75281201a2c14ae8b07fb7c14a13ed09126c"
   }
 }

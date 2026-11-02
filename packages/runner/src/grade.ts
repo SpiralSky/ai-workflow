@@ -8,6 +8,7 @@ import { promisify } from "node:util";
 import { cp, mkdtemp, rm, stat, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
+import { randomUUID } from "node:crypto";
 
 import { problemImageRef, type Container } from "./container.ts";
 
@@ -22,11 +23,38 @@ export function gradingContainerArgs(problem: string, imageId?: string): string[
 /** Grading result. */
 export interface GradeResult {
   pass: boolean;
+  /** True only when the check wrapper reports a completed script exit, not a timeout/transport failure. */
+  checksCompleted?: boolean;
   reason?: "checks" | "patch-failed";
   /** Path to diff.patch written by the grader. */
   diffPatch?: string;
   /** Path to check.log written by the grader. */
   checkLog?: string;
+}
+
+/** Run checks with explicit completion evidence, distinguishing Docker failures from script exits. */
+export async function runGradingChecks(containerId: string,
+  run: (command: string, args: string[], options: { maxBuffer: number }) => Promise<{ stdout: string; stderr: string }> = execFile,
+): Promise<{ output: string; exitCode: number; completed: boolean }> {
+  const marker = `AIW_CHECK_EXIT_${randomUUID()}`;
+  const command = `cd /work && timeout 120 sh -c 'sh checks/check.sh; result=$?; printf "\\n${marker}:%s\\n" "$result" >&2; exit "$result"'`;
+  let stdout = "", stderr = "", exitCode = 0, failure: unknown;
+  try {
+    ({ stdout, stderr } = await run("docker", ["exec", containerId, "sh", "-c", command], { maxBuffer: 10 * 1024 * 1024 }));
+  } catch (error) {
+    failure = error;
+    const e = error as NodeJS.ErrnoException & { stdout?: string; stderr?: string };
+    stdout = typeof e.stdout === "string" ? e.stdout : "";
+    stderr = typeof e.stderr === "string" ? e.stderr : "";
+    exitCode = typeof e.code === "number" ? e.code : -1;
+  }
+  const completion = new RegExp(`\\n${marker}:(\\d+)\\n$`).exec(stderr);
+  // Preserve grading's timeout-as-failure outcome, but it cannot prove the empty fixture failed checks.
+  if (!completion && exitCode === 124) return { output: stdout + stderr, exitCode, completed: false };
+  if (!completion || Number(completion[1]) !== exitCode || exitCode < 0 || exitCode > 255) {
+    throw new Error("grading checks did not report a completed exit status", { cause: failure });
+  }
+  return { output: stdout + stderr.slice(0, completion.index), exitCode, completed: true };
 }
 
 /**
@@ -135,20 +163,9 @@ export async function gradeJob(
 
     // 7. Run check.sh with 120 s timeout
     const checkLogPath = join(jobDir, "check.log");
-    let checkOutput = "";
-    let checkExitCode = 0;
-    try {
-      const { stdout: cOut, stderr: cErr } = await execFile(
-        "docker",
-        ["exec", gradeId, "sh", "-c", "cd /work && timeout 120 sh checks/check.sh"],
-        { maxBuffer: 10 * 1024 * 1024 },
-      );
-      checkOutput = cOut + cErr;
-    } catch (err: unknown) {
-      const e = err as NodeJS.ErrnoException & { code?: number | string; stdout?: string; stderr?: string };
-      checkExitCode = typeof e.code === "number" ? e.code : 1;
-      checkOutput = (e.stdout ?? "") + (e.stderr ?? "");
-    }
+    const checkResult = await runGradingChecks(gradeId);
+    const checkOutput = checkResult.output;
+    const checkExitCode = checkResult.exitCode;
     await writeFile(checkLogPath, checkOutput);
 
     // 8. Cleanup grading container and tmp dir
@@ -158,9 +175,9 @@ export async function gradeJob(
 
     // 9. Return result
     if (checkExitCode === 0) {
-      return { pass: true, diffPatch: diffPatchPath, checkLog: checkLogPath };
+      return { pass: true, checksCompleted: checkResult.completed, diffPatch: diffPatchPath, checkLog: checkLogPath };
     }
-    return { pass: false, reason: "checks", diffPatch: diffPatchPath, checkLog: checkLogPath };
+    return { pass: false, reason: "checks", checksCompleted: checkResult.completed, diffPatch: diffPatchPath, checkLog: checkLogPath };
   } finally {
     // Always clean up on failure
     if (gradeId) {

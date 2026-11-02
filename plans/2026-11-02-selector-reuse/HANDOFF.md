@@ -33,3 +33,13 @@ Original inventory bytes/baseline before-states/historical followups and old dra
 remain untouched. New runtime/docs/plan/test files staged for tracked snapshot visibility only;
 no commit. Additive draft status boundary and separate tamper suite pass with existing guards:
 25/25 preservation tests, no skips. Parent owns subsequent full candidate verification.
+
+## 2026-11-02 shared-gate development integration
+
+The later user authorization permits development-branch merges only. The independent candidate
+now composes shared parent `7b4980f3806db5ad2a7cf7ba28ab11c303caad08` without hotpath
+treatment changes. Full composed verification: 775 Node + 12 normal/12 optimized Python
+tests, both typechecks, zero incomplete outcomes. Exact parent identities, conflict decisions,
+review fingerprint and evidence are in
+`docs/dot-progress/selector-reuse-shared-integration.md`. This supersedes earlier pending-test
+notes only; plan remains draft, runtime wiring remains absent, no efficacy/default promotion.
