@@ -38617,6 +38617,115 @@ function bindTools(registry2, host2, opts) {
   return wrapTools(map2, opts.reporter);
 }
 
+// packages/core/src/orchestrate/selection/complete.ts
+function complete(tools, catalog2, warn = (m) => console.warn(m)) {
+  const byName = new Map(catalog2.map((d2) => [d2.name, d2]));
+  const out = [];
+  const seen = /* @__PURE__ */ new Set();
+  const add = (d2) => {
+    if (!seen.has(d2.name)) {
+      seen.add(d2.name);
+      out.push(d2);
+    }
+  };
+  for (const d2 of tools) {
+    add(d2);
+    for (const r of d2.meta.requires ?? []) {
+      const req = byName.get(r);
+      if (req) add(req);
+      else warn(`Tool "${d2.name}" requires unknown tool "${r}"`);
+    }
+  }
+  return out;
+}
+
+// packages/core/src/orchestrate/selection/retrieve.ts
+var DEFAULT_K = 20;
+var DEFAULT_COST = 1;
+var indexes = /* @__PURE__ */ new WeakMap();
+function indexedText(d2) {
+  return [d2.name, d2.description, d2.meta.whenToUse, ...d2.meta.examples ?? []].join("\n");
+}
+function indexFor(catalog2) {
+  let index = indexes.get(catalog2);
+  if (!index) {
+    index = new BM25Index(catalog2.map((d2) => ({ id: d2.name, text: indexedText(d2) })));
+    indexes.set(catalog2, index);
+  }
+  return index;
+}
+function retrieve(instruction, catalog2, opts = {}) {
+  const byName = new Map(catalog2.map((d2) => [d2.name, d2]));
+  const cost = (d2) => d2.meta.cost ?? DEFAULT_COST;
+  return indexFor(catalog2).score(instruction).map((s) => ({ tool: byName.get(s.id), score: s.score })).filter(({ tool }) => tool.routing === "routed" && !opts.exclude?.has(tool.name)).sort((a, b) => b.score - a.score || cost(a.tool) - cost(b.tool) || (a.tool.name < b.tool.name ? -1 : 1)).slice(0, opts.k ?? DEFAULT_K);
+}
+
+// packages/core/src/framework/prompts.ts
+import { readFileSync as readFileSync3 } from "node:fs";
+var cache2 = /* @__PURE__ */ new Map();
+function loadPrompt(name) {
+  let text2 = cache2.get(name);
+  if (text2 === void 0) {
+    text2 = readFileSync3(new URL("./prompts/" + name + ".md", import.meta.url), "utf8");
+    cache2.set(name, text2);
+  }
+  return text2;
+}
+
+// packages/core/src/orchestrate/selection/rerank.ts
+var noneReranker = {
+  async rerank(_instruction, candidates) {
+    return candidates;
+  }
+};
+function parseNames(text2) {
+  const arr = /\[[\s\S]*\]/.exec(text2);
+  if (arr) {
+    try {
+      const v = JSON.parse(arr[0]);
+      if (Array.isArray(v) && v.every((x) => typeof x === "string")) return v;
+    } catch {
+    }
+  }
+  const names = text2.split(/[\n,]/).map((s) => s.replace(/^\s*(?:[-*]|\d+[.)])\s*/, "").replace(/^[\s"'`\[]+|[\s"'`\].]+$/g, "")).filter((s) => /^[A-Za-z_$][\w$]*$/.test(s));
+  return names.length ? names : void 0;
+}
+function llmReranker(client, opts) {
+  return {
+    async rerank(instruction, candidates, ctx = {}) {
+      ctx.signal?.throwIfAborted();
+      if (candidates.length === 0) return [];
+      const reporter = ctx.reporter ?? opts.reporter;
+      if (!reporter) throw new Error("llmReranker needs a reporter (option or ctx) to report the selection turn");
+      const list = candidates.map((d2) => {
+        const lines2 = [`- ${d2.name}: ${d2.meta.whenToUse}`];
+        if (d2.meta.whenNotToUse) lines2.push(`  Not for: ${d2.meta.whenNotToUse}`);
+        return lines2.join("\n");
+      }).join("\n");
+      const res = await wrapLLM(client, reporter, "selection").complete({
+        model: opts.model,
+        signal: ctx.signal,
+        system: loadPrompt("rerank"),
+        tools: [],
+        messages: [{ role: "user", content: `Task:
+${instruction}
+
+Candidate tools:
+${list}` }]
+      });
+      const content = res.response?.choices?.[0]?.message?.content;
+      const names = typeof content === "string" ? parseNames(content) : void 0;
+      const byName = new Map(candidates.map((d2) => [d2.name, d2]));
+      const picked = [...new Set(names ?? [])].flatMap((n) => byName.get(n) ?? []);
+      if (picked.length === 0) {
+        ctx.fallback = true;
+        return candidates;
+      }
+      return picked;
+    }
+  };
+}
+
 // packages/core/src/orchestrate/selection/classifier.ts
 function validateClassifierPolicy(threshold, policy) {
   if (policy !== "noul-v1" || !Number.isFinite(threshold) || threshold <= 0.5 || threshold > 1) {
@@ -38694,20 +38803,301 @@ function classifierReranker(client, opts) {
   } };
 }
 
+// packages/core/src/orchestrate/selection/index.ts
+var DEFAULT_N = 6;
+function createSelector(opts) {
+  const k = opts.k ?? DEFAULT_K;
+  const n = opts.n ?? DEFAULT_N;
+  return {
+    async select(q, catalog2) {
+      q.signal?.throwIfAborted();
+      const exclude = new Set(q.exclude ?? []);
+      const byName = new Map(catalog2.map((d2) => [d2.name, d2]));
+      if (q.override) {
+        const unknown2 = q.override.filter((name) => !byName.has(name));
+        if (unknown2.length) throw new Error(`Unknown tools in override: ${unknown2.join(", ")}`);
+        const tools2 = complete(q.override.map((name) => byName.get(name)), catalog2);
+        return { tools: tools2, stages: { retrieved: [], final: tools2.map((d2) => d2.name), override: true } };
+      }
+      const retrieved = retrieve(q.instruction, catalog2, { k, exclude });
+      const ctx = { reporter: q.reporter, signal: q.signal, fallback: false, fallbackReason: void 0 };
+      const reranked = await opts.reranker.rerank(q.instruction, retrieved.map((r) => r.tool), ctx);
+      const tools = complete(reranked.slice(0, n), catalog2).filter((d2) => !exclude.has(d2.name));
+      const stages = {
+        retrieved: retrieved.map((r) => ({ name: r.tool.name, score: r.score })),
+        reranked: reranked.map((d2) => d2.name),
+        final: tools.map((d2) => d2.name)
+      };
+      if (ctx.fallback) stages.rerankFallback = true;
+      if (ctx.fallbackReason) stages.rerankFallbackReason = ctx.fallbackReason;
+      return { tools, stages };
+    }
+  };
+}
+
+// packages/core/src/orchestrate/hot-paths/index.ts
+var MAX_HOT_PATHS = 2;
+var MAX_HOT_PATH_ADDED_TOOLS = 6;
+var HotPathIndex = class {
+  snippets;
+  index;
+  /** Reject malformed catalogs rather than exposing incomplete recovery examples. */
+  constructor(snippets) {
+    this.snippets = /* @__PURE__ */ new Map();
+    for (const s of snippets) {
+      if (!s.id || this.snippets.has(s.id) || !s.description.trim() || !s.outcome.trim() || !s.tools.length || new Set(s.tools).size !== s.tools.length || s.tools.some((t) => !t.trim()) || !s.code.trim() || s.code.trim().split(/\r?\n/).length > 25) throw new Error(`Invalid hot path: ${s.id}`);
+      this.snippets.set(s.id, { ...s, tools: [...s.tools] });
+    }
+    this.index = new BM25Index([...this.snippets.values()].map((s) => ({ id: s.id, text: s.description })));
+  }
+  /** Retrieve bounded examples and add their available routed tools before locking/execution.
+   * Explicit overrides bypass examples entirely. Original selection objects remain unmodified.
+   */
+  select(instruction, selection, catalog2, override) {
+    if (override !== void 0) return { selection, hotPaths: [] };
+    const byName = new Map(catalog2.map((d2) => [d2.name, d2]));
+    const initial = new Set(selection.tools.map((d2) => d2.name));
+    let tools = selection.tools;
+    const hotPaths = [];
+    const ranked = this.index.score(instruction).sort((a, b) => b.score - a.score || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+    for (const { id } of ranked) {
+      const snippet13 = this.snippets.get(id);
+      const declared = snippet13.tools.map((name) => byName.get(name));
+      if (declared.some((d2) => !d2 || d2.routing !== "routed" || (d2.meta.requires ?? []).some((name) => byName.get(name)?.routing !== "routed"))) continue;
+      const added = complete(declared, catalog2);
+      const merged = [...tools, ...added.filter((d2) => !tools.some((t) => t.name === d2.name))];
+      if (merged.filter((d2) => !initial.has(d2.name)).length > MAX_HOT_PATH_ADDED_TOOLS) continue;
+      tools = merged;
+      hotPaths.push({ ...snippet13, tools: [...snippet13.tools] });
+      if (hotPaths.length === MAX_HOT_PATHS) break;
+    }
+    if (!hotPaths.length) return { selection, hotPaths };
+    return { selection: { tools, stages: { ...selection.stages, final: tools.map((d2) => d2.name) } }, hotPaths };
+  }
+};
+
+// packages/core/src/orchestrate/hot-paths/grep-empty-widen.ts
+var snippet = {
+  id: "grep-empty-widen",
+  description: "Search file contents with grep; when a scoped pattern has no matches, widen only to the workspace and summarize matches.",
+  tools: ["grep"],
+  outcome: "empty-result",
+  code: String.raw`async (tools, state) => {
+  const safePath = (p) => typeof p === "string" && p.length > 0 && p.length <= 512 && !/^[\\/]|^[A-Za-z]:|[\x00-\x1f\x7f\\]/.test(p) && !p.split("/").includes("..");
+  const { path, pattern } = state;
+  if (!safePath(path) || typeof pattern !== "string" || !pattern.trim() || pattern.length > 256) throw new Error("invalid search inputs");
+  new RegExp(pattern);
+  const first = await tools.grep({ path, pattern, maxResults: 20 });
+  if (first.matches.length || path === ".") return first;
+  const wider = await tools.grep({ path: ".", pattern, maxResults: 20 });
+  return { widened: true, ...wider };
+}`
+};
+
+// packages/core/src/orchestrate/hot-paths/find-files-empty-widen.ts
+var snippet2 = {
+  id: "find-files-empty-widen",
+  description: "Find files by name with a glob; recover from an empty scoped file search by widening only to the workspace.",
+  tools: ["findFiles"],
+  outcome: "empty-result",
+  code: String.raw`async (tools, state) => {
+  const safePath = (p) => typeof p === "string" && p.length > 0 && p.length <= 512 && !/^[\\/]|^[A-Za-z]:|[\x00-\x1f\x7f\\]/.test(p) && !p.split("/").includes("..");
+  const { path, pattern } = state;
+  if (!safePath(path) || typeof pattern !== "string" || !pattern.trim() || pattern.length > 256 || !safePath(pattern)) throw new Error("invalid file search inputs");
+  const first = await tools.findFiles({ path, pattern });
+  if (first.files.length || path === ".") return { files: first.files.slice(0, 20), omittedVisible: Math.max(0, first.files.length - 20), truncated: first.truncated };
+  const wider = await tools.findFiles({ path: ".", pattern });
+  return { widened: true, files: wider.files.slice(0, 20), omittedVisible: Math.max(0, wider.files.length - 20), truncated: wider.truncated };
+}`
+};
+
+// packages/core/src/orchestrate/hot-paths/read-not-found-locate.ts
+var snippet3 = {
+  id: "read-not-found-locate",
+  description: "Read a file; after file not found locate the exact basename in the workspace and read only a unique untruncated result.",
+  tools: ["readFile", "findFiles"],
+  outcome: "not-found",
+  code: String.raw`async (tools, state) => {
+  const safePath = (p) => typeof p === "string" && p.length > 0 && p.length <= 512 && !/^[\\/]|^[A-Za-z]:|[\x00-\x1f\x7f\\]/.test(p) && !p.split("/").includes("..");
+  const { path } = state;
+  if (!safePath(path) || /(?:^|\/)\.?$/.test(path)) throw new Error("invalid file path");
+  const name = path.split("/").pop();
+  if (!/^[A-Za-z0-9_.-]+$/.test(name) || name === "." || name === "..") throw new Error("invalid literal filename");
+  try { return { path, text: await tools.readFile({ path, range: [1, 80] }) }; }
+  catch (error) {
+    if (!/\bENOENT\b/.test(String(error))) throw error;
+    const found = await tools.findFiles({ pattern: name, path: "." });
+    if (found.truncated || found.files.length !== 1) return { found: false, candidates: found.files.slice(0, 20), omittedVisible: Math.max(0, found.files.length - 20), truncated: found.truncated };
+    const located = found.files[0];
+    if (!safePath(located) || located.split("/").pop() !== name) throw new Error("invalid located path");
+    return { path: located, text: await tools.readFile({ path: located, range: [1, 80] }) };
+  }
+}`
+};
+
+// packages/core/src/orchestrate/hot-paths/edit-missing-reread.ts
+var snippet4 = {
+  id: "edit-missing-reread",
+  description: "Edit an exact string; when the old target is missing, re-read bounded current context and stop for re-anchoring instead of guessing.",
+  tools: ["edit", "readFile"],
+  outcome: "not-found",
+  code: String.raw`async (tools, state) => {
+  const safePath = (p) => typeof p === "string" && p.length > 0 && p.length <= 512 && !/^[\\/]|^[A-Za-z]:|[\x00-\x1f\x7f\\]/.test(p) && !p.split("/").includes("..");
+  const { path, old, new: replacement } = state;
+  if (!safePath(path) || /(?:^|\/)\.?$/.test(path) || typeof old !== "string" || !old || old.length > 8000 || typeof replacement !== "string" || replacement.length > 8000) throw new Error("invalid edit inputs");
+  try { return { edited: true, change: await tools.edit({ path, old, new: replacement }) }; }
+  catch (error) {
+    if (!/^(Error: )?not found$/.test(String(error))) throw error;
+    const context = await tools.readFile({ path, range: [1, 80] });
+    return { edited: false, needsAnchor: true, context };
+  }
+}`
+};
+
+// packages/core/src/orchestrate/hot-paths/edit-ambiguous-reread.ts
+var snippet5 = {
+  id: "edit-ambiguous-reread",
+  description: "Edit an exact string; when the target is ambiguous, re-read bounded context for a unique anchor without replacing all matches.",
+  tools: ["edit", "readFile"],
+  outcome: "ambiguous-match",
+  code: String.raw`async (tools, state) => {
+  const safePath = (p) => typeof p === "string" && p.length > 0 && p.length <= 512 && !/^[\\/]|^[A-Za-z]:|[\x00-\x1f\x7f\\]/.test(p) && !p.split("/").includes("..");
+  const { path, old, new: replacement } = state;
+  if (!safePath(path) || /(?:^|\/)\.?$/.test(path) || typeof old !== "string" || !old || old.length > 8000 || typeof replacement !== "string" || replacement.length > 8000) throw new Error("invalid edit inputs");
+  try { return { edited: true, change: await tools.edit({ path, old, new: replacement }) }; }
+  catch (error) {
+    if (!/^(Error: )?not unique \(\d+ matches\); add context or pass all: true$/.test(String(error))) throw error;
+    const context = await tools.readFile({ path, range: [1, 80] });
+    return { edited: false, needsAnchor: true, context };
+  }
+}`
+};
+
+// packages/core/src/orchestrate/hot-paths/read-truncated-range.ts
+var snippet6 = {
+  id: "read-truncated-range",
+  description: "Read a large file; when the output is truncated, retrieve an explicitly requested bounded line range instead of the whole file.",
+  tools: ["readFile"],
+  outcome: "large-output",
+  code: String.raw`async (tools, state) => {
+  const safePath = (p) => typeof p === "string" && p.length > 0 && p.length <= 512 && !/^[\\/]|^[A-Za-z]:|[\x00-\x1f\x7f\\]/.test(p) && !p.split("/").includes("..");
+  const { path, start, end } = state;
+  if (!safePath(path) || /(?:^|\/)\.?$/.test(path) || !Number.isSafeInteger(start) || !Number.isSafeInteger(end) || start < 1 || end < start || end - start >= 80) throw new Error("invalid read range");
+  const text = await tools.readFile({ path });
+  if (!/\[truncated at line /.test(text)) return { text };
+  return { narrowed: true, text: await tools.readFile({ path, range: [start, end] }) };
+}`
+};
+
+// packages/core/src/orchestrate/hot-paths/command-nonzero-summary.ts
+var snippet7 = {
+  id: "command-nonzero-summary",
+  description: "Run an explicitly supplied workspace command; classify nonzero exit, timeout or abort and return a bounded tail of combined stdout and stderr.",
+  tools: ["bash"],
+  outcome: "nonzero-exit",
+  code: String.raw`async (tools, state) => {
+  const { cmd } = state;
+  if (typeof cmd !== "string" || !cmd.trim() || cmd.length > 4000 || /[\x00]/.test(cmd)) throw new Error("invalid command");
+  const result = await tools.bash({ cmd, timeoutMs: 10000 });
+  const kind = result.code === 0 ? "success" : result.code === 124 ? "timeout" : result.code === 130 ? "aborted" : "nonzero-exit";
+  return { code: result.code, kind, outputTail: result.out.slice(-2000) };
+}`
+};
+
+// packages/core/src/orchestrate/hot-paths/test-failure-summary.ts
+var snippet8 = {
+  id: "test-failure-summary",
+  description: "Run a named test target; on test failure extract failing test names and the first assertion message instead of returning the whole log.",
+  tools: ["runTests"],
+  outcome: "test-failure",
+  code: String.raw`async (tools, state) => {
+  const safePath = (p) => typeof p === "string" && p.length > 0 && p.length <= 512 && !/^[\\/]|^[A-Za-z]:|[\x00-\x1f\x7f\\]/.test(p) && !p.split("/").includes("..");
+  const validTarget = (t) => typeof t === "string" && t.length <= 512 && safePath(t.split("#")[0]) && /\.py$/.test(t.split("#")[0]) && t.split("#").length <= 2 && (!t.includes("#") || /^[A-Za-z_][A-Za-z0-9_.]*$/.test(t.split("#")[1]));
+  const { target } = state;
+  if (!validTarget(target)) throw new Error("invalid test target");
+  const result = await tools.runTests({ target, timeoutMs: 10000 });
+  if (!result.failed.length) return { passed: result.passed, skipped: result.skipped, failed: [], truncated: result.truncated };
+  return { passed: result.passed, failures: result.failed.slice(0, 5).map((f) => f.id), omittedVisibleFailures: Math.max(0, result.failed.length - 5), firstAssertion: result.failed[0].message.slice(0, 1000), truncated: result.truncated };
+}`
+};
+
+// packages/core/src/orchestrate/hot-paths/edit-then-narrow-test.ts
+var snippet9 = {
+  id: "edit-then-narrow-test",
+  description: "Apply an explicitly specified exact edit then verify only the named narrow test; report the first failure without speculative repair.",
+  tools: ["edit", "readFile", "runTests"],
+  outcome: "test-failure",
+  code: String.raw`async (tools, state) => {
+  const safePath = (p) => typeof p === "string" && p.length > 0 && p.length <= 512 && !/^[\\/]|^[A-Za-z]:|[\x00-\x1f\x7f\\]/.test(p) && !p.split("/").includes("..");
+  const validTarget = (t) => typeof t === "string" && t.length <= 512 && safePath(t.split("#")[0]) && /\.py$/.test(t.split("#")[0]) && t.split("#").length <= 2 && (!t.includes("#") || /^[A-Za-z_][A-Za-z0-9_.]*$/.test(t.split("#")[1]));
+  const { path, old, new: replacement, target } = state;
+  if (!safePath(path) || /(?:^|\/)\.?$/.test(path) || typeof old !== "string" || !old || old.length > 8000 || typeof replacement !== "string" || replacement.length > 8000 || !validTarget(target)) throw new Error("invalid edit or test inputs");
+  const change = await tools.edit({ path, old, new: replacement });
+  const result = await tools.runTests({ target, timeoutMs: 10000 });
+  return { change, passed: result.passed, failures: result.failed.slice(0, 5).map((f) => f.id), omittedVisibleFailures: Math.max(0, result.failed.length - 5), firstAssertion: result.failed.length ? result.failed[0].message.slice(0, 1000) : null, truncated: result.truncated };
+}`
+};
+
+// packages/core/src/orchestrate/hot-paths/rename-zero-references.ts
+var snippet10 = {
+  id: "rename-zero-references",
+  description: "Before renaming a symbol inspect references; when zero references are found inspect its definition and stop rather than speculatively rename.",
+  tools: ["findReferences", "findDefinition"],
+  outcome: "empty-result",
+  code: String.raw`async (tools, state) => {
+  const safePath = (p) => typeof p === "string" && p.length > 0 && p.length <= 512 && !/^[\\/]|^[A-Za-z]:|[\x00-\x1f\x7f\\]/.test(p) && !p.split("/").includes("..");
+  const { path, name } = state;
+  if (!safePath(path) || /(?:^|\/)\.?$/.test(path) || typeof name !== "string" || !/^[A-Za-z_][A-Za-z0-9_]*$/.test(name) || name.length > 128) throw new Error("invalid symbol inputs");
+  const refs = await tools.findReferences({ path, name });
+  if (refs.references.length) return { references: refs.references.slice(0, 20), omittedVisible: Math.max(0, refs.references.length - 20), truncated: refs.truncated };
+  const definition = await tools.findDefinition({ path, name });
+  return { needsReview: true, truncated: refs.truncated, definitions: definition.definitions.slice(0, 5), omittedVisible: Math.max(0, definition.definitions.length - 5) };
+}`
+};
+
+// packages/core/src/orchestrate/hot-paths/move-cycle-diagnose.ts
+var snippet11 = {
+  id: "move-cycle-diagnose",
+  description: "Preview a symbol move without writing; if an import cycle would be created inspect scoped module dependencies and stop for a new plan.",
+  tools: ["moveSymbol", "importGraph"],
+  outcome: "import-cycle",
+  code: String.raw`async (tools, state) => {
+  const safePath = (p) => typeof p === "string" && p.length > 0 && p.length <= 512 && !/^[\\/]|^[A-Za-z]:|[\x00-\x1f\x7f\\]/.test(p) && !p.split("/").includes("..");
+  const { path, name, to } = state;
+  if (!safePath(path) || /(?:^|\/)\.?$/.test(path) || !safePath(to) || /(?:^|\/)\.?$/.test(to) || path === to || typeof name !== "string" || !/^[A-Za-z_][A-Za-z0-9_]*$/.test(name) || name.length > 128) throw new Error("invalid move inputs");
+  try { return { preview: await tools.moveSymbol({ path, name, to, dryRun: true }) }; }
+  catch (error) {
+    if (!/the move would create an import cycle/.test(String(error))) throw error;
+    const graph = await tools.importGraph({ module: path });
+    return { needsPlan: true, cycles: graph.cycles.slice(0, 5), edges: graph.edges.slice(0, 20), omittedVisibleCycles: Math.max(0, graph.cycles.length - 5), omittedVisibleEdges: Math.max(0, graph.edges.length - 20), truncated: graph.truncated };
+  }
+}`
+};
+
+// packages/core/src/orchestrate/hot-paths/check-errors-read.ts
+var snippet12 = {
+  id: "check-errors-read",
+  description: "Check a changed file for type and lint errors; inspect a bounded line window around the first error instead of dumping every diagnostic.",
+  tools: ["check", "readFile"],
+  outcome: "check-errors",
+  code: String.raw`async (tools, state) => {
+  const safePath = (p) => typeof p === "string" && p.length > 0 && p.length <= 512 && !/^[\\/]|^[A-Za-z]:|[\x00-\x1f\x7f\\]/.test(p) && !p.split("/").includes("..");
+  const { path } = state;
+  if (!safePath(path) || /(?:^|\/)\.?$/.test(path)) throw new Error("invalid check path");
+  const result = await tools.check({ path });
+  const first = result.diagnostics.find((d) => d.severity === "error");
+  if (!first) return { counts: result.counts, status: (result.counts.error ?? 0) === 0 && !result.truncated ? "clean" : "no-visible-error", error: null, truncated: result.truncated };
+  if (!safePath(first.path) || /(?:^|\/)\.?$/.test(first.path) || !Number.isSafeInteger(first.line) || first.line < 1 || first.line > Number.MAX_SAFE_INTEGER - 3) throw new Error("invalid diagnostic location");
+  const text = await tools.readFile({ path: first.path, range: [Math.max(1, first.line - 3), first.line + 3] });
+  return { counts: result.counts, error: { path: first.path, line: first.line, message: first.message.slice(0, 1000) }, context: text, truncated: result.truncated };
+}`
+};
+
+// packages/core/src/orchestrate/hot-paths/catalog.ts
+var HOT_PATH_SEEDS = Object.freeze([snippet, snippet2, snippet3, snippet4, snippet5, snippet6, snippet7, snippet8, snippet9, snippet10, snippet11, snippet12]);
+
 // packages/core/src/orchestrate/executor.ts
 import { createHash as createHash3 } from "node:crypto";
-
-// packages/core/src/framework/prompts.ts
-import { readFileSync as readFileSync3 } from "node:fs";
-var cache2 = /* @__PURE__ */ new Map();
-function loadPrompt(name) {
-  let text2 = cache2.get(name);
-  if (text2 === void 0) {
-    text2 = readFileSync3(new URL("./prompts/" + name + ".md", import.meta.url), "utf8");
-    cache2.set(name, text2);
-  }
-  return text2;
-}
 
 // packages/core/src/refs/parse.ts
 var NAME = /^[A-Za-z_][A-Za-z0-9_]*$/;
@@ -39577,7 +39967,9 @@ function doTool(input2) {
       const step = task.startStep({ instruction, executor: input2.model });
       let lease;
       try {
-        const selection = await input2.selector.select({ instruction, override, reporter: call.reporter, signal: call.signal }, registry2.decls);
+        let selection = await input2.selector.select({ instruction, override, reporter: call.reporter, signal: call.signal }, registry2.decls);
+        const patterns = input2.hotPathIndex?.select(instruction, selection, registry2.decls, override);
+        if (patterns) selection = patterns.selection;
         lease = await task.acquire(selection.tools.every((d2) => d2.meta.effect === "read") ? "shared" : "exclusive");
         call.signal?.throwIfAborted();
         const held = lease;
@@ -39600,7 +39992,7 @@ function doTool(input2) {
           selection,
           selector: input2.selector,
           override,
-          hotPaths: input2.hotPaths,
+          hotPaths: patterns?.hotPaths,
           variant: input2.variant,
           limits: input2.limits,
           signal: call.signal,
@@ -39662,135 +40054,6 @@ function plannerResolveTool(input2) {
         if (e instanceof RefError) return fail(e.message);
         throw e;
       }
-    }
-  };
-}
-
-// packages/core/src/orchestrate/selection/complete.ts
-function complete(tools, catalog2, warn = (m) => console.warn(m)) {
-  const byName = new Map(catalog2.map((d2) => [d2.name, d2]));
-  const out = [];
-  const seen = /* @__PURE__ */ new Set();
-  const add = (d2) => {
-    if (!seen.has(d2.name)) {
-      seen.add(d2.name);
-      out.push(d2);
-    }
-  };
-  for (const d2 of tools) {
-    add(d2);
-    for (const r of d2.meta.requires ?? []) {
-      const req = byName.get(r);
-      if (req) add(req);
-      else warn(`Tool "${d2.name}" requires unknown tool "${r}"`);
-    }
-  }
-  return out;
-}
-
-// packages/core/src/orchestrate/selection/retrieve.ts
-var DEFAULT_K = 20;
-var DEFAULT_COST = 1;
-var indexes = /* @__PURE__ */ new WeakMap();
-function indexedText(d2) {
-  return [d2.name, d2.description, d2.meta.whenToUse, ...d2.meta.examples ?? []].join("\n");
-}
-function indexFor(catalog2) {
-  let index = indexes.get(catalog2);
-  if (!index) {
-    index = new BM25Index(catalog2.map((d2) => ({ id: d2.name, text: indexedText(d2) })));
-    indexes.set(catalog2, index);
-  }
-  return index;
-}
-function retrieve(instruction, catalog2, opts = {}) {
-  const byName = new Map(catalog2.map((d2) => [d2.name, d2]));
-  const cost = (d2) => d2.meta.cost ?? DEFAULT_COST;
-  return indexFor(catalog2).score(instruction).map((s) => ({ tool: byName.get(s.id), score: s.score })).filter(({ tool }) => tool.routing === "routed" && !opts.exclude?.has(tool.name)).sort((a, b) => b.score - a.score || cost(a.tool) - cost(b.tool) || (a.tool.name < b.tool.name ? -1 : 1)).slice(0, opts.k ?? DEFAULT_K);
-}
-
-// packages/core/src/orchestrate/selection/rerank.ts
-var noneReranker = {
-  async rerank(_instruction, candidates) {
-    return candidates;
-  }
-};
-function parseNames(text2) {
-  const arr = /\[[\s\S]*\]/.exec(text2);
-  if (arr) {
-    try {
-      const v = JSON.parse(arr[0]);
-      if (Array.isArray(v) && v.every((x) => typeof x === "string")) return v;
-    } catch {
-    }
-  }
-  const names = text2.split(/[\n,]/).map((s) => s.replace(/^\s*(?:[-*]|\d+[.)])\s*/, "").replace(/^[\s"'`\[]+|[\s"'`\].]+$/g, "")).filter((s) => /^[A-Za-z_$][\w$]*$/.test(s));
-  return names.length ? names : void 0;
-}
-function llmReranker(client, opts) {
-  return {
-    async rerank(instruction, candidates, ctx = {}) {
-      ctx.signal?.throwIfAborted();
-      if (candidates.length === 0) return [];
-      const reporter = ctx.reporter ?? opts.reporter;
-      if (!reporter) throw new Error("llmReranker needs a reporter (option or ctx) to report the selection turn");
-      const list = candidates.map((d2) => {
-        const lines2 = [`- ${d2.name}: ${d2.meta.whenToUse}`];
-        if (d2.meta.whenNotToUse) lines2.push(`  Not for: ${d2.meta.whenNotToUse}`);
-        return lines2.join("\n");
-      }).join("\n");
-      const res = await wrapLLM(client, reporter, "selection").complete({
-        model: opts.model,
-        signal: ctx.signal,
-        system: loadPrompt("rerank"),
-        tools: [],
-        messages: [{ role: "user", content: `Task:
-${instruction}
-
-Candidate tools:
-${list}` }]
-      });
-      const content = res.response?.choices?.[0]?.message?.content;
-      const names = typeof content === "string" ? parseNames(content) : void 0;
-      const byName = new Map(candidates.map((d2) => [d2.name, d2]));
-      const picked = [...new Set(names ?? [])].flatMap((n) => byName.get(n) ?? []);
-      if (picked.length === 0) {
-        ctx.fallback = true;
-        return candidates;
-      }
-      return picked;
-    }
-  };
-}
-
-// packages/core/src/orchestrate/selection/index.ts
-var DEFAULT_N = 6;
-function createSelector(opts) {
-  const k = opts.k ?? DEFAULT_K;
-  const n = opts.n ?? DEFAULT_N;
-  return {
-    async select(q, catalog2) {
-      q.signal?.throwIfAborted();
-      const exclude = new Set(q.exclude ?? []);
-      const byName = new Map(catalog2.map((d2) => [d2.name, d2]));
-      if (q.override) {
-        const unknown2 = q.override.filter((name) => !byName.has(name));
-        if (unknown2.length) throw new Error(`Unknown tools in override: ${unknown2.join(", ")}`);
-        const tools2 = complete(q.override.map((name) => byName.get(name)), catalog2);
-        return { tools: tools2, stages: { retrieved: [], final: tools2.map((d2) => d2.name), override: true } };
-      }
-      const retrieved = retrieve(q.instruction, catalog2, { k, exclude });
-      const ctx = { reporter: q.reporter, signal: q.signal, fallback: false, fallbackReason: void 0 };
-      const reranked = await opts.reranker.rerank(q.instruction, retrieved.map((r) => r.tool), ctx);
-      const tools = complete(reranked.slice(0, n), catalog2).filter((d2) => !exclude.has(d2.name));
-      const stages = {
-        retrieved: retrieved.map((r) => ({ name: r.tool.name, score: r.score })),
-        reranked: reranked.map((d2) => d2.name),
-        final: tools.map((d2) => d2.name)
-      };
-      if (ctx.fallback) stages.rerankFallback = true;
-      if (ctx.fallbackReason) stages.rerankFallbackReason = ctx.fallbackReason;
-      return { tools, stages };
     }
   };
 }
@@ -40178,6 +40441,7 @@ function branchOnlyTool(registry2, opts, state) {
   };
 }
 function buildFramework(kind2, realRegistry, opts) {
+  if (opts.variant?.hotPaths && kind2 !== "orchestrate") throw new Error("variant hotPaths applies to orchestrate only");
   if (opts.variant?.toolSearch && kind2 !== "branch-only") throw new Error("variant toolSearch applies to branch-only only");
   const registry2 = opts.variant?.catalog !== void 0 ? padRegistry(realRegistry, opts.variant.catalog) : realRegistry;
   let state = {};
@@ -40193,7 +40457,6 @@ function buildFramework(kind2, realRegistry, opts) {
   } else if (kind2 === "orchestrate") {
     const o = opts.orchestrate;
     if (!o) throw new Error("orchestrate needs opts.orchestrate (client, model, workspaceRoot)");
-    if (opts.variant?.hotPaths) throw new Error("hot paths not built yet");
     if (opts.variant?.executor === "calls") throw new Error("executor variant `calls` is not built yet");
     task = o.task ?? new Task({ workspaceRoot: o.workspaceRoot });
     const rerankMode = opts.variant?.rerank ?? o.rerank ?? "llm";
@@ -40211,6 +40474,7 @@ function buildFramework(kind2, realRegistry, opts) {
       reader: o.reader ?? fsCodeReader(o.workspaceRoot),
       pathExists: o.pathExists ?? fsPathExists(o.workspaceRoot),
       runtime: opts.runtime,
+      hotPathIndex: opts.variant?.hotPaths ? new HotPathIndex(HOT_PATH_SEEDS) : void 0,
       limits: {
         turns: opts.variant?.secondary ?? o.turns,
         reportMaxChars: o.reportMaxChars,
@@ -40253,13 +40517,20 @@ function parseFrameworkVariant(raw) {
     else if (key === "rerank" && kind2 === "orchestrate" && (value === "llm" || value === "none" || value === "classifier")) variant3.rerank = value;
     else if (key === "secondary" && kind2 === "orchestrate") variant3.secondary = positiveInt();
     else if (key === "executor" && kind2 === "orchestrate" && value === "branch") variant3.executor = value;
-    else if (key === "hotPaths" || key === "executor" && value === "calls") {
+    else if (key === "hotPaths" && kind2 === "orchestrate" && value === void 0) variant3.hotPaths = true;
+    else if (key === "executor" && value === "calls") {
       throw new Error(`Framework treatment is not implemented: ${part}`);
     } else throw new Error(`Unsupported variant for ${kind2}: ${part}`);
     pairs.set(key, value === void 0 ? key : `${key}=${value}`);
   }
   const suffix = [...pairs.keys()].sort().map((key) => pairs.get(key)).join(",");
   return { kind: kind2, variant: variant3, id: suffix ? `${kind2}[${suffix}]` : kind2 };
+}
+
+// packages/core/src/orchestrate/hot-paths/fingerprint.ts
+var HOT_PATH_PROMPT_KEY = "hot-paths";
+function hotPathCatalogFingerprint(snippets = HOT_PATH_SEEDS) {
+  return sha256(canonicalJSON([...snippets].sort((a, b) => a.id < b.id ? -1 : a.id > b.id ? 1 : 0).map(({ id, description, outcome, tools, code }) => ({ id, description, outcome, tools, code }))));
 }
 
 // packages/server/src/host-client.ts
@@ -40366,6 +40637,7 @@ async function startServer(opts) {
   const engine = actualRuntime === isolatedVMRuntime ? "isolated-vm" : actualRuntime === quickJSRuntime ? "quickjs" : "custom-unattested";
   const digest = (value) => createHash5("sha256").update(value).digest("hex");
   const prompts = Object.fromEntries(["base", "branch-only", "branch-tool", "do-tool", "executor", "orchestrate", "rerank", "resolve-tool"].map((name) => [name, digest(loadPrompt(name))]));
+  prompts[HOT_PATH_PROMPT_KEY] = hotPathCatalogFingerprint();
   const entryHash = process.argv[1] ? digest(readFileSync4(process.argv[1])) : null;
   mcpServer.setRequestHandler(ListToolsRequestSchema, async () => ({
     _meta: { "aiw/runtimeProvenance": { version: 1, engine, entryHash, prompts, catalogHash: digest(canonicalJSON(hostDecls)), settings: { kind: opts.kind, variant: opts.variant ?? {}, branchContext: opts.branchContext ?? "trace", secondaryCap: opts.secondaryCap ?? 4, secondaryTemperature: orchestrateOpts?.temperature ?? null, ...orchestrateOpts?.classifier ? { classifier: { model: orchestrateOpts.classifier.model, threshold: orchestrateOpts.classifier.threshold, policy: orchestrateOpts.classifier.policy } } : {} }, nodeVersion: process.version, runtimePlatform: { platform: process.platform, arch: process.arch, moduleABI: process.versions.modules } } },

@@ -105,9 +105,9 @@ export function applyDevelopmentAllowances(root, inventory, replacements, allowa
     assert.notDeepEqual(change.before,change.after,`Unnecessary development allowance: ${change.path}`);
     expected.set(change.path,change.after);
   }
-  assert.deepEqual([...allowances.draft_plans].sort(),['plans/2026-11-01-all-provider-host-broker/PLAN.md','plans/2026-11-01-classifier-evaluation/PLAN.md','plans/2026-11-01-direct-deepseek/PLAN.md','plans/2026-11-01-direct-typesafe-classifier/PLAN.md','plans/2026-11-01-failfast-campaign/PLAN.md','plans/2026-11-01-openai-plan-signin/PLAN.md','plans/2026-11-01-provenance-readiness/PLAN.md','plans/2026-11-01-tool-env-secrets/PLAN.md','plans/2026-11-01-typed-classifier-reranker/PLAN.md']);
+  assert.deepEqual([...allowances.draft_plans].sort(),['plans/2026-11-01-all-provider-host-broker/PLAN.md','plans/2026-11-01-classifier-evaluation/PLAN.md','plans/2026-11-01-direct-deepseek/PLAN.md','plans/2026-11-01-direct-typesafe-classifier/PLAN.md','plans/2026-11-01-failfast-campaign/PLAN.md','plans/2026-11-01-openai-plan-signin/PLAN.md','plans/2026-11-01-provenance-readiness/PLAN.md','plans/2026-11-01-tool-env-secrets/PLAN.md','plans/2026-11-01-typed-classifier-reranker/PLAN.md','plans/2026-11-02-hotpath-prototype/PLAN.md']);
   for (const file of allowances.draft_plans) {
-    assert.match(file,/^plans\/2026-11-01-(all-provider-host-broker|classifier-evaluation|direct-deepseek|direct-typesafe-classifier|failfast-campaign|openai-plan-signin|provenance-readiness|tool-env-secrets|typed-classifier-reranker)\/PLAN\.md$/);
+    assert.match(file,/^plans\/(?:2026-11-01-(all-provider-host-broker|classifier-evaluation|direct-deepseek|direct-typesafe-classifier|failfast-campaign|openai-plan-signin|provenance-readiness|tool-env-secrets|typed-classifier-reranker)|2026-11-02-hotpath-prototype)\/PLAN\.md$/);
     const text=fs.readFileSync(path.join(root,file),'utf8');
     const frontmatter = /^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/.exec(text);
     assert.ok(frontmatter,`Missing development plan frontmatter: ${file}`);

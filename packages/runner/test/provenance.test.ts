@@ -180,3 +180,42 @@ test("classifier model, threshold and policy are observed settings, not request-
   observed.runtimeProvenance!.settings.classifier.threshold = 0.8;
   assert.doesNotThrow(() => attestJob(provenance, config, "p", config.frameworks[0], image, observed));
 });
+
+test("hot-path seeds and treatment settings are independently covered by provenance", t => {
+  const { root, put, config, base } = fixture(t);
+  const seedPath = "packages/core/src/orchestrate/hot-paths/example.ts";
+  put(seedPath, "export const code = 'first';");
+  execFileSync("git", ["add", seedPath], { cwd: root });
+  const plain = { ...config, frameworks: ["orchestrate"] };
+  const hot = { ...config, frameworks: ["orchestrate[hotPaths]"] };
+  const a = collectStaticProvenance(root, plain, base, () => {});
+  const b = collectStaticProvenance(root, hot, base, () => {});
+  assert.notEqual(a.integrity!.configHash, b.integrity!.configHash);
+  assert.equal(a.integrity!.sourceHash, b.integrity!.sourceHash);
+  put(seedPath, "export const code = 'changed';");
+  const changed = collectStaticProvenance(root, hot, base, () => {});
+  assert.notEqual(changed.integrity!.sourceHash, b.integrity!.sourceHash);
+  put("packages/server/dist/aiw-server.mjs", "changed bundled seed");
+  const bundled = collectStaticProvenance(root, hot, base, () => {});
+  assert.notEqual(bundled.integrity!.bundleHash, changed.integrity!.bundleHash);
+  assert.notEqual(bundled.integrity!.entryHash, changed.integrity!.entryHash);
+});
+
+test("enabled hot paths require the observed reviewed prompt-set fingerprint before attestation", t => {
+  const { config, provenance } = fixture(t);
+  config.frameworks = ["orchestrate[hotPaths]"];
+  for (const mode of ["missing", "mismatch", "both-missing", "both-mismatch", "valid"] as const) {
+    const p = structuredClone(provenance);
+    const actual = session(p);
+    actual.runtimeProvenance!.settings.kind = "orchestrate";
+    actual.runtimeProvenance!.settings.variant = { hotPaths: true };
+    if (mode.includes("missing")) delete actual.runtimeProvenance!.prompts["hot-paths"];
+    if (mode.includes("mismatch")) actual.runtimeProvenance!.prompts["hot-paths"] = digest;
+    if (mode === "both-missing") delete p.integrity!.promptHashes["hot-paths"];
+    if (mode === "both-mismatch") p.integrity!.promptHashes["hot-paths"] = digest;
+    if (mode === "valid") {
+      assert.doesNotThrow(() => attestJob(p, config, "p", "orchestrate[hotPaths]", image, actual));
+      assert.equal(p.frameworks["orchestrate[hotPaths]"].extra!["hot-paths"], p.integrity!.promptHashes["hot-paths"]);
+    } else assert.throws(() => attestJob(p, config, "p", "orchestrate[hotPaths]", image, actual), /hot-path prompt fingerprint/);
+  }
+});

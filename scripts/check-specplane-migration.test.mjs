@@ -110,3 +110,28 @@ test('runtime hygiene helper cannot be silently weakened',t=>{
   const root=snapshot(t);fs.appendFileSync(path.join(root,'scripts/check-runtime-gitignore.sh'),'\n# unauthorized weakening\n');
   assert.throws(()=>verifyPreservation(root),/Preserved content changed/);
 });
+
+test('hot-path draft cannot become ready through the candidate',t=>{
+  const root=snapshot(t);const file=path.join(root,'plans/2026-11-02-hotpath-prototype/PLAN.md');
+  fs.writeFileSync(file,fs.readFileSync(file,'utf8').replace('status: draft','status: ready'));
+  assert.throws(()=>verifyPreservation(root),/must remain draft/);
+});
+
+test('hot-path allowance cannot silently add another draft plan',t=>{
+  const root=snapshot(t);const file=path.join(root,'.specplane/development-allowances.json');
+  const data=JSON.parse(fs.readFileSync(file));data.draft_plans.push('plans/2026-11-02-unreviewed/PLAN.md');
+  fs.writeFileSync(file,JSON.stringify(data));
+  assert.throws(()=>verifyPreservation(root),/deep-equal/);
+});
+
+test('hot-path allowance cannot silently omit its draft plan guard',t=>{
+  const root=snapshot(t);const file=path.join(root,'.specplane/development-allowances.json');
+  const data=JSON.parse(fs.readFileSync(file));data.draft_plans=data.draft_plans.filter(p=>!p.includes('hotpath-prototype'));
+  fs.writeFileSync(file,JSON.stringify(data));
+  assert.throws(()=>verifyPreservation(root),/deep-equal/);
+});
+
+test('hot-path source must match its exact recorded after-state',t=>{
+  const root=snapshot(t);fs.appendFileSync(path.join(root,'packages/core/src/orchestrate/hot-paths/index.ts'),'\n// tampered\n');
+  assert.throws(()=>verifyPreservation(root),/Preserved content changed/);
+});

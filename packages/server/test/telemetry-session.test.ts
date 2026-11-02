@@ -1,3 +1,4 @@
+import { hotPathCatalogFingerprint, HOT_PATH_PROMPT_KEY } from "@aiw/core";
 import test from "node:test";
 import assert from "node:assert/strict";
 import { mkdtempSync, readFileSync, rmSync } from "node:fs";
@@ -23,6 +24,7 @@ test("server shares telemetry counter and parent correlation across successive r
     assert.equal(observed.nodeVersion, process.version);
     assert.equal(observed.runtimePlatform.moduleABI, process.versions.modules);
     for (const name of ["executor", "rerank", "base"]) assert.match(observed.prompts[name], /^[a-f0-9]{64}$/);
+    assert.equal(observed.prompts[HOT_PATH_PROMPT_KEY], hotPathCatalogFingerprint());
     assert.match(observed.catalogHash, /^[a-f0-9]{64}$/);
     for (const n of [1, 2]) {
       const result = await client.callTool({ name: "branch", arguments: { code: 'async (tools) => await tools.bash({ cmd: "printf fixture" })' },
@@ -74,4 +76,18 @@ test("MCP cancellation reaches the actual server host request", { timeout: 10_00
     while (!existsSync(cancelled) && Date.now() < until) await delay(10);
     assert.equal(readFileSync(cancelled, "utf8"), "cancelled");
   } finally { controller.abort(); await client.close(); }
+});
+
+test("compiled server observes its own reviewed hot-path catalog fingerprint without model calls", async t => {
+  const root = mkdtempSync(join(tmpdir(), "aiw-hotpath-fingerprint-"));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  const client = new Client({ name: "fingerprint-fixture", version: "1" });
+  const transport = new StdioClientTransport({ command: process.execPath,
+    args: [fileURLToPath(new URL("../dist/aiw-server.mjs", import.meta.url)), "--framework", "orchestrate[hotPaths]", "--executor-model", "fixture", "--executor-provider", "host", "--root", root], stderr: "pipe" });
+  try {
+    await client.connect(transport);
+    const observed = (await client.listTools())._meta?.["aiw/runtimeProvenance"] as any;
+    assert.equal(observed.prompts[HOT_PATH_PROMPT_KEY], hotPathCatalogFingerprint());
+    assert.equal(observed.settings.variant.hotPaths, true);
+  } finally { await client.close(); }
 });

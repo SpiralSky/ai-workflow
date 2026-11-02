@@ -183,3 +183,10 @@ test("campaign concurrency defaults to one, accepts explicit parallelism and rej
     assert.throws(() => resolveConfig({ ...flags, concurrency }, sampleProblems), /positive integer/);
   }
 });
+
+test("hotPaths is a distinct canonical opt-in, never part of compare", () => {
+  assert.equal(parseVariant("orchestrate[rerank=none,hotPaths]"), "orchestrate[hotPaths,rerank=none]");
+  assert.deepEqual(expandModes("compare,orchestrate[hotPaths]"), ["baseline", "branch-only", "orchestrate", "orchestrate[hotPaths]"]);
+  assert.deepEqual(expandModes("compare"), ["baseline", "branch-only", "orchestrate"]);
+  assert.throws(() => parseVariant("baseline[hotPaths]"));
+});

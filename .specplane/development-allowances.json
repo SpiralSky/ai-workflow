@@ -6,7 +6,8 @@
   "authorization_kind": "development requests only; final approval and merge remain human-only",
   "user_requests": [
     "Add sign in to open ai support for ai-workflow workflow runs",
-    "Additionally, try to approach testing in the future with saving money in mind, for example once hitting an error, stop all other runs and try to fix the error first."
+    "Additionally, try to approach testing in the future with saving money in mind, for example once hitting an error, stop all other runs and try to fix the error first.",
+    "Keep working on and improving it"
   ],
   "source_commits": [
     "1e133031b939d91d50b4502f8f624f506a15ef21",
@@ -28,7 +29,8 @@
     "plans/2026-11-01-openai-plan-signin/PLAN.md",
     "plans/2026-11-01-provenance-readiness/PLAN.md",
     "plans/2026-11-01-tool-env-secrets/PLAN.md",
-    "plans/2026-11-01-typed-classifier-reranker/PLAN.md"
+    "plans/2026-11-01-typed-classifier-reranker/PLAN.md",
+    "plans/2026-11-02-hotpath-prototype/PLAN.md"
   ],
   "changes": [
     {
@@ -79,7 +81,7 @@
       "after": {
         "path": "packages/core/src/framework/build.ts",
         "mode": "100644",
-        "sha256": "8b33bb4bfc7c76614748fadea5665468d7c3862010466c4cd87dfaa01987e8f5"
+        "sha256": "b923e5caab429b53841e5b9e033640c8bbb073c6c15d99e04b1d373af5251fbf"
       },
       "rationale": "Host-only optional typed classifier with strict probability/usage contract and same selector completion."
     },
@@ -107,7 +109,7 @@
       "after": {
         "path": "packages/core/src/framework/variant.ts",
         "mode": "100644",
-        "sha256": "1c5b4e31ea1ad217cfd23e430416be80717b283a7d187fe046ddbbbd0409745f"
+        "sha256": "4f13afdd7cf321e6c2cd23cf0613a9dececa083344babc3ef7d74e0681c95a14"
       },
       "rationale": "Host-only optional typed classifier with strict probability/usage contract and same selector completion."
     },
@@ -121,7 +123,7 @@
       "after": {
         "path": "packages/core/src/orchestrate/executor.ts",
         "mode": "100644",
-        "sha256": "ed1fb7ff4d12600aa8c4e0f85173d2c84ad93b1bb50ddc31788bdbfaa45c2238"
+        "sha256": "bc8d1bf24be1ff86c4231f37ce59cc412b692f2030c9f7e878da7aef07018261"
       },
       "rationale": "Stop concurrent work and propagate cancellation after terminal failures, preserving task success requirements."
     },
@@ -135,7 +137,7 @@
       "after": {
         "path": "packages/core/src/orchestrate/planner-tools.ts",
         "mode": "100644",
-        "sha256": "5dec000457c21d8a33c0fae6caca093b7172ac39a8d2a55be6e9596e14406d83"
+        "sha256": "01f39d39605e51d74b5bfea6997085ec2ac11ee1ff7ca8e63f6268a56414f85b"
       },
       "rationale": "Stop concurrent work and propagate cancellation after terminal failures, preserving task success requirements."
     },
@@ -557,7 +559,7 @@
       "after": {
         "path": "packages/runner/src/provenance.ts",
         "mode": "100644",
-        "sha256": "6093584f3a65a5e4e336e2b2f4b33906c21b97fab92a67ed4a4e5bb2c5619c4c"
+        "sha256": "73afb5f6cd5ef18012af25929b93bf2ec813d0b4015765f4516744c2b7ff5f4e"
       },
       "rationale": "Truthful pre-model provenance gate and provider observations, without fabricated model versions or task completion. Follow-up: host-only optional typed classifier selection, complete cost/fallback evidence."
     },
@@ -691,7 +693,7 @@
       "after": {
         "path": "packages/runner/test/config.test.ts",
         "mode": "100644",
-        "sha256": "e03c55a2fa68a93d9fa7ca9b1a6837954cc3467d9f27e48c657f1e931d9d60cc"
+        "sha256": "d56ade7bc7c1431e73e8b7a5d68387d2dcfaa6a0de631fa254a023616262d0d1"
       },
       "rationale": "OpenAI sign-in, bounded host-brokered workflow usage and security regressions; fail-fast cancellation where shared with runner/core/server."
     },
@@ -775,7 +777,7 @@
       "after": {
         "path": "packages/runner/test/provenance.test.ts",
         "mode": "100644",
-        "sha256": "9bec96f2b7e346ac2f6ad333be24a523afd022f5fcd158dc9007a705a5b3cca6"
+        "sha256": "8276237bf62c227c2202c5584a09e139ffcf7fe49c47410734c26a647c79063c"
       },
       "rationale": "Truthful pre-model provenance gate and provider observations, without fabricated model versions or task completion. Follow-up: host-only optional typed classifier selection, complete cost/fallback evidence."
     },
@@ -843,9 +845,9 @@
       "after": {
         "path": "packages/server/dist/aiw-server.mjs",
         "mode": "100755",
-        "sha256": "da6ee243d143d5f182ee8f00ed471e0ea8f79648c9aafcc358016f9a7ae5bd08"
+        "sha256": "fef6ac2c41454c89476187e340871db188bcfdc6821e075a2ad6e83c2cf8519e"
       },
-      "rationale": "Rebuild/verify coherent tracked runtime and honor explicit engine selection without silent fallback. Follow-up: verified packaged native/tierL resources and lifecycle integration. Follow-up: awaited graceful sidecar descendant shutdown. Follow-up: actual runtime provenance gate and immutable observed-image grading. Security follow-up: all orchestration credentials/inference stay host-side, typed sanitized provider errors. Follow-up: bounded direct DeepSeek provider with host-only credentials and explicit estimated costs. Phase2: direct TypeSafe filtering with separate estimates and shared bounded campaign counters."
+      "rationale": "Rebuilt exact-source server artifact for explicit hotPaths ablation; defaults unchanged"
     },
     {
       "path": "packages/server/dist/fixtures/external/ciStatus.json",
@@ -1179,7 +1181,7 @@
       "after": {
         "path": "packages/server/src/server.ts",
         "mode": "100644",
-        "sha256": "b16497f1ea2c6cbf0c966f5256fc98d54e7d658b6874251eae0df91f4742771d"
+        "sha256": "a54d485ad57633f4086392d8b9e4480048623ea06eac1ab5eb7880fbd056d777"
       },
       "rationale": "OpenAI sign-in, bounded host-brokered workflow usage and security regressions; fail-fast cancellation where shared with runner/core/server. Follow-up: verified packaged native/tierL resources and lifecycle integration. Follow-up: actual runtime provenance gate and immutable observed-image grading. Follow-up: host-only optional typed classifier selection, complete cost/fallback evidence."
     },
@@ -1223,7 +1225,7 @@
       "after": {
         "path": "packages/server/test/telemetry-session.test.ts",
         "mode": "100644",
-        "sha256": "62d409caa6164472bb00ffb5229a194ff8cc2dc360846e85ee5452d6fb801dce"
+        "sha256": "74670e4f572629080e9b98d2e0724d480a0b985b5ca67174bdac0e2a4b8d2040"
       },
       "rationale": "OpenAI sign-in, bounded host-brokered workflow usage and security regressions; fail-fast cancellation where shared with runner/core/server. Follow-up: actual runtime provenance gate and immutable observed-image grading."
     },
@@ -1376,6 +1378,242 @@
         "sha256": "496074b5376d350e14cc0888dd9da1aa5dafe18af2c6462b4d5bef9879610a7a"
       },
       "rationale": "Local tool subprocess environment secret filtering and synthetic-only boundary/descendant regressions."
+    },
+    {
+      "path": "packages/core/src/orchestrate/hot-paths/catalog.ts",
+      "before": null,
+      "after": {
+        "path": "packages/core/src/orchestrate/hot-paths/catalog.ts",
+        "mode": "100644",
+        "sha256": "b5851ecc7c366f543cad5af42478ada0dd49b36f663b925ddfa10b5eb266c3ad"
+      },
+      "rationale": "Isolated opt-in hot-path prototype: generic bounded snippets, selection/locking integration and mocked deterministic regressions; defaults unchanged."
+    },
+    {
+      "path": "packages/core/src/orchestrate/hot-paths/check-errors-read.ts",
+      "before": null,
+      "after": {
+        "path": "packages/core/src/orchestrate/hot-paths/check-errors-read.ts",
+        "mode": "100644",
+        "sha256": "1867ea25081ef85cf59784063afb68ecca8901375da70d362d9566a97dc63f5c"
+      },
+      "rationale": "Isolated opt-in hot-path prototype: generic bounded snippets, selection/locking integration and mocked deterministic regressions; defaults unchanged."
+    },
+    {
+      "path": "packages/core/src/orchestrate/hot-paths/command-nonzero-summary.ts",
+      "before": null,
+      "after": {
+        "path": "packages/core/src/orchestrate/hot-paths/command-nonzero-summary.ts",
+        "mode": "100644",
+        "sha256": "0b4dae8fa4216b47893cce8eec9142de35dc05dc3d26add5f30b212387665bf0"
+      },
+      "rationale": "Isolated opt-in hot-path prototype: generic bounded snippets, selection/locking integration and mocked deterministic regressions; defaults unchanged."
+    },
+    {
+      "path": "packages/core/src/orchestrate/hot-paths/edit-ambiguous-reread.ts",
+      "before": null,
+      "after": {
+        "path": "packages/core/src/orchestrate/hot-paths/edit-ambiguous-reread.ts",
+        "mode": "100644",
+        "sha256": "417aea50947dea3f61b3767883e5531b4f6bf7270c7db2bb93d2100703de117e"
+      },
+      "rationale": "Isolated opt-in hot-path prototype: generic bounded snippets, selection/locking integration and mocked deterministic regressions; defaults unchanged."
+    },
+    {
+      "path": "packages/core/src/orchestrate/hot-paths/edit-missing-reread.ts",
+      "before": null,
+      "after": {
+        "path": "packages/core/src/orchestrate/hot-paths/edit-missing-reread.ts",
+        "mode": "100644",
+        "sha256": "c378b4d54e05dabfd18a174055f0aacc8967b43f8a19d540ac0b958808d4771d"
+      },
+      "rationale": "Isolated opt-in hot-path prototype: generic bounded snippets, selection/locking integration and mocked deterministic regressions; defaults unchanged."
+    },
+    {
+      "path": "packages/core/src/orchestrate/hot-paths/edit-then-narrow-test.ts",
+      "before": null,
+      "after": {
+        "path": "packages/core/src/orchestrate/hot-paths/edit-then-narrow-test.ts",
+        "mode": "100644",
+        "sha256": "7973d76f1f80c2ff8c7e7b8bc3325ca15fcb25402105193e0794e92dab7be95e"
+      },
+      "rationale": "Isolated opt-in hot-path prototype: generic bounded snippets, selection/locking integration and mocked deterministic regressions; defaults unchanged."
+    },
+    {
+      "path": "packages/core/src/orchestrate/hot-paths/find-files-empty-widen.ts",
+      "before": null,
+      "after": {
+        "path": "packages/core/src/orchestrate/hot-paths/find-files-empty-widen.ts",
+        "mode": "100644",
+        "sha256": "edf44156be9c4ed3f2307dcc5bc69c7a61e0e777577e7cfbfd2bbec962d72156"
+      },
+      "rationale": "Isolated opt-in hot-path prototype: generic bounded snippets, selection/locking integration and mocked deterministic regressions; defaults unchanged."
+    },
+    {
+      "path": "packages/core/src/orchestrate/hot-paths/grep-empty-widen.ts",
+      "before": null,
+      "after": {
+        "path": "packages/core/src/orchestrate/hot-paths/grep-empty-widen.ts",
+        "mode": "100644",
+        "sha256": "d56b1169f4a0c20eb206c117dda829d82ce7dbca2e86b8aaf061b50a19e6ddfb"
+      },
+      "rationale": "Isolated opt-in hot-path prototype: generic bounded snippets, selection/locking integration and mocked deterministic regressions; defaults unchanged."
+    },
+    {
+      "path": "packages/core/src/orchestrate/hot-paths/index.ts",
+      "before": null,
+      "after": {
+        "path": "packages/core/src/orchestrate/hot-paths/index.ts",
+        "mode": "100644",
+        "sha256": "73dd601a56bd439c5551069fe3f548c7ddec24b36226efc3ef5d8c430b2585dd"
+      },
+      "rationale": "Isolated opt-in hot-path prototype: generic bounded snippets, selection/locking integration and mocked deterministic regressions; defaults unchanged."
+    },
+    {
+      "path": "packages/core/src/orchestrate/hot-paths/move-cycle-diagnose.ts",
+      "before": null,
+      "after": {
+        "path": "packages/core/src/orchestrate/hot-paths/move-cycle-diagnose.ts",
+        "mode": "100644",
+        "sha256": "86ed314721882154ef0d6188d976813d655e89e69bf2868b6f62e27f8c029092"
+      },
+      "rationale": "Isolated opt-in hot-path prototype: generic bounded snippets, selection/locking integration and mocked deterministic regressions; defaults unchanged."
+    },
+    {
+      "path": "packages/core/src/orchestrate/hot-paths/read-not-found-locate.ts",
+      "before": null,
+      "after": {
+        "path": "packages/core/src/orchestrate/hot-paths/read-not-found-locate.ts",
+        "mode": "100644",
+        "sha256": "a5731f9f87ca54b33914efd4d3dd42695da0a17f9dd96e43016e093109ad7f58"
+      },
+      "rationale": "Isolated opt-in hot-path prototype: generic bounded snippets, selection/locking integration and mocked deterministic regressions; defaults unchanged."
+    },
+    {
+      "path": "packages/core/src/orchestrate/hot-paths/read-truncated-range.ts",
+      "before": null,
+      "after": {
+        "path": "packages/core/src/orchestrate/hot-paths/read-truncated-range.ts",
+        "mode": "100644",
+        "sha256": "6af633e022057d976693ae9b8b830624dc0875b387498979173e0bd42cd00c12"
+      },
+      "rationale": "Isolated opt-in hot-path prototype: generic bounded snippets, selection/locking integration and mocked deterministic regressions; defaults unchanged."
+    },
+    {
+      "path": "packages/core/src/orchestrate/hot-paths/rename-zero-references.ts",
+      "before": null,
+      "after": {
+        "path": "packages/core/src/orchestrate/hot-paths/rename-zero-references.ts",
+        "mode": "100644",
+        "sha256": "c43eecaa0c82e3dd5e491f260e4bc7ece92d3183c30106b37b67677e160a4559"
+      },
+      "rationale": "Isolated opt-in hot-path prototype: generic bounded snippets, selection/locking integration and mocked deterministic regressions; defaults unchanged."
+    },
+    {
+      "path": "packages/core/src/orchestrate/hot-paths/test-failure-summary.ts",
+      "before": null,
+      "after": {
+        "path": "packages/core/src/orchestrate/hot-paths/test-failure-summary.ts",
+        "mode": "100644",
+        "sha256": "03496a3cf1cff70a0d527b95a2a7e8f685b10703034310a35f452c34eb0ff0b1"
+      },
+      "rationale": "Isolated opt-in hot-path prototype: generic bounded snippets, selection/locking integration and mocked deterministic regressions; defaults unchanged."
+    },
+    {
+      "path": "packages/core/src/orchestrate/hot-paths/types.ts",
+      "before": null,
+      "after": {
+        "path": "packages/core/src/orchestrate/hot-paths/types.ts",
+        "mode": "100644",
+        "sha256": "c4fbe75fc92f0517301f38e0d07a4f9a48fbd2f761e54e561bb96cdd8dfb4eef"
+      },
+      "rationale": "Isolated opt-in hot-path prototype: generic bounded snippets, selection/locking integration and mocked deterministic regressions; defaults unchanged."
+    },
+    {
+      "path": "packages/core/test/executor.test.ts",
+      "before": {
+        "path": "packages/core/test/executor.test.ts",
+        "mode": "100644",
+        "sha256": "d459612d075c408a2f1124a365120d98e60f6a4fb91a2aacb67deb0e3f5c06ba"
+      },
+      "after": {
+        "path": "packages/core/test/executor.test.ts",
+        "mode": "100644",
+        "sha256": "73efd44cd8de4ee8c8beb1b25e30d5f59f1a6f3c6dc475c743fcb90390bcff91"
+      },
+      "rationale": "Isolated opt-in hot-path prototype: generic bounded snippets, selection/locking integration and mocked deterministic regressions; defaults unchanged."
+    },
+    {
+      "path": "packages/core/test/hot-path-index.test.ts",
+      "before": null,
+      "after": {
+        "path": "packages/core/test/hot-path-index.test.ts",
+        "mode": "100644",
+        "sha256": "23892f0a8b06a7658efc0eb0e09eabedda1a6b517f8f118f6c2854c2b5fe449c"
+      },
+      "rationale": "Isolated opt-in hot-path prototype: generic bounded snippets, selection/locking integration and mocked deterministic regressions; defaults unchanged."
+    },
+    {
+      "path": "packages/core/test/hot-path-seeds.test.ts",
+      "before": null,
+      "after": {
+        "path": "packages/core/test/hot-path-seeds.test.ts",
+        "mode": "100644",
+        "sha256": "f0efe1ffceb1414187f1f7035dfc7d366d2951a9c15070bedb89fdad07fff75c"
+      },
+      "rationale": "Isolated opt-in hot-path prototype: generic bounded snippets, selection/locking integration and mocked deterministic regressions; defaults unchanged."
+    },
+    {
+      "path": "packages/core/test/orchestrate.test.ts",
+      "before": {
+        "path": "packages/core/test/orchestrate.test.ts",
+        "mode": "100644",
+        "sha256": "45431d3ac6b46b64f97530fd4665c3390fd5212f30a69dfe41162821e50d8290"
+      },
+      "after": {
+        "path": "packages/core/test/orchestrate.test.ts",
+        "mode": "100644",
+        "sha256": "7d1831b3eef073a51797401a284de5c6cecb5c1af142626b9f2f5f60e8f571c7"
+      },
+      "rationale": "Isolated opt-in hot-path prototype: generic bounded snippets, selection/locking integration and mocked deterministic regressions; defaults unchanged."
+    },
+    {
+      "path": "packages/core/test/variant.test.ts",
+      "before": {
+        "path": "packages/core/test/variant.test.ts",
+        "mode": "100644",
+        "sha256": "ca6b8b5dbbae8f91f720d8384231883ab6eb92eee69194888fd3a1f5d54538b5"
+      },
+      "after": {
+        "path": "packages/core/test/variant.test.ts",
+        "mode": "100644",
+        "sha256": "60b211e25ca94d43c164342cdb9d2c69376bad2c916cc9c72753826f51c82094"
+      },
+      "rationale": "Isolated opt-in hot-path prototype: generic bounded snippets, selection/locking integration and mocked deterministic regressions; defaults unchanged."
+    },
+    {
+      "path": "packages/core/src/orchestrate/hot-paths/fingerprint.ts",
+      "before": null,
+      "after": {
+        "path": "packages/core/src/orchestrate/hot-paths/fingerprint.ts",
+        "mode": "100644",
+        "sha256": "73a7b75298c22abe296993ef808382b9a460841c4fc92e178a3ee677af9dddef"
+      },
+      "rationale": "Explicit observed hot-path hidden-prompt fingerprint and deterministic attestation regressions; original baseline unchanged."
+    },
+    {
+      "path": "packages/core/src/orchestrate/index.ts",
+      "before": {
+        "path": "packages/core/src/orchestrate/index.ts",
+        "mode": "100644",
+        "sha256": "eca706c558d0389ad4031ec3cd86868946b289480f622dbb71198df7bd2366c1"
+      },
+      "after": {
+        "path": "packages/core/src/orchestrate/index.ts",
+        "mode": "100644",
+        "sha256": "c0ec876b1ec3988ef02d422c427070e6798ddb96e83da3b979113d7dcf775bda"
+      },
+      "rationale": "Explicit observed hot-path hidden-prompt fingerprint and deterministic attestation regressions; original baseline unchanged."
     }
   ],
   "packaging_followup": {
@@ -3301,5 +3539,357 @@
     ],
     "limits": "Direct/local host environment defense, not a sandbox; no runner key exposure claimed.",
     "canonical_artifact_commit": "09773499da6e55cb2c0b2419b80fe4b7b08faca0"
+  },
+  "hotpaths_experimental_followup": {
+    "source_base": "67b42ae04153079e84b1fdacdd0082a2e623ffc8",
+    "draft_plan": "plans/2026-11-02-hotpath-prototype/PLAN.md",
+    "authorization": "User requested continued ai-workflow idea refinement; development only, not approval or merge",
+    "changes": [
+      {
+        "path": "packages/core/src/framework/build.ts",
+        "before": {
+          "path": "packages/core/src/framework/build.ts",
+          "mode": "100644",
+          "sha256": "8b33bb4bfc7c76614748fadea5665468d7c3862010466c4cd87dfaa01987e8f5"
+        },
+        "after": {
+          "path": "packages/core/src/framework/build.ts",
+          "mode": "100644",
+          "sha256": "b923e5caab429b53841e5b9e033640c8bbb073c6c15d99e04b1d373af5251fbf"
+        }
+      },
+      {
+        "path": "packages/core/src/framework/variant.ts",
+        "before": {
+          "path": "packages/core/src/framework/variant.ts",
+          "mode": "100644",
+          "sha256": "1c5b4e31ea1ad217cfd23e430416be80717b283a7d187fe046ddbbbd0409745f"
+        },
+        "after": {
+          "path": "packages/core/src/framework/variant.ts",
+          "mode": "100644",
+          "sha256": "4f13afdd7cf321e6c2cd23cf0613a9dececa083344babc3ef7d74e0681c95a14"
+        }
+      },
+      {
+        "path": "packages/core/src/orchestrate/executor.ts",
+        "before": {
+          "path": "packages/core/src/orchestrate/executor.ts",
+          "mode": "100644",
+          "sha256": "ed1fb7ff4d12600aa8c4e0f85173d2c84ad93b1bb50ddc31788bdbfaa45c2238"
+        },
+        "after": {
+          "path": "packages/core/src/orchestrate/executor.ts",
+          "mode": "100644",
+          "sha256": "bc8d1bf24be1ff86c4231f37ce59cc412b692f2030c9f7e878da7aef07018261"
+        }
+      },
+      {
+        "path": "packages/core/src/orchestrate/hot-paths/catalog.ts",
+        "before": null,
+        "after": {
+          "path": "packages/core/src/orchestrate/hot-paths/catalog.ts",
+          "mode": "100644",
+          "sha256": "b5851ecc7c366f543cad5af42478ada0dd49b36f663b925ddfa10b5eb266c3ad"
+        }
+      },
+      {
+        "path": "packages/core/src/orchestrate/hot-paths/check-errors-read.ts",
+        "before": null,
+        "after": {
+          "path": "packages/core/src/orchestrate/hot-paths/check-errors-read.ts",
+          "mode": "100644",
+          "sha256": "1867ea25081ef85cf59784063afb68ecca8901375da70d362d9566a97dc63f5c"
+        }
+      },
+      {
+        "path": "packages/core/src/orchestrate/hot-paths/command-nonzero-summary.ts",
+        "before": null,
+        "after": {
+          "path": "packages/core/src/orchestrate/hot-paths/command-nonzero-summary.ts",
+          "mode": "100644",
+          "sha256": "0b4dae8fa4216b47893cce8eec9142de35dc05dc3d26add5f30b212387665bf0"
+        }
+      },
+      {
+        "path": "packages/core/src/orchestrate/hot-paths/edit-ambiguous-reread.ts",
+        "before": null,
+        "after": {
+          "path": "packages/core/src/orchestrate/hot-paths/edit-ambiguous-reread.ts",
+          "mode": "100644",
+          "sha256": "417aea50947dea3f61b3767883e5531b4f6bf7270c7db2bb93d2100703de117e"
+        }
+      },
+      {
+        "path": "packages/core/src/orchestrate/hot-paths/edit-missing-reread.ts",
+        "before": null,
+        "after": {
+          "path": "packages/core/src/orchestrate/hot-paths/edit-missing-reread.ts",
+          "mode": "100644",
+          "sha256": "c378b4d54e05dabfd18a174055f0aacc8967b43f8a19d540ac0b958808d4771d"
+        }
+      },
+      {
+        "path": "packages/core/src/orchestrate/hot-paths/edit-then-narrow-test.ts",
+        "before": null,
+        "after": {
+          "path": "packages/core/src/orchestrate/hot-paths/edit-then-narrow-test.ts",
+          "mode": "100644",
+          "sha256": "7973d76f1f80c2ff8c7e7b8bc3325ca15fcb25402105193e0794e92dab7be95e"
+        }
+      },
+      {
+        "path": "packages/core/src/orchestrate/hot-paths/find-files-empty-widen.ts",
+        "before": null,
+        "after": {
+          "path": "packages/core/src/orchestrate/hot-paths/find-files-empty-widen.ts",
+          "mode": "100644",
+          "sha256": "edf44156be9c4ed3f2307dcc5bc69c7a61e0e777577e7cfbfd2bbec962d72156"
+        }
+      },
+      {
+        "path": "packages/core/src/orchestrate/hot-paths/grep-empty-widen.ts",
+        "before": null,
+        "after": {
+          "path": "packages/core/src/orchestrate/hot-paths/grep-empty-widen.ts",
+          "mode": "100644",
+          "sha256": "d56b1169f4a0c20eb206c117dda829d82ce7dbca2e86b8aaf061b50a19e6ddfb"
+        }
+      },
+      {
+        "path": "packages/core/src/orchestrate/hot-paths/index.ts",
+        "before": null,
+        "after": {
+          "path": "packages/core/src/orchestrate/hot-paths/index.ts",
+          "mode": "100644",
+          "sha256": "73dd601a56bd439c5551069fe3f548c7ddec24b36226efc3ef5d8c430b2585dd"
+        }
+      },
+      {
+        "path": "packages/core/src/orchestrate/hot-paths/move-cycle-diagnose.ts",
+        "before": null,
+        "after": {
+          "path": "packages/core/src/orchestrate/hot-paths/move-cycle-diagnose.ts",
+          "mode": "100644",
+          "sha256": "86ed314721882154ef0d6188d976813d655e89e69bf2868b6f62e27f8c029092"
+        }
+      },
+      {
+        "path": "packages/core/src/orchestrate/hot-paths/read-not-found-locate.ts",
+        "before": null,
+        "after": {
+          "path": "packages/core/src/orchestrate/hot-paths/read-not-found-locate.ts",
+          "mode": "100644",
+          "sha256": "a5731f9f87ca54b33914efd4d3dd42695da0a17f9dd96e43016e093109ad7f58"
+        }
+      },
+      {
+        "path": "packages/core/src/orchestrate/hot-paths/read-truncated-range.ts",
+        "before": null,
+        "after": {
+          "path": "packages/core/src/orchestrate/hot-paths/read-truncated-range.ts",
+          "mode": "100644",
+          "sha256": "6af633e022057d976693ae9b8b830624dc0875b387498979173e0bd42cd00c12"
+        }
+      },
+      {
+        "path": "packages/core/src/orchestrate/hot-paths/rename-zero-references.ts",
+        "before": null,
+        "after": {
+          "path": "packages/core/src/orchestrate/hot-paths/rename-zero-references.ts",
+          "mode": "100644",
+          "sha256": "c43eecaa0c82e3dd5e491f260e4bc7ece92d3183c30106b37b67677e160a4559"
+        }
+      },
+      {
+        "path": "packages/core/src/orchestrate/hot-paths/test-failure-summary.ts",
+        "before": null,
+        "after": {
+          "path": "packages/core/src/orchestrate/hot-paths/test-failure-summary.ts",
+          "mode": "100644",
+          "sha256": "03496a3cf1cff70a0d527b95a2a7e8f685b10703034310a35f452c34eb0ff0b1"
+        }
+      },
+      {
+        "path": "packages/core/src/orchestrate/hot-paths/types.ts",
+        "before": null,
+        "after": {
+          "path": "packages/core/src/orchestrate/hot-paths/types.ts",
+          "mode": "100644",
+          "sha256": "c4fbe75fc92f0517301f38e0d07a4f9a48fbd2f761e54e561bb96cdd8dfb4eef"
+        }
+      },
+      {
+        "path": "packages/core/src/orchestrate/planner-tools.ts",
+        "before": {
+          "path": "packages/core/src/orchestrate/planner-tools.ts",
+          "mode": "100644",
+          "sha256": "5dec000457c21d8a33c0fae6caca093b7172ac39a8d2a55be6e9596e14406d83"
+        },
+        "after": {
+          "path": "packages/core/src/orchestrate/planner-tools.ts",
+          "mode": "100644",
+          "sha256": "01f39d39605e51d74b5bfea6997085ec2ac11ee1ff7ca8e63f6268a56414f85b"
+        }
+      },
+      {
+        "path": "packages/core/test/executor.test.ts",
+        "before": {
+          "path": "packages/core/test/executor.test.ts",
+          "mode": "100644",
+          "sha256": "d459612d075c408a2f1124a365120d98e60f6a4fb91a2aacb67deb0e3f5c06ba"
+        },
+        "after": {
+          "path": "packages/core/test/executor.test.ts",
+          "mode": "100644",
+          "sha256": "73efd44cd8de4ee8c8beb1b25e30d5f59f1a6f3c6dc475c743fcb90390bcff91"
+        }
+      },
+      {
+        "path": "packages/core/test/hot-path-index.test.ts",
+        "before": null,
+        "after": {
+          "path": "packages/core/test/hot-path-index.test.ts",
+          "mode": "100644",
+          "sha256": "23892f0a8b06a7658efc0eb0e09eabedda1a6b517f8f118f6c2854c2b5fe449c"
+        }
+      },
+      {
+        "path": "packages/core/test/hot-path-seeds.test.ts",
+        "before": null,
+        "after": {
+          "path": "packages/core/test/hot-path-seeds.test.ts",
+          "mode": "100644",
+          "sha256": "f0efe1ffceb1414187f1f7035dfc7d366d2951a9c15070bedb89fdad07fff75c"
+        }
+      },
+      {
+        "path": "packages/core/test/orchestrate.test.ts",
+        "before": {
+          "path": "packages/core/test/orchestrate.test.ts",
+          "mode": "100644",
+          "sha256": "45431d3ac6b46b64f97530fd4665c3390fd5212f30a69dfe41162821e50d8290"
+        },
+        "after": {
+          "path": "packages/core/test/orchestrate.test.ts",
+          "mode": "100644",
+          "sha256": "7d1831b3eef073a51797401a284de5c6cecb5c1af142626b9f2f5f60e8f571c7"
+        }
+      },
+      {
+        "path": "packages/core/test/variant.test.ts",
+        "before": {
+          "path": "packages/core/test/variant.test.ts",
+          "mode": "100644",
+          "sha256": "ca6b8b5dbbae8f91f720d8384231883ab6eb92eee69194888fd3a1f5d54538b5"
+        },
+        "after": {
+          "path": "packages/core/test/variant.test.ts",
+          "mode": "100644",
+          "sha256": "60b211e25ca94d43c164342cdb9d2c69376bad2c916cc9c72753826f51c82094"
+        }
+      },
+      {
+        "path": "packages/server/dist/aiw-server.mjs",
+        "before": {
+          "path": "packages/server/dist/aiw-server.mjs",
+          "mode": "100755",
+          "sha256": "da6ee243d143d5f182ee8f00ed471e0ea8f79648c9aafcc358016f9a7ae5bd08"
+        },
+        "after": {
+          "path": "packages/server/dist/aiw-server.mjs",
+          "mode": "100755",
+          "sha256": "fef6ac2c41454c89476187e340871db188bcfdc6821e075a2ad6e83c2cf8519e"
+        }
+      },
+      {
+        "path": "packages/runner/test/config.test.ts",
+        "before": {
+          "path": "packages/runner/test/config.test.ts",
+          "mode": "100644",
+          "sha256": "e03c55a2fa68a93d9fa7ca9b1a6837954cc3467d9f27e48c657f1e931d9d60cc"
+        },
+        "after": {
+          "path": "packages/runner/test/config.test.ts",
+          "mode": "100644",
+          "sha256": "d56ade7bc7c1431e73e8b7a5d68387d2dcfaa6a0de631fa254a023616262d0d1"
+        }
+      },
+      {
+        "path": "packages/runner/test/provenance.test.ts",
+        "before": {
+          "path": "packages/runner/test/provenance.test.ts",
+          "mode": "100644",
+          "sha256": "9bec96f2b7e346ac2f6ad333be24a523afd022f5fcd158dc9007a705a5b3cca6"
+        },
+        "after": {
+          "path": "packages/runner/test/provenance.test.ts",
+          "mode": "100644",
+          "sha256": "8276237bf62c227c2202c5584a09e139ffcf7fe49c47410734c26a647c79063c"
+        }
+      },
+      {
+        "path": "packages/core/src/orchestrate/hot-paths/fingerprint.ts",
+        "before": null,
+        "after": {
+          "path": "packages/core/src/orchestrate/hot-paths/fingerprint.ts",
+          "mode": "100644",
+          "sha256": "73a7b75298c22abe296993ef808382b9a460841c4fc92e178a3ee677af9dddef"
+        }
+      },
+      {
+        "path": "packages/core/src/orchestrate/index.ts",
+        "before": {
+          "path": "packages/core/src/orchestrate/index.ts",
+          "mode": "100644",
+          "sha256": "eca706c558d0389ad4031ec3cd86868946b289480f622dbb71198df7bd2366c1"
+        },
+        "after": {
+          "path": "packages/core/src/orchestrate/index.ts",
+          "mode": "100644",
+          "sha256": "c0ec876b1ec3988ef02d422c427070e6798ddb96e83da3b979113d7dcf775bda"
+        }
+      },
+      {
+        "path": "packages/server/src/server.ts",
+        "before": {
+          "path": "packages/server/src/server.ts",
+          "mode": "100644",
+          "sha256": "b16497f1ea2c6cbf0c966f5256fc98d54e7d658b6874251eae0df91f4742771d"
+        },
+        "after": {
+          "path": "packages/server/src/server.ts",
+          "mode": "100644",
+          "sha256": "a54d485ad57633f4086392d8b9e4480048623ea06eac1ab5eb7880fbd056d777"
+        }
+      },
+      {
+        "path": "packages/server/test/telemetry-session.test.ts",
+        "before": {
+          "path": "packages/server/test/telemetry-session.test.ts",
+          "mode": "100644",
+          "sha256": "62d409caa6164472bb00ffb5229a194ff8cc2dc360846e85ee5452d6fb801dce"
+        },
+        "after": {
+          "path": "packages/server/test/telemetry-session.test.ts",
+          "mode": "100644",
+          "sha256": "74670e4f572629080e9b98d2e0724d480a0b985b5ca67174bdac0e2a4b8d2040"
+        }
+      },
+      {
+        "path": "packages/runner/src/provenance.ts",
+        "before": {
+          "path": "packages/runner/src/provenance.ts",
+          "mode": "100644",
+          "sha256": "6093584f3a65a5e4e336e2b2f4b33906c21b97fab92a67ed4a4e5bb2c5619c4c"
+        },
+        "after": {
+          "path": "packages/runner/src/provenance.ts",
+          "mode": "100644",
+          "sha256": "73afb5f6cd5ef18012af25929b93bf2ec813d0b4015765f4516744c2b7ff5f4e"
+        }
+      }
+    ],
+    "limits": "Opt-in generic pattern ablation; no model task success, cost saving or default promotion measured"
   }
 }

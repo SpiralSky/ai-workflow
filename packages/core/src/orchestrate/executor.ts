@@ -24,12 +24,8 @@ export const DEFAULT_ESCALATION_LIMIT = 6;
 /** Appended before the last allowed turn (orchestrate §8.2). */
 export const LAST_TURN_NOTICE = "This is your last turn: report what you have.";
 
-/** A hot-path snippet to include in the prompt (orchestrate-engine §4.5); the index is built elsewhere. */
-export interface HotPathSnippet {
-  id: string;
-  description: string;
-  code: string;
-}
+export type { HotPathSnippet } from "./hot-paths/types.ts";
+import type { HotPathSnippet } from "./hot-paths/types.ts";
 
 /** Limits and rendering options of one executor run. */
 export interface ExecutorLimits {

@@ -4,7 +4,7 @@ import { execFile, execFileSync } from "node:child_process";
 import { promisify } from "node:util";
 import { readFileSync, readdirSync, lstatSync } from "node:fs";
 import { join, resolve, relative, isAbsolute, sep } from "node:path";
-import { parseFrameworkVariant, DEFAULT_TRACE_LIMITS } from "@aiw/core";
+import { hotPathCatalogFingerprint, HOT_PATH_PROMPT_KEY, parseFrameworkVariant, DEFAULT_TRACE_LIMITS } from "@aiw/core";
 import { canonicalJSON } from "@aiw/telemetry";
 import { gitProvenance } from "./config.ts";
 import type { MCPSession } from "./mcp.ts";
@@ -72,6 +72,7 @@ export function collectStaticProvenance(root: string, config: RunConfig, base: O
   const promptDir = join(root, "packages/server/dist/prompts");
   const promptHashes = Object.fromEntries(readdirSync(promptDir).filter((name) => name.endsWith(".md")).sort()
     .map((name) => [name.slice(0, -3), hashText(readFileSync(join(promptDir, name)))]));
+  promptHashes[HOT_PATH_PROMPT_KEY] = hotPathCatalogFingerprint();
   if (promptHashes.base !== base.basePrompt) throw new Error("host and bundled base prompts differ");
   const problems: Provenance["problems"] = Object.create(null);
   for (const id of config.problems) {
@@ -108,6 +109,9 @@ export function attestJob(provenance: Provenance, config: RunConfig, problem: st
   if (!IMAGE.test(image)) throw new Error("job image must be an immutable sha256 ID");
   const runtime = session.runtimeProvenance;
   if (!runtime || runtime.version !== 1 || runtime.engine !== "isolated-vm" || runtime.entryHash !== provenance.integrity.entryHash || !runtime.prompts || !Object.keys(runtime.prompts).length) throw new Error("server runtime provenance missing or unexpected engine");
+  if (parseFrameworkVariant(framework).variant.hotPaths &&
+      (runtime.prompts[HOT_PATH_PROMPT_KEY] !== hotPathCatalogFingerprint() ||
+       provenance.integrity.promptHashes[HOT_PATH_PROMPT_KEY] !== hotPathCatalogFingerprint())) throw new Error("missing or mismatched hot-path prompt fingerprint");
   if (canonicalJSON(runtime.prompts) !== canonicalJSON(provenance.integrity.promptHashes)) throw new Error("server prompt fingerprints differ from mounted bundle");
   for (const name of ["base", "branch-only", "branch-tool", "do-tool", "executor", "orchestrate", "rerank", "resolve-tool"]) {
     if (!HASH.test(runtime.prompts[name] ?? "")) throw new Error(`missing server prompt fingerprint: ${name}`);

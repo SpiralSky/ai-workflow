@@ -36,7 +36,8 @@ export function parseFrameworkVariant(raw: string): { kind: FrameworkKind; varia
     else if (key === "rerank" && kind === "orchestrate" && (value === "llm" || value === "none" || value === "classifier")) variant.rerank = value;
     else if (key === "secondary" && kind === "orchestrate") variant.secondary = positiveInt();
     else if (key === "executor" && kind === "orchestrate" && value === "branch") variant.executor = value;
-    else if (key === "hotPaths" || (key === "executor" && value === "calls")) {
+    else if (key === "hotPaths" && kind === "orchestrate" && value === undefined) variant.hotPaths = true;
+    else if (key === "executor" && value === "calls") {
       throw new Error(`Framework treatment is not implemented: ${part}`);
     } else throw new Error(`Unsupported variant for ${kind}: ${part}`);
     pairs.set(key, value === undefined ? key : `${key}=${value}`);

@@ -18,7 +18,12 @@ for (const id of [
   "orchestrate[secondary=-1]", "orchestrate[secondary=2x]", "orchestrate[secondary=1.5]",
   "orchestrate[secondary=9007199254740992]", "baseline[rerank=none]", "branch-only[secondary=2]",
   "orchestrate[toolSearch]", "branch-only[toolSearch=false]", "baseline[catalog=0]", "baseline[catalog=2junk]",
-  "orchestrate[hotPaths]", "orchestrate[executor=calls]", "orchestrate[executor=unknown]", "orchestrate[rerank=none=x]",
+  "baseline[hotPaths]", "branch-only[hotPaths]", "orchestrate[hotPaths=false]", "orchestrate[executor=calls]", "orchestrate[executor=unknown]", "orchestrate[rerank=none=x]",
 ]) {
   test(`variant rejects unsupported or malformed treatment ${id}`, () => assert.throws(() => parseFrameworkVariant(id)));
 }
+
+test("hot paths are explicit orchestrate-only ablation", () => {
+  assert.deepEqual(parseFrameworkVariant("orchestrate[hotPaths]"), { kind: "orchestrate", variant: { hotPaths: true }, id: "orchestrate[hotPaths]" });
+  assert.deepEqual(parseFrameworkVariant("orchestrate").variant, {});
+});

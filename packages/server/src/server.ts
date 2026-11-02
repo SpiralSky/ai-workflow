@@ -4,7 +4,7 @@ import { readFileSync } from "node:fs";
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { CallToolRequestSchema, ListToolsRequestSchema, type Request, type Notification } from "@modelcontextprotocol/sdk/types.js";
-import { buildFramework, buildRegistry, isolatedVMRuntime, quickJSRuntime, loadPrompt, type Host } from "@aiw/core";
+import { hotPathCatalogFingerprint, HOT_PATH_PROMPT_KEY, buildFramework, buildRegistry, isolatedVMRuntime, quickJSRuntime, loadPrompt, type Host } from "@aiw/core";
 import { canonicalJSON, createReporter, NoopSink, FileSink, fromMeta } from "@aiw/telemetry";
 import { createChatClient } from "@aiw/llm";
 import { createHostLLMClient } from "./host-client.ts";
@@ -106,6 +106,7 @@ export async function startServer(opts: ServerOptions): Promise<void> {
   const digest = (value: string | Buffer) => createHash("sha256").update(value).digest("hex");
   const prompts = Object.fromEntries(["base", "branch-only", "branch-tool", "do-tool", "executor", "orchestrate", "rerank", "resolve-tool"]
     .map((name) => [name, digest(loadPrompt(name))]));
+  prompts[HOT_PATH_PROMPT_KEY] = hotPathCatalogFingerprint();
   const entryHash = process.argv[1] ? digest(readFileSync(process.argv[1])) : null;
 
   // 4. Advertise framework tools via tools/list.
