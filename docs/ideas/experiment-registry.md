@@ -24,11 +24,13 @@ unknowns. Native artifact tests are not a live orchestrate or fixed60 model camp
 |---|---|---|---|---|
 | classifier-filtering | Replace generic LLM reranking with dedicated classifier filtering | Optional implementation included in historical base `67b42ae`; Jev/Microsoft/Perplexity arms are one family | Deferred effectiveness evaluation; not rejected | Matched real classifier/control outcomes, recall/recovery/task success and accounting; native substitutes cannot establish named-model quality |
 | selector-reuse | Reuse an eligible unchanged selection decision | `dot/selector-reuse-20261102`, library only; Task does not supply reuseScope | Active prototype, not an exercised runner treatment | Exact eligible repeat opportunities and invalidation/rejection reasons; conservative wiring; real task completion |
-| hotpaths | Bounded retrieval of reusable recovery-code examples | `dot/hotpath-prototype-20261102`, opt-in `orchestrate[hotPaths]` | Active candidate | Matched off/on tests; snippet use/misuse, recovery completeness, tool/context overhead and task success |
-| static-context | Reduce repeated static context | Historical audit suggestion only | Deferred concept; no branch or measured benefit | Trace evidence of avoidable duplication; distinguish exact provider caching from smaller prompts |
+| hotpaths | Bounded retrieval of reusable recovery-code examples | `dot/hotpath-prototype-20261102`, opt-in `orchestrate[hotPaths]` | Inactive reference: current two-snippet policy not promoted after bounded native pilot; family refinement remains possible | See native-hotpath-pilot-v2: both arms 2/2 tasks and97/97 checks, snippet payload proxy higher in all9 scenarios; no full-orchestrate conclusion |
+| static-context/type-interning | Intern exact duplicate declaration types without dropping information | `dot/declaration-type-interning-20261102`, opt-in initial declaration renderer | New independent candidate, focused tests/survey pass; aggregate and native quality evaluation pending | Exact expansion/default preservation; complete task success; declaration bytes are not tokens or dollars |
 
-No candidate currently has measured comparative full-task success or monetary savings supporting
-an effectiveness ranking. No idea is archived for poor results without comparable results.
+No candidate has measured full-project task success or monetary savings supporting a global
+effectiveness ranking. The current hotpath policy is parked only on the bounded presentation pilot
+recorded in [the curated results](../dot-progress/native-hotpath-pilot-v2.md); its branch is retained.
+Unmeasured hypotheses are not classified as experimentally disproven.
 `rerank=none` is an existing control, not a new algorithm. BM25 index caching, findTools expansion,
 branch-only lazy toolSearch, reference passing and replaceSymbol already exist; do not relabel
 these as new ideas. Diagnostic instrumentation may enable a new experiment, but is not itself
