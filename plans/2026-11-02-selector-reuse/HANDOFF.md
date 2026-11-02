@@ -43,3 +43,12 @@ tests, both typechecks, zero incomplete outcomes. Exact parent identities, confl
 review fingerprint and evidence are in
 `docs/dot-progress/selector-reuse-shared-integration.md`. This supersedes earlier pending-test
 notes only; plan remains draft, runtime wiring remains absent, no efficacy/default promotion.
+
+## Corrected native-comparison shared gates
+
+Shared central `972fb81e419b948f0ff5ae9ff128132ae64c7d89` is independently composed into this
+candidate, without hotpath runtime source or changed reuse wiring. Focused58 and full805 Node
++24 Python tests pass with all three typechecks and zero incomplete outcomes. Runtime source,
+bundle, allowances, inventories and specs remain exact prior candidate bytes. Review and evidence:
+`docs/dot-progress/selector-reuse-native-harness-integration.md`. Plan stays draft; publication and
+separate native experiment interpretation remain parent-owned. Frozen hotpath HEAD was untouched.

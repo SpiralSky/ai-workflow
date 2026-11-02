@@ -114,19 +114,21 @@ for (const concurrency of [undefined, '1', '3']) {
     }});
     const flag = concurrency === undefined ? [] : [`--test-concurrency=${concurrency}`];
     const prefix = ['--import', 'tsx', '--test', '--test-reporter=tap', ...flag];
-    assert.equal(calls.length, 8);
-    assert.deepEqual(calls.map(([command]) => command), [process.execPath, path.join(root,'venv/bin/python'), path.join(root,'venv/bin/python'), ...Array(5).fill(process.execPath)]);
+    assert.equal(calls.length, 10);
+    assert.deepEqual(calls.map(([command]) => command), [process.execPath, path.join(root,'venv/bin/python'), path.join(root,'venv/bin/python'), ...Array(7).fill(process.execPath)]);
     assert.deepEqual(calls.map(([, args]) => args), [
       [...prefix, 'scripts/a.test.mjs', 'scripts/z.test.mjs'],
       ['scripts/evaluation/check_classifier_design.py', '--self-test'],
       ['-O', 'scripts/evaluation/check_classifier_design.py', '--self-test'],
       [...prefix, 'scripts/dot-native/method.test.ts'],
       nativeTypeArgs(root),
+      [...prefix, 'scripts/native-comparison/method.test.ts'],
+      nativeTypeArgs(root).map(arg => arg.replace('scripts/dot-native/', 'scripts/native-comparison/')),
       [...prefix, 'test/a.test.ts', 'test/native-relocated.test.ts'],
       [...prefix, 'test/l-test.test.ts'],
       [path.join(root, 'node_modules/typescript/bin/tsc'), '-p', 'tsconfig.json'],
     ]);
-    assert.deepEqual(calls.map(([, , options]) => options.cwd), [root, root, root, root, root, path.join(root, 'packages/core'), path.join(root, 'packages/tools'), root]);
+    assert.deepEqual(calls.map(([, , options]) => options.cwd), [root, root, root, root, root, root, root, path.join(root, 'packages/core'), path.join(root, 'packages/tools'), root]);
     for (const [, , options] of calls) {
       assert.equal(options.env.AIW_VENV, path.join(root, 'venv'));
       assert.equal(options.env.NODE_OPTIONS, undefined);
@@ -164,9 +166,9 @@ test('serial main still rejects typecheck failure after all test children', (t) 
   let calls = 0;
   assert.throws(() => runQuietly(t, root, {env:{AIW_VENV:'venv', AIW_TEST_CONCURRENCY:'1'}, spawn:(_command, args) => {
     calls++;
-    return calls === 8 ? {status:2} : successfulChild(args);
+    return calls === 10 ? {status:2} : successfulChild(args);
   }}), /typecheck failed/);
-  assert.equal(calls, 8);
+  assert.equal(calls, 10);
 });
 
 for (const [failedCall, label, result, expected] of [
@@ -178,6 +180,11 @@ for (const [failedCall, label, result, expected] of [
   [4, 'native contract failure', {status:1,stdout:''}, /dot-native local contract failed/],
   [5, 'native typecheck failure', {status:1}, /dot-native typecheck failed/],
   [5, 'native typecheck spawn error', {error:new Error('typescript unavailable')}, /typescript unavailable/],
+  [6, 'comparison contract skips', {status:0,stdout:tap({skipped:1})}, /skipped/],
+  [6, 'comparison contract empty coverage', {status:0,stdout:tap({tests:0,pass:0})}, /empty/],
+  [6, 'comparison contract failure', {status:1,stdout:''}, /native-comparison local contract failed/],
+  [7, 'comparison typecheck failure', {status:1}, /native-comparison typecheck failed/],
+  [7, 'comparison typecheck spawn error', {error:new Error('comparison types unavailable')}, /comparison types unavailable/],
 ]) {
   test(`shared gates stop later tests and checks on ${label}`, t => {
     const root = fakeWorkspace();
