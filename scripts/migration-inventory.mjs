@@ -113,6 +113,15 @@ export function applyDevelopmentAllowances(root, inventory, replacements, allowa
     assert.ok(frontmatter,`Missing development plan frontmatter: ${file}`);
     assert.match(frontmatter[1],/^status: draft\r?$/m,`Development plan must remain draft: ${file}`);
   }
+  if (allowances.selector_reuse_followup) {
+    // Additive experimental-plan boundary; the historical draft_plans allowlist stays exact.
+    const file = allowances.selector_reuse_followup.draft_plan;
+    assert.equal(file,'plans/2026-11-02-selector-reuse/PLAN.md');
+    const text = fs.readFileSync(path.join(root,file),'utf8');
+    const frontmatter = /^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/.exec(text);
+    assert.ok(frontmatter,'Missing selector reuse plan frontmatter');
+    assert.match(frontmatter[1],/^status: draft\r?$/m,'Selector reuse plan must remain draft');
+  }
   if (allowances.hygiene_metadata) {
     assert.deepEqual(allowances.hygiene_metadata.files.map(e=>e.path).sort(), [".gitignore","docs/dot-progress/ignore-hygiene.md","docs/dot-progress/runtime-hygiene-followup.md","scripts/check-gitignore.sh","scripts/check-runtime-gitignore.sh"]);
     verifyWorkingInventory(root, allowances.hygiene_metadata);

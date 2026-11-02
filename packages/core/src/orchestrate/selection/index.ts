@@ -1,3 +1,5 @@
+import { accountedReranks, accountedSelections, rerankerIdentities, selectorIdentities } from "./reuse-proof.ts";
+import type { SelectionReuseScope } from "./task-reuse.ts";
 import type { Reporter } from "@aiw/telemetry";
 import type { ToolDecl } from "../../registry/types.ts";
 import { complete } from "./complete.ts";
@@ -8,6 +10,7 @@ export * from "./retrieve.ts";
 export * from "./rerank.ts";
 export * from "./classifier.ts";
 export * from "./complete.ts";
+export * from "./task-reuse.ts";
 
 /** Default shortlist size after rerank (orchestrate §7.2). */
 export const DEFAULT_N = 6;
@@ -36,6 +39,8 @@ export interface Selection {
 /** Selection query (engine §4). */
 export interface SelectQuery {
   instruction: string;
+  /** Experimental: explicit task ownership; absent means no reuse. */
+  reuseScope?: SelectionReuseScope;
   /** Planner `tools`: skips retrieve and rerank, still completed. */
   override?: string[];
   /** Tool names to leave out (escalation: tools already present). */
@@ -64,9 +69,10 @@ export interface Selector {
  * @returns the selector
  */
 export function createSelector(opts: { reranker: Reranker; k?: number; n?: number }): Selector {
+  opts = { ...opts };
   const k = opts.k ?? DEFAULT_K;
   const n = opts.n ?? DEFAULT_N;
-  return {
+  const selector: Selector = {
     async select(q, catalog) {
       q.signal?.throwIfAborted();
       const exclude = new Set(q.exclude ?? []);
@@ -88,7 +94,16 @@ export function createSelector(opts: { reranker: Reranker; k?: number; n?: numbe
       };
       if (ctx.fallback) stages.rerankFallback = true;
       if (ctx.fallbackReason) stages.rerankFallbackReason = ctx.fallbackReason;
-      return { tools, stages };
+      const selection = { tools, stages };
+      const proof = accountedReranks.get(ctx);
+      if (proof && !ctx.fallback) accountedSelections.set(selection, JSON.stringify({
+        rerank: proof, k, n, retrieval: "bm25-v1", completion: "requires-v1",
+      }));
+      return selection;
     },
   };
+  const identity = rerankerIdentities.get(opts.reranker);
+  if (identity) selectorIdentities.set(selector, JSON.stringify({ reranker: identity, k, n,
+    retrieval: "bm25-v1", completion: "requires-v1" }));
+  return selector;
 }

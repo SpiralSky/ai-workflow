@@ -1,4 +1,5 @@
 import { TYPESAFE_MODEL, TYPESAFE_PRICE_BASIS, LLMError, type DecisionsClient } from "@aiw/llm";
+import { accountedReranks, rerankerIdentities } from "./reuse-proof.ts";
 import type { Reranker } from "./rerank.ts";
 
 /** Explicit experimental threshold policy; probabilities are not calibrated across models. */
@@ -10,13 +11,15 @@ export function validateClassifierPolicy(threshold: number, policy: string): voi
 
 /** Typed relevance probabilities, with no paid fallback. Unknown/uncertain answers keep retrieval order. */
 export function classifierReranker(client: DecisionsClient, opts: { model: string; threshold: number; policy: "noul-v1" }): Reranker {
+  opts = { ...opts };
   validateClassifierPolicy(opts.threshold, opts.policy);
-  return { async rerank(instruction, candidates, ctx = {}) {
+  const classify = client.classify.bind(client);
+  const reranker: Reranker = { async rerank(instruction, candidates, ctx = {}) {
     if (ctx.signal?.aborted) throw new DOMException("Classifier selection cancelled", "AbortError");
     if (!candidates.length) return [];
     if (!ctx.reporter) throw new Error("classifier rerank requires selection telemetry");
     const start = performance.now();
-    const result = await client.classify({ instruction, candidates: candidates.map((d, i) => ({
+    const result = await classify({ instruction, candidates: candidates.map((d, i) => ({
       id: `c${i}`, name: d.name, whenToUse: d.meta.whenToUse, ...(d.meta.whenNotToUse ? { whenNotToUse: d.meta.whenNotToUse } : {}),
     })), signal: ctx.signal });
     // Record a billed malformed answer too. Missing usage remains absent, never fabricated zero.
@@ -55,6 +58,18 @@ export function classifierReranker(client: DecisionsClient, opts: { model: strin
     if (!positive.length) return fallback("no-confident-positive");
     ctx.reporter.attach("classifierSelection", { policy: opts.policy, threshold: opts.threshold, fallback: false,
       scores: scored.map(a => ({ name: candidates[a.index].name, probability: a.probability })) });
+    // Only this trusted boundary can establish completed, nonfallback accounting evidence.
+    // Invalid numeric accounting is retained in telemetry but never admitted for reuse.
+    const finiteNonnegative = (n: unknown) => typeof n === "number" && Number.isFinite(n) && n >= 0;
+    if (!ctx.signal?.aborted && result.provider &&
+        Object.values(result.usage).every(finiteNonnegative) &&
+        finiteNonnegative(result.usage.input) && finiteNonnegative(result.usage.output) &&
+        (finiteNonnegative(result.costUsd) || directEstimateValid)) {
+      accountedReranks.set(ctx, JSON.stringify({ kind: "classifier", provider: result.provider,
+        model: opts.model, observedModel: result.providerModel, threshold: opts.threshold, policy: opts.policy }));
+    }
     return positive.map(a => candidates[a.index]);
   } };
+  rerankerIdentities.set(reranker, JSON.stringify({ kind: "classifier", ...opts }));
+  return reranker;
 }

@@ -38617,6 +38617,12 @@ function bindTools(registry2, host2, opts) {
   return wrapTools(map2, opts.reporter);
 }
 
+// packages/core/src/orchestrate/selection/reuse-proof.ts
+var accountedReranks = /* @__PURE__ */ new WeakMap();
+var accountedSelections = /* @__PURE__ */ new WeakMap();
+var rerankerIdentities = /* @__PURE__ */ new WeakMap();
+var selectorIdentities = /* @__PURE__ */ new WeakMap();
+
 // packages/core/src/orchestrate/selection/classifier.ts
 function validateClassifierPolicy(threshold, policy) {
   if (policy !== "noul-v1" || !Number.isFinite(threshold) || threshold <= 0.5 || threshold > 1) {
@@ -38624,13 +38630,15 @@ function validateClassifierPolicy(threshold, policy) {
   }
 }
 function classifierReranker(client, opts) {
+  opts = { ...opts };
   validateClassifierPolicy(opts.threshold, opts.policy);
-  return { async rerank(instruction, candidates, ctx = {}) {
+  const classify2 = client.classify.bind(client);
+  const reranker = { async rerank(instruction, candidates, ctx = {}) {
     if (ctx.signal?.aborted) throw new DOMException("Classifier selection cancelled", "AbortError");
     if (!candidates.length) return [];
     if (!ctx.reporter) throw new Error("classifier rerank requires selection telemetry");
     const start = performance.now();
-    const result = await client.classify({ instruction, candidates: candidates.map((d2, i) => ({
+    const result = await classify2({ instruction, candidates: candidates.map((d2, i) => ({
       id: `c${i}`,
       name: d2.name,
       whenToUse: d2.meta.whenToUse,
@@ -38690,8 +38698,21 @@ function classifierReranker(client, opts) {
       fallback: false,
       scores: scored.map((a) => ({ name: candidates[a.index].name, probability: a.probability }))
     });
+    const finiteNonnegative = (n) => typeof n === "number" && Number.isFinite(n) && n >= 0;
+    if (!ctx.signal?.aborted && result.provider && Object.values(result.usage).every(finiteNonnegative) && finiteNonnegative(result.usage.input) && finiteNonnegative(result.usage.output) && (finiteNonnegative(result.costUsd) || directEstimateValid)) {
+      accountedReranks.set(ctx, JSON.stringify({
+        kind: "classifier",
+        provider: result.provider,
+        model: opts.model,
+        observedModel: result.providerModel,
+        threshold: opts.threshold,
+        policy: opts.policy
+      }));
+    }
     return positive.map((a) => candidates[a.index]);
   } };
+  rerankerIdentities.set(reranker, JSON.stringify({ kind: "classifier", ...opts }));
+  return reranker;
 }
 
 // packages/core/src/orchestrate/executor.ts
@@ -39766,9 +39787,10 @@ ${list}` }]
 // packages/core/src/orchestrate/selection/index.ts
 var DEFAULT_N = 6;
 function createSelector(opts) {
+  opts = { ...opts };
   const k = opts.k ?? DEFAULT_K;
   const n = opts.n ?? DEFAULT_N;
-  return {
+  const selector = {
     async select(q, catalog2) {
       q.signal?.throwIfAborted();
       const exclude = new Set(q.exclude ?? []);
@@ -39790,9 +39812,27 @@ function createSelector(opts) {
       };
       if (ctx.fallback) stages.rerankFallback = true;
       if (ctx.fallbackReason) stages.rerankFallbackReason = ctx.fallbackReason;
-      return { tools, stages };
+      const selection = { tools, stages };
+      const proof = accountedReranks.get(ctx);
+      if (proof && !ctx.fallback) accountedSelections.set(selection, JSON.stringify({
+        rerank: proof,
+        k,
+        n,
+        retrieval: "bm25-v1",
+        completion: "requires-v1"
+      }));
+      return selection;
     }
   };
+  const identity = rerankerIdentities.get(opts.reranker);
+  if (identity) selectorIdentities.set(selector, JSON.stringify({
+    reranker: identity,
+    k,
+    n,
+    retrieval: "bm25-v1",
+    completion: "requires-v1"
+  }));
+  return selector;
 }
 
 // packages/core/src/orchestrate/task.ts
