@@ -1,6 +1,6 @@
 # AI Workflow status
 
-Updated: 2026-11-03 14:11 UTC. This is the single current status file; dated notes are historical evidence, not a live queue. Update this file at each milestone or blocker.
+Updated: 2026-11-03 14:12 UTC. This is the single current status file; dated notes are historical evidence, not a live queue. Update this file at each milestone or blocker.
 
 ## Running and since when
 
@@ -13,7 +13,7 @@ Updated: 2026-11-03 14:11 UTC. This is the single current status file; dated not
 - **Before any new actor run:** recover or rebuild the shell-safety/data-only persistence fix, test hostile characters, and externally checkpoint it. The missing `620a421` is not a verified fix. This is the immediate run blocker.
 - **Native comparisons are screening only.** The user accepts procedural subagent isolation for free usage. Never present screening as proof that an idea beats baseline; keep a list of qualifying ideas for later isolated confirmation. **Do not build that runner now.**
 - **Reduce accidental leakage:** keep graders/reference answers out of worker environments during runs; grade afterward outside their reach. Use unique canaries in grader files and run outputs, flag unexpected canary exposure as contaminated, and audit tool logs for outside-workspace reads. These controls are requirements, **not yet verified implemented here**. No actual canary or private content belongs in this public file.
-- **Three-hour reflection:** omit token-wastage assessment because native usage is unmeasured; retain other reflection/checkpoint duties. Do not invent native token or money totals.
+- **Three-hour reflection:** assess observed waste: rework, retries, uninformative dead ends, machinery time versus useful outcomes, blocked time, unusable runs and other observable signals. Use rough wall-clock/run counts and name the largest observed source; do not invent native token or money totals. The coordinator reports the scheduled reflection prompt updated accordingly.
 
 ## User priority order and gates
 
