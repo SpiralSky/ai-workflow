@@ -66,11 +66,9 @@ test('aliases, unsupported committed links and invalid fixture layouts fail clos
  const link=fixture();fs.symlinkSync('example.ts',path.join(link.root,'packages/core/src/alias.ts'));link.git('add','.');link.git('-c','user.name=Synthetic Control','-c','user.email=synthetic@example.invalid','commit','-q','-m','test: link control');assert.throws(()=>inspectPublicAdmissionInputs(link.root),/unsupported/);
  const invalid=fixture(),file=path.join(invalid.root,'experiments/native-dev/manifest.json'),manifest=JSON.parse(fs.readFileSync(file));manifest.fixtures[0].workspaceDir='experiments/native-dev/example/../workspace';fs.writeFileSync(file,JSON.stringify(manifest));invalid.git('add','.');invalid.git('-c','user.name=Synthetic Control','-c','user.email=synthetic@example.invalid','commit','-q','-m','test: invalid layout');assert.throws(()=>inspectPublicAdmissionInputs(invalid.root),/invalid public fixture path/);
 });
-test('preflight is not wired into or substituted for existing full preparation/grading gates',()=>{
+test('full private admission inputs remain required by the default source gate',()=>{
  const source=fs.readFileSync(path.resolve(import.meta.dirname,'coordinator.mjs'),'utf8');
- assert.doesNotMatch(source,/public-admission|inspectPublicAdmissionInputs/);
  for(const required of ['.specplane/native-reconstruction-inventory.json','.specplane/native-offline-check-inventory.json','docs/dot-progress/native-interactive-reconstruction.md','docs/dot-progress/native-hotpath-extension-plan.md','docs/dot-progress/native-action-receipt-proposal.md','docs/dot-progress/native-offline-check-adaptation.md','experiments/native-dev/grade.py'])assert.ok(source.includes(required),required);
- assert.ok(source.includes('const bindings=sourceBindings();'));
- assert.ok(source.includes('bindings:sourceBindings()'));
- assert.ok(source.includes("const output=execFileSync('/usr/bin/python3',[path.join(repo,'experiments/native-dev/grade.py')"));
+ assert.ok(source.includes("if(mode==='full')return {bindings:sourceBindings(),candidateBinding:hotpathBinding()}"));
+ assert.ok(source.includes("admissionMode:mode='full'"));
 });

@@ -125,7 +125,7 @@ for (const concurrency of [undefined, '1', '3']) {
       nativeTypeArgs(root),
       [...prefix, 'scripts/native-comparison/method.test.ts'],
       nativeTypeArgs(root).map(arg => arg.replace('scripts/dot-native/', 'scripts/native-comparison/')),
-      [...prefix,...['protocol','files','controller','handoff','bootstrap','actor-data','public-admission','action-receipts','action-receipt-files','coordinator','check-runtime','cli'].map(n=>`scripts/native-interactive/${n}.test.mjs`),'scripts/native-interactive/session.test.ts','scripts/native-interactive/hotpath.test.ts'],
+      [...prefix,...['protocol','files','controller','handoff','bootstrap','actor-data','public-admission','cooperative-screening','screening-audit','action-receipts','action-receipt-files','coordinator','check-runtime','cli'].map(n=>`scripts/native-interactive/${n}.test.mjs`),'scripts/native-interactive/session.test.ts','scripts/native-interactive/hotpath.test.ts'],
       [...nativeTypeArgs(root).slice(0,-3),'scripts/native-interactive/session.ts','scripts/native-interactive/worker.ts','scripts/native-interactive/session.test.ts','scripts/native-interactive/hotpath.ts','scripts/native-interactive/hotpath.test.ts'],
       [path.join(root,'node_modules/typescript/bin/tsc'),'--ignoreConfig','--noEmit','--module','nodenext','--target','es2022','--strict','--types','node',...['readiness','controller','cli','check-runtime','handoff','bootstrap','handoff-files','action-receipts','action-receipt-files'].map(n=>`scripts/native-interactive/${n}.d.mts`)],
       ['scripts/native-fixture-controls.py'],

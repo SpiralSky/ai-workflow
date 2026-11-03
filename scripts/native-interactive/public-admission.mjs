@@ -64,8 +64,8 @@ export function inspectPublicAdmissionInputs(root=path.resolve(import.meta.dirna
  for(const fixture of fixtures)for(const [rel,entry]of Object.entries(fixture.workspace))if(sources[fixture.workspaceDir+'/'+rel].sha256!==entry.sha256)throw Error('public fixture changed during observation');
  if(git('rev-parse','HEAD').trim()!==commit)throw Error('public source changed during observation');
  return {version:'public-admission-inputs-v1',status:'public-inputs-verified',commit,tree,sourceIdentitySHA256:digest(sources),sourceFiles:Object.keys(sources).length,sourceBytes:total,fixtures,sources,
-  readyForActors:false,readyForGrading:false,fullAdmissionGate:'unchanged; required before any campaign',privateMaterialPresence:'not assessed',nativeToolLogCoverage:'not assessed',installedRuntimeClosure:'not assessed',untrackedRuntimeFiles:'not assessed',overallCheckoutCleanliness:'not assessed',
-  limitations:['Read-only preparation evidence, not campaign admission or task success','Private gate inputs and hotpath runtime are not read or validated','Same-account native comparisons are screening only','Full grading still requires a permitted boundary outside candidate reach']};
+  readyForActors:false,readyForGrading:false,fullAdmissionGate:'unchanged default; explicit cooperative screening uses separate procedural controls',privateMaterialPresence:'not assessed',nativeToolLogCoverage:'not assessed',installedRuntimeClosure:'not assessed',untrackedRuntimeFiles:'not assessed',overallCheckoutCleanliness:'not assessed',
+  limitations:['Read-only preparation evidence, not campaign admission or task success','Private gate inputs and hotpath runtime are not read or validated','Same-account native comparisons are screening only','Cooperative screening requires explicit authorization and separate controls; this helper grants neither']};
 }
 
 if(process.argv[1]&&pathToFileURL(path.resolve(process.argv[1])).href===import.meta.url){

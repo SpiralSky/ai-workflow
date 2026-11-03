@@ -134,7 +134,7 @@ export function main(root = path.resolve(path.dirname(fileURLToPath(import.meta.
     'scripts/native-comparison/method.ts', 'scripts/native-comparison/cli.ts', 'scripts/native-comparison/method.test.ts'], {cwd:root,env,stdio:'inherit'});
   if (comparisonTypes.error) throw comparisonTypes.error;
   if (comparisonTypes.status !== 0) throw new Error(`native-comparison typecheck failed (exit ${comparisonTypes.status})`);
-  runTests(['protocol','files','controller','handoff','bootstrap','actor-data','public-admission','action-receipts','action-receipt-files','coordinator','check-runtime','cli'].map(n=>`scripts/native-interactive/${n}.test.mjs`).concat(['scripts/native-interactive/session.test.ts','scripts/native-interactive/hotpath.test.ts']),root,'native-interactive local contract');
+  runTests(['protocol','files','controller','handoff','bootstrap','actor-data','public-admission','cooperative-screening','screening-audit','action-receipts','action-receipt-files','coordinator','check-runtime','cli'].map(n=>`scripts/native-interactive/${n}.test.mjs`).concat(['scripts/native-interactive/session.test.ts','scripts/native-interactive/hotpath.test.ts']),root,'native-interactive local contract');
   const interactiveTypes=spawn(process.execPath,[path.join(root,'node_modules/typescript/bin/tsc'),
     '--ignoreConfig','--noEmit','--module','nodenext','--target','es2022','--strict',
     '--allowImportingTsExtensions','--skipLibCheck','--types','node',
