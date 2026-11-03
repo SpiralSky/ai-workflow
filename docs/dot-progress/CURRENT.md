@@ -1,12 +1,21 @@
 # AI Workflow status
 
-Updated: 2026-11-03 16:59 UTC. This is the single current status file; dated notes and Git history retain earlier milestones.
+Updated: 2026-11-03 17:06 UTC. This is the single current status file; dated notes and Git history retain earlier milestones.
 
 ## Running and since when
 
 **No-model actual-orchestrate flag-off/on wiring is independently verified; private checkpoint preparation is active**, as of 16:58 UTC. Existing candidate: [commit `8dcf05ba`](https://github.com/SpiralSky/ai-workflow/commit/8dcf05bad0c0f7c806db3d7350060435018773f8), with a planned feature-flag off/on contrast on that same commit. **Actors remain held:** expanded metadata-only inspection found the same set of **18 unrelated public benchmark hidden-test/reference paths in five older checkouts, including their histories**, in addition to the candidate finding. No contents were read or deleted. A sanitized no-history candidate export now passes **120/120 core tests and four no-model arms**. Repository cleanup is held: the shared Git store backs **25 worktrees and 31 local branch tips** without verified external recovery for the full set, and ignored runtimes are not verified reproducible. **Do not delete or rewrite repositories.** The native completion-bridge design is technically reviewed/frozen but **not implemented or validated**; its private external checkpoint is underway. Real actors remain held under the reference-exclusion requirement. No actors/model runs are underway; two completed direct controls are **not evaluations of the actual orchestrate implementation**.
 
 Reviews and private evidence have been recorded. The final **644-file private bundle was independently verified before cleanup**. Completion of sensitive/candidate-file cleanup is not asserted here; verify scoped absence before any future solve. Three-hour checkpointing remains enabled.
+
+## Three-hour reflection: approximately 14:05–17:05 UTC
+
+- **Main outcome:** completed and graded two same-fixture direct-harness controls, both passing local fixture gates, with observed wall times of 365.29s and 301.17s. The actual orchestrate comparison has not run; no optimization benefit is established.
+- **Largest clearly observed unusable run:** the first actor hit its 15-minute deadline because of submit/EOF handling. Its result was lost as a usable baseline; the failure and subsequent repair/validation are retained separately. Do not count the repaired controls as recovering that failed observation.
+- **Other retained waste:** one pre-grade mode mismatch stopped before candidate execution; ten expanded checks failed on unavailable inputs. Neither became a hidden success or model-task verdict. The selected public rerun did not erase the red expanded run.
+- **Machinery versus outcome:** substantial activity went to recovery, safety, transport, validation, staging and checkpoints; the delivered empirical result is still one direct-control fixture pair, not an idea comparison. Reliable elapsed totals or percentages for setup, repair, validation, blocked time and useful solving are **unknown**. Native tokens and costs remain unknown.
+- **Current work/gate:** actual orchestrate no-model wiring passed independent checks; the native bridge is not validated for real operation. Actors remain held by legacy-reference/history scope. Continue narrow no-model bridge work and preserve the 25-worktree/31-tip store; do not delete/rewrite it.
+- **External checkpoints:** public code/report/status checkpoints are verified and linked below; the final 644-file private evidence bundle is independently verified. Private no-model/bridge-design checkpoint completion is **not yet verified in this record**. Scheduled work is not proof of a completed backup.
 
 ## Completed screening result
 
