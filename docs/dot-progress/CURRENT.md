@@ -1,25 +1,25 @@
 # AI Workflow status
 
-Updated: 2026-11-03 14:47 UTC. This is the single current status file; dated notes and Git history retain earlier milestones.
+Updated: 2026-11-03 15:00 UTC. This is the single current status file; dated notes and Git history retain earlier milestones.
 
 ## Running and since when
 
-**STOPPED since 2026-11-03 14:46 UTC, awaiting the user's decision.** Independent authorized preparation is exhausted for now. No actor, baseline, or candidate comparison is running. No new faithful baseline, native token measurement, or cost comparison has been established.
+**RESUMED by 2026-11-03 14:59 UTC:** the user chose cooperative screening with explicit grading-reach and read-audit limits. The baseline path is active again. An exact actor start time or new completed run has not yet been reported to this ledger; no new baseline result, native token measurement or cost comparison is claimed.
 
-Shell-safety recovery ran from approximately 14:12 UTC through external verification at 14:28 UTC. Public preparation then completed its tests, independent review and external checkpoint by 14:46 UTC. The three-hour checkpoint schedule is paused while work is stopped; it is not continuing the project autonomously.
+Shell-safety recovery ran from approximately 14:12 UTC through external verification at 14:28 UTC. Public preparation then completed its tests, independent review and external checkpoint by 14:46 UTC. The temporary stop began at 14:46 UTC and ended after the user's decision. The three-hour checkpoint schedule is re-enabled; a scheduled checkpoint is not proof it has executed.
 
-## Decision needed and remaining blockers
+## Accepted screening limits and remaining gates
 
-- **Outside-reach grading cannot currently be enforced.** Candidate Python executes under the same OS user beside grader resources. Keeping graders out of the solve filesystem does not prevent access during grading; Space access is also shared. No suitable preexisting separate grading boundary has been found.
-- **Awaiting the user's choice:** wait for an existing separate grading boundary, or explicitly permit cooperative grading with the reach limitation disclosed. No reply or permission is inferred. Do not build a new isolated runner.
-- **Tool-log audit remains incomplete.** Available logs do not establish a complete audit of outside-workspace reads. Synthetic canary/audit checks do not prove absence of contamination in a real run.
+- **Cooperative grading accepted for screening:** keep the grader absent during solving. Submitted code may reach grader resources during grading because it runs under the same OS user; the user accepts this stated limitation. Space access is shared, so no isolation guarantee is claimed. Grade only after solving and label results accordingly.
+- **Decision resolved:** cooperative screening is permitted; there is no pending decision about waiting for an isolated grading boundary. Do not build a new isolated runner or present limited screening as proof of superiority.
+- **Read-audit remains incomplete and must be disclosed.** Available logs do not establish a complete audit of outside-workspace reads. Synthetic canary/audit checks do not prove absence of contamination. Unexpected canary exposure must still mark the affected run contaminated; missing audit evidence is not a clean result.
 - **Original admission/grading gates remain unchanged.** The full admission path still expects private grading assets and a separate hotpath checkout. The new public-only preflight verifies selected public inputs; it neither replaces those gates nor grants actor admission.
 
 ## User decisions and priority order
 
 Native subagent comparisons are **screening only**, never proof that an idea beats baseline. Candidates qualifying from screening may be listed for later isolated confirmation; do not build that runner now.
 
-Leakage requirements remain: keep graders/reference answers out of worker environments while solving; grade afterward outside their reach unless the user explicitly changes this requirement; use unique canaries, mark unexpected exposure contaminated, and audit outside-workspace reads. No real canary or private grader content belongs in this public status file.
+Leakage requirements for the accepted cooperative mode: keep graders/reference answers absent during solving, grade afterward with submitted-code reach explicitly disclosed, use unique canaries, mark unexpected exposure contaminated, and inspect available tool logs while stating the incomplete read-audit. No real canary or private grader content belongs in this public status file.
 
 1. **Anti-cheating list:** delivered directly in chat, with prevention and unenforceable limits. Disclosure does not itself satisfy technical gates.
 2. **Baseline noise:** at least two baseline runs on the same task from the same commit, reporting differences. **Not measured.** Two runs alone are not a reliable variance estimate.
@@ -27,7 +27,7 @@ Leakage requirements remain: keep graders/reference answers out of worker enviro
 4. **One real run:** report elapsed time. **Not measured on the current frozen setup.** Native token usage is unavailable and must remain unknown; mock checks and CI duration do not substitute.
 5. **Small fixed comparison only afterward:** freeze tasks, source/configuration and comparison rules. **Not started.** The older 60-cell/300-potential-cell design is not the next dispatch plan.
 
-When checkpoint reflection resumes, assess observable waste: rework, retries, dead ends, machinery time versus useful outcomes, blocked time and unusable runs. Use rough wall-clock/run counts and the largest observed source, never invented native token or money totals.
+At three-hour checkpoint reflection, assess observable waste: rework, retries, dead ends, machinery time versus useful outcomes, blocked time and unusable runs. Use rough wall-clock/run counts and the largest observed source, never invented native token or money totals.
 
 ## Done, with evidence
 
@@ -42,7 +42,7 @@ Implementation test/review results below were reported by the coordinator; this 
 
 ## Independent work instead
 
-**STOPPED.** Safe independent preparation is complete. Preserve all checkpoints and failed-attempt evidence while awaiting the grading decision. Do not launch actors, weaken admission/grading, retry canceled actions, bypass denials, build a new isolated runner, or treat the paused schedule as permission to resume. User notification and the decision request are handled in the main conversation.
+**ACTIVE: limited cooperative baseline screening.** Continue the baseline path and safe, documented workarounds overnight within existing permissions, avoiding unnecessary blocking decisions. Preserve exact source/configuration, attempts, timing, grader absence during solving, disclosed grading reach, available audit evidence and contamination flags. Do not silently relax other admission/grading requirements, retry canceled actions, bypass denials, build an isolated runner, or treat this as new permission for paid/API work. When a step blocks, preserve it and continue independent authorized work; ask when policy requires authorization. No superiority claim can follow from this screening alone.
 
 ## Idea ledger
 
@@ -62,5 +62,5 @@ Existing rerank-none, lazy tool search, reference passing and BM25 caching are c
 - **This ledger:** local `dot/status-ledger-20261103` began at `21fcab0`; remote branch of the same name began at verified public backup `3e3b715`. Ancestry differs intentionally: only this sanitized file is transferred. Each published status milestone has exact-content, branch-head and status-only-diff verification; the containing remote commit identifies this revision.
 - **Safety and public preparation are externally checkpointed** at the links above. Other local branches remain preserved; do not claim backup equivalence without verifying their remote tree. Historical `620a421` remains unavailable.
 - **Transport failures retained:** first Git push was denied; one retry after relevant user evidence was permitted but failed for missing CLI credentials. The authorized sanitized safety change was then published through the connector. No successful CLI push or canceled giant-blob retry is claimed.
-- **Three-hour schedule: PAUSED**, per coordinator confirmation, while work is stopped; resume when work resumes. Its earlier scheduled first run was 2026-11-03 17:05 UTC. No execution or persistence guarantee is inferred from the schedule.
+- **Three-hour schedule: RE-ENABLED**, per coordinator confirmation after the cooperative-screening decision. Resume checkpointing and observable-waste reflection with the active work. Successful execution and environment persistence still require evidence; the schedule alone establishes neither.
 - **Publication scope:** status only; no credentials, actual canaries, hidden graders, reference answers or raw run logs. No default/protected-branch edits, PR approvals, merges, force pushes, destructive actions, Codex tasks or paid/model calls occurred in this status work.
