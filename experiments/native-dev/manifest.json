@@ -1,0 +1,43 @@
+{
+  "version": 1,
+  "status": "draft",
+  "canonicalCampaign": false,
+  "fixtures": [
+    {
+      "id": "calendar-window",
+      "taskPath": "experiments/native-dev/calendar-window/TASK.md",
+      "workspaceDir": "experiments/native-dev/calendar-window/workspace",
+      "allowedWritePaths": [
+        "window.py",
+        "event_store.py",
+        "report.py",
+        "tests/test_regressions.py"
+      ],
+      "publicTestTarget": "tests"
+    },
+    {
+      "id": "csv-contact-import",
+      "taskPath": "experiments/native-dev/csv-contact-import/TASK.md",
+      "workspaceDir": "experiments/native-dev/csv-contact-import/workspace",
+      "allowedWritePaths": [
+        "importer.py",
+        "contacts.py",
+        "summary.py",
+        "tests/test_regressions.py"
+      ],
+      "publicTestTarget": "tests"
+    },
+    {
+      "id": "settings-diagnostics",
+      "taskPath": "experiments/native-dev/settings-diagnostics/TASK.md",
+      "workspaceDir": "experiments/native-dev/settings-diagnostics/workspace",
+      "allowedWritePaths": [
+        "settings.py",
+        "loader.py",
+        "app.py",
+        "tests/test_regressions.py"
+      ],
+      "publicTestTarget": "tests"
+    }
+  ]
+}

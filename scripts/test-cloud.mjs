@@ -11,6 +11,20 @@ export function findVenv(root, env = process.env, exists = fs.existsSync) {
     .filter(Boolean).map(p => path.resolve(root, p)).find(p => exists(path.join(p, 'bin/python')));
 }
 
+/** Cheap local entrypoint presence only, not native ABI/transitive closure readiness.
+ * Canonicalize checkout aliases; never resolve modules from ancestor node_modules.
+ * The existing relocated runtime readiness test remains required.
+ */
+export function assertLocalPackagedDependencies(root) {
+  const canonicalRoot = fs.realpathSync(root);
+  for (const entry of ['typescript-api/lib/typescript.js', 'isolated-vm/isolated-vm.js']) {
+    const file = path.join(canonicalRoot, 'packages/server/dist/node_modules', entry);
+    let local = false;
+    try { local = fs.lstatSync(file).isFile() && fs.realpathSync(file) === file; } catch { /* absent/unreadable */ }
+    if (!local) throw new Error(`Local packaged dependency entrypoint missing or nonlocal: ${file}. Materialize the already installed lockfile-resolved dist/node_modules closure using the documented offline preparation. No install/build was performed; no tests were run or counted as passed. Real relocated readiness remains required.`);
+  }
+}
+
 /** Require complete positive TAP coverage, not merely a zero process exit or skipped count. */
 export function assertTestResult(result, label, {files = [], cwd = process.cwd()} = {}) {
   if (result.error) throw result.error;
@@ -60,6 +74,14 @@ export function assertDesignResult(result, label) {
   }
 }
 
+export function assertFixtureResult(result) {
+ if(result.error)throw result.error;
+ if(result.status!==0)throw new Error('native fixture controls failed');
+ let report;try{report=JSON.parse(result.stdout);}catch{throw new Error('invalid fixture summary');}
+ const fields=['run','failures','errors','skipped','expectedFailures','unexpectedSuccesses'];
+ if(report?.kind!=='fixture-controls'||report.modelCalls!==0||!report.counts||Object.keys(report.counts).sort().join()!==fields.sort().join()||fields.some(k=>!Number.isSafeInteger(report.counts[k])||report.counts[k]<0)||report.counts.run===0||fields.some(k=>k!=='run'&&report.counts[k]!==0))throw new Error('incomplete native fixture coverage');
+}
+
 /** Validate optional test-file scheduling without silently accepting malformed configuration. */
 export function testConcurrencyArgs(value) {
   if (value === undefined) return [];
@@ -73,6 +95,7 @@ export function testConcurrencyArgs(value) {
 export function main(root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..'), {env: inputEnv = process.env, spawn = spawnSync} = {}) {
   // Validate before venv discovery, cache setup, or any child execution.
   const concurrencyArgs = testConcurrencyArgs(inputEnv.AIW_TEST_CONCURRENCY);
+  assertLocalPackagedDependencies(root);
   const venv = findVenv(root, inputEnv);
   if (!venv) throw new Error('Python tool venv missing. Set AIW_VENV to a verified venv or prepare packages/tools/.venv using its documented dependencies. No tests were counted as passed.');
   // Inherited XDG_CACHE_HOME can exist but be read-only in cloud sandboxes.
@@ -111,6 +134,20 @@ export function main(root = path.resolve(path.dirname(fileURLToPath(import.meta.
     'scripts/native-comparison/method.ts', 'scripts/native-comparison/cli.ts', 'scripts/native-comparison/method.test.ts'], {cwd:root,env,stdio:'inherit'});
   if (comparisonTypes.error) throw comparisonTypes.error;
   if (comparisonTypes.status !== 0) throw new Error(`native-comparison typecheck failed (exit ${comparisonTypes.status})`);
+  runTests(['protocol','files','controller','handoff','bootstrap','coordinator','cli'].map(n=>`scripts/native-interactive/${n}.test.mjs`).concat(['scripts/native-interactive/session.test.ts','scripts/native-interactive/hotpath.test.ts']),root,'native-interactive local contract');
+  const interactiveTypes=spawn(process.execPath,[path.join(root,'node_modules/typescript/bin/tsc'),
+    '--ignoreConfig','--noEmit','--module','nodenext','--target','es2022','--strict',
+    '--allowImportingTsExtensions','--skipLibCheck','--types','node',
+    'scripts/native-interactive/session.ts','scripts/native-interactive/worker.ts','scripts/native-interactive/session.test.ts','scripts/native-interactive/hotpath.ts','scripts/native-interactive/hotpath.test.ts'],{cwd:root,env,stdio:'inherit'});
+  if(interactiveTypes.error)throw interactiveTypes.error;
+  if(interactiveTypes.status!==0)throw new Error('native-interactive typecheck failed');
+  const interactiveDeclarations=spawn(process.execPath,[path.join(root,'node_modules/typescript/bin/tsc'),
+    '--ignoreConfig','--noEmit','--module','nodenext','--target','es2022','--strict','--types','node',
+    ...['readiness','controller','cli','handoff','bootstrap','handoff-files'].map(n=>`scripts/native-interactive/${n}.d.mts`)],{cwd:root,env,stdio:'inherit'});
+  if(interactiveDeclarations.error)throw interactiveDeclarations.error;
+  if(interactiveDeclarations.status!==0)throw new Error('native-interactive declaration typecheck failed');
+  const fixtureControls=spawn(path.join(venv,'bin/python'),['scripts/native-fixture-controls.py'],{cwd:root,env,encoding:'utf8',maxBuffer:32*1024*1024});
+  process.stdout.write(fixtureControls.stdout??'');process.stderr.write(fixtureControls.stderr??'');assertFixtureResult(fixtureControls);
   for (const name of fs.readdirSync(path.join(root,'packages')).sort()) {
     const cwd = path.join(root,'packages',name);
     const testDir = path.join(cwd,'test');

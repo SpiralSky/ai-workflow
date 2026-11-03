@@ -282,9 +282,12 @@ test('summaries reject forged success, zero checks, altered observations, identi
   const f = await fixture(); const cell = f.cells[0]; await solution(f.path, cell);
   await f.harness.grade('unit', cell);
   const path = join(f.path, cell, 'report.json'); const original = await readFile(path, 'utf8');
+  const baseline = JSON.parse(original);
+  assert.equal(baseline.passed, true, `Reference grade must pass before tamper checks: ${original}`);
+  assert.equal(baseline.checksRun, baseline.checksExpected);
   const mutations: Array<(r: any) => void> = [
     r => { r.checksRun = 0; r.cases = []; }, r => { r.checksExpected = 0; },
-    r => { r.passed = false; }, r => { r.cases[0].passed = false; },
+    r => { r.passed = !r.passed; }, r => { r.cases[0].passed = false; },
     r => { r.cases[0].toolCalls = 0; }, r => { r.cases[0].observations = []; },
     r => { r.cases[0].observations[0].returned = false; },
     r => { r.cases.find((c: any) => c.runtimeError).runtimeError.message = 'forged error'; },
@@ -296,7 +299,9 @@ test('summaries reject forged success, zero checks, altered observations, identi
     r => { delete r.infrastructurePreflight; }, r => { r.infrastructurePreflight.localElapsedMs = ENGINE_SETUP_TIMEOUT_MS + 1; },
   ];
   for (const mutate of mutations) {
-    const r = JSON.parse(original); mutate(r); await writeFile(path, JSON.stringify(r));
+    const r = JSON.parse(original); mutate(r);
+    assert.notDeepEqual(r,baseline,'Tamper control must change evidence, not reassign an existing value');
+    await writeFile(path, JSON.stringify(r));
     await assert.rejects(f.harness.summarize('unit'), /inconsistent/);
   }
   await writeFile(path, original);

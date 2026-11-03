@@ -117,5 +117,17 @@ export function applyDevelopmentAllowances(root, inventory, replacements, allowa
     assert.deepEqual(allowances.hygiene_metadata.files.map(e=>e.path).sort(), [".gitignore","docs/dot-progress/ignore-hygiene.md","docs/dot-progress/runtime-hygiene-followup.md","scripts/check-gitignore.sh","scripts/check-runtime-gitignore.sh"]);
     verifyWorkingInventory(root, allowances.hygiene_metadata);
   }
+  // Exact reviewed new corpus only. Never rewrite/relax original runtime or benchmark inventories.
+  const nativeBytes=fs.readFileSync(path.join(root,'.specplane/native-reconstruction-inventory.json'));
+  assert.equal(sha256(nativeBytes),'1a34fdb4a25ebdeffe8667f6d21aa1990a5aba1c649ef951cb013d2bd58aa541','Reconstructed fixture declaration changed');
+  const native=JSON.parse(nativeBytes);
+  assert.equal(native.version,1);assert.equal(native.kind,'reconstructed-noncanonical-fixtures');
+  assert.equal(native.source_commit,'e2d26b00acad5fd42ff7355f2b628c02f02d013b');assert.equal(native.canonicalCampaign,false);
+  assert.equal(native.changes.length,25);
+  for(const entry of native.changes){
+    assert.equal(entry.before,null);assert.ok(!expected.has(entry.path),'Reconstruction cannot replace baseline paths');
+    assert.equal(entry.after.path,entry.path);validateInventory({version:1,source_ref:native.source_commit,files:[entry.after]});
+    expected.set(entry.path,entry.after);
+  }
   return {...inventory,files:[...expected.values()]};
 }

@@ -55,3 +55,10 @@ coverage/
 
 # OS metadata
 .DS_Store
+
+# Public export: private grading assets must stay local after restoration.
+experiments/native-dev/*/checks/
+experiments/native-dev/*/reference/
+experiments/native-dev/grade.py
+experiments/native-dev/test_fixtures.py
+.specplane/native-reconstruction-inventory.json

@@ -23,7 +23,7 @@ async function runFixture() {
 
 test('actual compiler/QuickJS succeeds on three fixed generic cases', async () => {
   const result = await gradeSource(GOOD);
-  assert.equal(result.passed, true);
+  assert.equal(result.passed, true, JSON.stringify(result));
   assert.equal(result.checksRun, 3);
   assert.ok(result.cases.every(c => c.toolCalls === 2));
 });

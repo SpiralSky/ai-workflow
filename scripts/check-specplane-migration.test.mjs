@@ -110,3 +110,20 @@ test('runtime hygiene helper cannot be silently weakened',t=>{
   const root=snapshot(t);fs.appendFileSync(path.join(root,'scripts/check-runtime-gitignore.sh'),'\n# unauthorized weakening\n');
   assert.throws(()=>verifyPreservation(root),/Preserved content changed/);
 });
+
+test('reconstructed corpus rejects missing extra content and executable mode drift',t=>{
+ for(const kind of ['missing','extra','content','mode']){const root=snapshot(t),rel='experiments/native-dev/calendar-window/TASK.md',file=path.join(root,rel);
+  if(kind==='missing')fs.unlinkSync(file);
+  if(kind==='extra'){fs.writeFileSync(path.join(root,'experiments/native-dev/unlisted.py'),'# not authorized');git(root,'add','experiments/native-dev/unlisted.py');}
+  if(kind==='content')fs.appendFileSync(file,'changed task');
+  if(kind==='mode')fs.chmodSync(file,0o755);
+  assert.throws(()=>verifyPreservation(root),kind==='extra'?/Tracked inventory/:kind==='missing'?/ENOENT/:kind==='mode'?/mode changed/:/Preserved content changed/);
+ }
+});
+test('reconstructed declaration cannot authorize unlisted paths or transplant another fixture hash',t=>{
+ const root=snapshot(t),file=path.join(root,'.specplane/native-reconstruction-inventory.json'),data=JSON.parse(fs.readFileSync(file));
+ data.changes[0].after.sha256=data.changes[1].after.sha256;fs.writeFileSync(file,JSON.stringify(data));
+ assert.throws(()=>verifyPreservation(root),/declaration changed/);
+ data.changes[0].path='experiments/native-dev/unlisted.py';data.changes[0].after.path=data.changes[0].path;fs.writeFileSync(file,JSON.stringify(data));
+ assert.throws(()=>verifyPreservation(root),/declaration changed/);
+});

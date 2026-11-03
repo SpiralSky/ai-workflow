@@ -1,0 +1,5 @@
+import type {Readable} from 'node:stream';
+export interface ObservationClock {now:()=>number;setTimeout:(callback:()=>void,ms:number)=>any;clearTimeout:(timer:any)=>void}
+export interface WorkerTiming {scope:string;startedMonotonicMs:number;endedMonotonicMs:number;elapsedMs:number;inputWaitMs:number;helperActiveMs:number;phasesMs:Record<'setup'|'input'|'action'|'emit'|'submit'|'close',number>}
+export interface CellOutcome {status:'submitted'|'incomplete';reason?:string;visibleInputBytes:number;visibleFeedbackBytes:number;initialBytes:number;hostAttempts:number;confirmedOutputBytes:number;cleanupStatus:'closed'|'uncertain';timing:WorkerTiming}
+export function runCell(options:{arm:'direct'|'branch-expanded'|'branch-hotpath2';input:Readable;emit:(line:string)=>unknown|Promise<unknown>;journal:{append:(event:unknown)=>unknown};createSession:(callbacks:{onHostAttempt:(name:string,args:unknown)=>void;onHostResult:(event:unknown)=>void})=>Promise<{packet:unknown;dispatch:(action:any,signal?:AbortSignal)=>Promise<unknown>;close:()=>Promise<void>}>;onSubmit:()=>unknown|Promise<unknown>;clock?:ObservationClock}):Promise<CellOutcome>;

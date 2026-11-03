@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {spawnSync} from 'node:child_process';
-import {findVenv,assertTestResult,assertDesignResult,testConcurrencyArgs,main} from './test-cloud.mjs';
+import {findVenv,assertTestResult,assertDesignResult,assertFixtureResult,testConcurrencyArgs,assertLocalPackagedDependencies,main} from './test-cloud.mjs';
 
 /** Realistic final TAP summaries, with a named test rather than Node's empty-file fallback. */
 function tap(overrides = {}) {
@@ -49,7 +49,7 @@ const designReport = {
 /** Match real Python JSON and Node TAP separately without executing either child. */
 function successfulChild(args) {
   return {status:0, stdout:args.includes('scripts/evaluation/check_classifier_design.py')
-    ? JSON.stringify(designReport) : tap(), stderr:''};
+    ? JSON.stringify(designReport) : args.includes('scripts/native-fixture-controls.py') ? JSON.stringify({kind:'fixture-controls',modelCalls:0,counts:designReport.selfTests}) : tap(), stderr:''};
 }
 
 /** Exact focused native typecheck remains separate from the package-only tsconfig. */
@@ -87,7 +87,8 @@ test('design gate requires successful process, real complete counts, and offline
 /** Make only discovery inputs; the fake spawn never runs package tests or typecheck. */
 function fakeWorkspace() {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'aiw-cloud-entry-fixture-'));
-  for (const file of ['venv/bin/python', 'scripts/z.test.mjs', 'scripts/a.test.mjs',
+  for (const file of ['packages/server/dist/node_modules/typescript-api/lib/typescript.js',
+    'packages/server/dist/node_modules/isolated-vm/isolated-vm.js', 'venv/bin/python', 'scripts/z.test.mjs', 'scripts/a.test.mjs',
     'packages/core/test/native-relocated.test.ts', 'packages/core/test/a.test.ts',
     'packages/tools/test/l-test.test.ts']) {
     fs.mkdirSync(path.dirname(path.join(root, file)), {recursive:true});
@@ -114,8 +115,8 @@ for (const concurrency of [undefined, '1', '3']) {
     }});
     const flag = concurrency === undefined ? [] : [`--test-concurrency=${concurrency}`];
     const prefix = ['--import', 'tsx', '--test', '--test-reporter=tap', ...flag];
-    assert.equal(calls.length, 10);
-    assert.deepEqual(calls.map(([command]) => command), [process.execPath, path.join(root,'venv/bin/python'), path.join(root,'venv/bin/python'), ...Array(7).fill(process.execPath)]);
+    assert.equal(calls.length, 14);
+    assert.deepEqual(calls.map(([command]) => command), [process.execPath, path.join(root,'venv/bin/python'), path.join(root,'venv/bin/python'), ...Array(7).fill(process.execPath),path.join(root,'venv/bin/python'),...Array(3).fill(process.execPath)]);
     assert.deepEqual(calls.map(([, args]) => args), [
       [...prefix, 'scripts/a.test.mjs', 'scripts/z.test.mjs'],
       ['scripts/evaluation/check_classifier_design.py', '--self-test'],
@@ -124,11 +125,15 @@ for (const concurrency of [undefined, '1', '3']) {
       nativeTypeArgs(root),
       [...prefix, 'scripts/native-comparison/method.test.ts'],
       nativeTypeArgs(root).map(arg => arg.replace('scripts/dot-native/', 'scripts/native-comparison/')),
+      [...prefix,...['protocol','files','controller','handoff','bootstrap','coordinator','cli'].map(n=>`scripts/native-interactive/${n}.test.mjs`),'scripts/native-interactive/session.test.ts','scripts/native-interactive/hotpath.test.ts'],
+      [...nativeTypeArgs(root).slice(0,-3),'scripts/native-interactive/session.ts','scripts/native-interactive/worker.ts','scripts/native-interactive/session.test.ts','scripts/native-interactive/hotpath.ts','scripts/native-interactive/hotpath.test.ts'],
+      [path.join(root,'node_modules/typescript/bin/tsc'),'--ignoreConfig','--noEmit','--module','nodenext','--target','es2022','--strict','--types','node',...['readiness','controller','cli','handoff','bootstrap','handoff-files'].map(n=>`scripts/native-interactive/${n}.d.mts`)],
+      ['scripts/native-fixture-controls.py'],
       [...prefix, 'test/a.test.ts', 'test/native-relocated.test.ts'],
       [...prefix, 'test/l-test.test.ts'],
       [path.join(root, 'node_modules/typescript/bin/tsc'), '-p', 'tsconfig.json'],
     ]);
-    assert.deepEqual(calls.map(([, , options]) => options.cwd), [root, root, root, root, root, root, root, path.join(root, 'packages/core'), path.join(root, 'packages/tools'), root]);
+    assert.deepEqual(calls.map(([, , options]) => options.cwd), [root, root, root, root, root, root, root, root, root, root, root, path.join(root, 'packages/core'), path.join(root, 'packages/tools'), root]);
     for (const [, , options] of calls) {
       assert.equal(options.env.AIW_VENV, path.join(root, 'venv'));
       assert.equal(options.env.NODE_OPTIONS, undefined);
@@ -166,9 +171,9 @@ test('serial main still rejects typecheck failure after all test children', (t) 
   let calls = 0;
   assert.throws(() => runQuietly(t, root, {env:{AIW_VENV:'venv', AIW_TEST_CONCURRENCY:'1'}, spawn:(_command, args) => {
     calls++;
-    return calls === 10 ? {status:2} : successfulChild(args);
+    return calls === 14 ? {status:2} : successfulChild(args);
   }}), /typecheck failed/);
-  assert.equal(calls, 10);
+  assert.equal(calls, 14);
 });
 
 for (const [failedCall, label, result, expected] of [
@@ -184,6 +189,11 @@ for (const [failedCall, label, result, expected] of [
   [6, 'comparison contract empty coverage', {status:0,stdout:tap({tests:0,pass:0})}, /empty/],
   [6, 'comparison contract failure', {status:1,stdout:''}, /native-comparison local contract failed/],
   [7, 'comparison typecheck failure', {status:1}, /native-comparison typecheck failed/],
+  [8,'interactive skips',{status:0,stdout:tap({skipped:1})},/skipped/],
+  [9,'interactive type failure',{status:1},/native-interactive typecheck/],
+  [10,'interactive declaration failure',{status:1},/declaration typecheck/],
+  [11,'fixture malformed counts',{status:0,stdout:'{}'},/fixture/],
+  [11,'fixture failed',{status:1},/fixture/],
   [7, 'comparison typecheck spawn error', {error:new Error('comparison types unavailable')}, /comparison types unavailable/],
 ]) {
   test(`shared gates stop later tests and checks on ${label}`, t => {
@@ -232,4 +242,64 @@ test('empty entry discovery fails before a test child can fall back to implicit 
   let calls = 0;
   assert.throws(() => runQuietly(t,root,{env:{AIW_VENV:'venv'},spawn:() => {calls++;}}), /No expected top-level script tests/);
   assert.equal(calls,0);
+});
+test('fixture gate rejects skipped empty malformed and model-backed controls',()=>{
+ const valid={kind:'fixture-controls',modelCalls:0,counts:{...designReport.selfTests}};
+ assert.doesNotThrow(()=>assertFixtureResult({status:0,stdout:JSON.stringify(valid)}));
+ for(const mutate of [r=>r.counts.run=0,r=>r.counts.skipped=1,r=>r.counts.errors=1,r=>r.counts.expectedFailures=1,r=>r.counts.unexpectedSuccesses=1,r=>r.counts.extra=0,r=>r.modelCalls=1,r=>r.kind='other',r=>r.counts.run='15']){const report=structuredClone(valid);mutate(report);assert.throws(()=>assertFixtureResult({status:0,stdout:JSON.stringify(report)}));}
+ for(const result of [{status:1},{status:null,signal:'SIGKILL'},{error:Error('spawn')},{status:0,stdout:'{}'},{status:0,stdout:'not json'}])assert.throws(()=>assertFixtureResult(result));
+});
+
+/** Owned disposable closure fixture; empty files prove presence only, never readiness. */
+function packagedFixture(t) {
+  const root = fakeWorkspace();
+  t.after(() => fs.rmSync(root, {recursive:true,force:true}));
+  return root;
+}
+test('packaged preflight accepts local regular entrypoints', t => {
+  assert.doesNotThrow(() => assertLocalPackagedDependencies(packagedFixture(t)));
+});
+test('packaged preflight rejects each missing entrypoint', t => {
+  for (const entry of ['typescript-api/lib/typescript.js','isolated-vm/isolated-vm.js']) {
+    const root = packagedFixture(t);
+    fs.unlinkSync(path.join(root,'packages/server/dist/node_modules',entry));
+    assert.throws(() => assertLocalPackagedDependencies(root), /missing or nonlocal/);
+  }
+});
+test('packaged preflight rejects file and directory dependency symlinks', t => {
+  for (const directory of [false,true]) {
+    const root = packagedFixture(t);
+    const original = path.join(root,'packages/server/dist/node_modules/isolated-vm',directory ? '' : 'isolated-vm.js');
+    const target = path.join(root,directory ? 'external-package' : 'external.js');
+    fs.renameSync(original,target); fs.symlinkSync(target,original);
+    assert.throws(() => assertLocalPackagedDependencies(root), /missing or nonlocal/);
+  }
+});
+test('packaged preflight allows a symlink-aliased workspace root', t => {
+  const root = packagedFixture(t);
+  const alias = `${root}-alias`;
+  fs.symlinkSync(root,alias); t.after(() => fs.unlinkSync(alias));
+  assert.doesNotThrow(() => assertLocalPackagedDependencies(alias));
+});
+test('packaged preflight does not fall back to ancestor dependencies', t => {
+  const root = packagedFixture(t);
+  const child = path.join(root,'nested'); fs.mkdirSync(child);
+  assert.throws(() => assertLocalPackagedDependencies(child), /missing or nonlocal/);
+});
+test('missing packaged closure fails before venv discovery cache and children', t => {
+  const root = packagedFixture(t);
+  fs.unlinkSync(path.join(root,'packages/server/dist/node_modules/isolated-vm/isolated-vm.js'));
+  let venvRead = false; let calls = 0;
+  const env = {get AIW_VENV() {venvRead = true; throw new Error('venv read');}};
+  const cache = t.mock.method(fs,'mkdtempSync',() => {throw new Error('cache created');});
+  assert.throws(() => main(root,{env,spawn:()=>{calls++;}}), /missing or nonlocal/);
+  cache.mock.restore(); assert.equal(venvRead,false); assert.equal(calls,0);
+});
+test('actual CLI default root refuses missing closure before tests', t => {
+  const root = packagedFixture(t);
+  fs.copyFileSync(new URL('./test-cloud.mjs', import.meta.url),path.join(root,'scripts/test-cloud.mjs'));
+  fs.unlinkSync(path.join(root,'packages/server/dist/node_modules/isolated-vm/isolated-vm.js'));
+  const result = spawnSync(process.execPath,[path.join(root,'scripts/test-cloud.mjs')],{cwd:root,encoding:'utf8',env:{PATH:process.env.PATH},timeout:10000});
+  assert.equal(result.error,undefined); assert.equal(result.status,1);
+  assert.equal(result.stdout,''); assert.match(result.stderr,/No tests were run|no tests were run/);
 });
