@@ -1,3 +1,4 @@
+import {inspectCheckRuntime,nativeCheckEnv} from './check-runtime.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import {selectHotpathExamples} from './hotpath.ts';
@@ -36,9 +37,14 @@ export async function createNativeSession(opts:SessionOptions) {
   try {assertPermittedDelta(original,inventory(root),[...allowed]);
   }catch(e){throw fail(e);}
  };
- const permittedEnv=new Set(['PATH','HOME','TMPDIR','LANG','LC_ALL','AIW_VENV','PYTHONDONTWRITEBYTECODE','PYTHONIOENCODING']);
+ const permittedEnv=new Set(['PATH','HOME','TMPDIR','LANG','LC_ALL','AIW_VENV','PYTHONDONTWRITEBYTECODE','PYTHONIOENCODING','AIW_OFFLINE_CHECKS','AIW_CHECK_RUNTIME']);
  for(const key of Object.keys(opts.env))if(!permittedEnv.has(key))throw new Error('nonminimal environment');
  if(opts.env.AIW_VENV!==opts.venv || opts.env.PYTHONDONTWRITEBYTECODE!=='1')throw new Error('explicit venv/no-bytecode environment required');
+ if(opts.env.AIW_OFFLINE_CHECKS!=='1'||!opts.env.AIW_CHECK_RUNTIME||!opts.env.HOME)throw new Error('native offline checker binding required');
+ const checkRuntime=JSON.parse(opts.env.AIW_CHECK_RUNTIME);
+ const expectedEnv=nativeCheckEnv({venv:opts.venv},opts.env.HOME,checkRuntime);
+ if(Object.keys(opts.env).sort().join(',')!==Object.keys(expectedEnv).sort().join(',')||Object.entries(expectedEnv).some(([key,value])=>opts.env[key]!==value))throw new Error('native checker environment mismatch');
+ inspectCheckRuntime(opts.venv,opts.env.HOME,checkRuntime);
  const sidecar=new Sidecar({root,env:{...opts.env}});
  const local=new LocalHost('L',{root,sidecar});
  let closing:Promise<void>|undefined;

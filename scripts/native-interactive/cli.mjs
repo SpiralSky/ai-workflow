@@ -1,3 +1,6 @@
+import {nativeCheckEnv,inspectCheckRuntime,checkRuntimePolicy} from './check-runtime.mjs';
+import {createActionReceiptTracker} from './action-receipts.mjs';
+import {createActionReceiptStore} from './action-receipt-files.mjs';
 import {verifyCellPublicHandoff,readCellBootstrapReceipt} from './handoff-files.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -21,7 +24,7 @@ export function validateConfig(c) {
  if(path.dirname(c.journalDir)!==c.cellDir||c.root===c.cellDir||c.root.startsWith(c.cellDir+path.sep)===false)throw new Error('cell containment required');
  return c;
 }
-export function sanitizedEnv(c,temp) {return {PATH:'/usr/local/bin:/usr/bin:/bin',HOME:temp,TMPDIR:temp,LANG:'C.UTF-8',LC_ALL:'C.UTF-8',AIW_VENV:c.venv,PYTHONDONTWRITEBYTECODE:'1',PYTHONIOENCODING:'utf-8'};}
+export function sanitizedEnv(c,temp,runtime) {return nativeCheckEnv(c,temp,runtime);}
 /** Persist exact public wire bytes without JSON reserialization. */
 function exclusiveBytes(file,bytes){const fd=fs.openSync(file,'wx',0o600);try{fs.writeFileSync(fd,bytes);fs.fsyncSync(fd);}finally{fs.closeSync(fd);}}
 function exclusive(file,value){const fd=fs.openSync(file,'wx',0o600);try{fs.writeFileSync(fd,JSON.stringify(value)+'\n');fs.fsyncSync(fd);}finally{fs.closeSync(fd);}}
@@ -80,18 +83,33 @@ export async function supervise(config,{input=process.stdin,stdout=s=>writeStrea
  const assignmentSHA256=assignmentBytes?digest(assignmentBytes):undefined;
  const configSHA256=digest(configBytes),admissionSHA256=digest(admissionBytes);
  const resultPath=path.join(c.cellDir,'supervisor-result.json');
- for(const name of ['ready-frame.jsonl','supervisor-start.json','supervisor-ready.json','supervisor-result.json','worker-outcome.json','worker-config.json'])if(fs.existsSync(path.join(c.cellDir,name)))throw new Error('cell already attempted');
- const temp=fs.mkdtempSync(path.join(os.tmpdir(),'native-worker-'));
- const configPath=path.join(c.cellDir,'worker-config.json');exclusive(configPath,c);
- const env=sanitizedEnv(c,temp);
- let failure,bytesIn=0,bytesOut=0,bytesErr=0,exitCode,exitSignal,coordinatorInputBytes=0,coordinatorOutputBytes=0,coordinatorControls=0;
- let inputPhase=nativeAssignment?'waiting-ready':'tools',controlBuffer=Buffer.alloc(0),controlPromise=Promise.resolve(),inputEnded=false,readyEvidence,actorInputObserved=false,acceptedHandoff,bootstrap;
+ for(const name of ['check-runtime-preflight.json','check-runtime.json','action-receipts','ready-frame.jsonl','supervisor-start.json','supervisor-ready.json','supervisor-result.json','worker-outcome.json','worker-config.json'])if(fs.existsSync(path.join(c.cellDir,name)))throw new Error('cell already attempted');
  const supervisorIdentity=readLinuxProcessIdentity(process.pid);
  const started=clock.now(),startedAtUTC=new Date().toISOString(),deadline=started+BOUNDS.wallMs,observations=[];let acceptingObservations=true,readyObserved=false;
  const observe=(type,fields={})=>{if(!acceptingObservations)return;const monotonicMs=clock.now();if(!Number.isFinite(monotonicMs)||monotonicMs<(observations.at(-1)?.monotonicMs??started))throw Error('invalid monotonic clock');const event={type,monotonicMs,observedAtUTC:new Date().toISOString(),...fields};observations.push(event);return event;};
  if(!Number.isFinite(started)||started<0)throw Error('invalid monotonic clock');
+ const runtimePolicy=checkRuntimePolicy();
+ if((nativeAssignment||admission.checkRuntimePolicy)&&JSON.stringify(admission.checkRuntimePolicy)!==JSON.stringify(runtimePolicy))throw Error('offline check runtime: admission policy mismatch');
+ observe('check-runtime-preflight-start');
+ const temp=fs.mkdtempSync(path.join(os.tmpdir(),'native-worker-'));
+ let checkRuntime;
+ try{
+  checkRuntime=inspectCheckRuntime(c.venv,temp,undefined,Math.min(30000,deadline-clock.now()));
+  if(checkRuntime.sources['offline_check_runtime.json']?.sha256!==runtimePolicy.lockSHA256)throw Error('offline check runtime: lock changed during preflight');
+  observe('check-runtime-preflight-end');
+  if(clock.now()>=deadline)throw Error('assignment expired during checker preflight');
+  exclusive(path.join(c.cellDir,'check-runtime-preflight.json'),{status:'passed',runtimePolicy,startedMonotonicMs:started,endedMonotonicMs:clock.now(),scope:'bounded offline runtime validation within assignment; no worker or actor started'});
+ }catch(error){exclusive(path.join(c.cellDir,'check-runtime-preflight.json'),{status:'failed',runtimePolicy,startedMonotonicMs:started,endedMonotonicMs:clock.now(),reason:String(error).slice(-1500),scope:'preflight attempted; no worker or actor started'});throw error;}
+ const checkRuntimePreflightSHA256=digest(readBounded(path.join(c.cellDir,'check-runtime-preflight.json'),16384));
+ exclusive(path.join(c.cellDir,'check-runtime.json'),checkRuntime);
+ const checkRuntimeSHA256=digest(readBounded(path.join(c.cellDir,'check-runtime.json'),16384));
+ const actionStore=nativeAssignment?createActionReceiptStore({cellDir:c.cellDir}):undefined;
+ const configPath=path.join(c.cellDir,'worker-config.json');exclusive(configPath,c);
+ const env=sanitizedEnv(c,temp,checkRuntime);
+ let failure,bytesIn=0,bytesOut=0,bytesErr=0,exitCode,exitSignal,coordinatorInputBytes=0,coordinatorOutputBytes=0,coordinatorControls=0,coordinatorActionReceiptBytes=0;
+ let inputPhase=nativeAssignment?'waiting-ready':'tools',controlBuffer=Buffer.alloc(0),controlPromise=Promise.resolve(),inputEnded=false,readyEvidence,actorInputObserved=false,acceptedHandoff,bootstrap,actionTracker;
  observe('worker-spawn');
- exclusive(path.join(c.cellDir,'supervisor-start.json'),{kind:'supervisor-launch-observation',startedMonotonicMs:started,startedAtUTC,assignmentLimitMs:BOUNDS.wallMs,deadlineMonotonicMs:deadline,supervisorIdentity,assignmentSHA256,configSHA256,admissionSHA256,scope:'observation before spawn; not proof child executed'});
+ exclusive(path.join(c.cellDir,'supervisor-start.json'),{kind:'supervisor-launch-observation',startedMonotonicMs:started,startedAtUTC,assignmentLimitMs:BOUNDS.wallMs,deadlineMonotonicMs:deadline,supervisorIdentity,assignmentSHA256,configSHA256,admissionSHA256,checkRuntimeSHA256,checkRuntimePreflightSHA256,checkRuntimePolicy:runtimePolicy,scope:'observation before spawn; assignment includes bounded checker preflight; not proof child executed'});
  const supervisorStartBytes=readBounded(path.join(c.cellDir,'supervisor-start.json'),16384),supervisorStartSHA256=digest(supervisorStartBytes),startEvidence=JSON.parse(supervisorStartBytes.toString('utf8'));
  const child=spawn(process.execPath,['--import',path.join(REPO,'node_modules/tsx/dist/loader.mjs'),path.join(HERE,'worker.ts'),configPath],{cwd:REPO,env,detached:true,stdio:['pipe','pipe','pipe']});
  let outputQueue=Promise.resolve(),errorQueue=Promise.resolve();
@@ -99,6 +117,7 @@ export async function supervise(config,{input=process.stdin,stdout=s=>writeStrea
  const kill=()=>{if(child.pid)try{process.kill(-child.pid,'SIGKILL');}catch(e){if(e.code!=='ESRCH')failure??='group kill uncertain';}};
  const fail=reason=>{if(!acceptingObservations)return;failure??=reason;input.pause?.();child.stdin.destroy();kill();};
  const timer=clock.setTimeout(()=>{observe('assignment-timeout');fail('wall timeout; cleanup uncertain');},Math.max(0,deadline-clock.now()));
+ const assertReceiptActive=()=>{if(failure||!acceptingObservations||clock.now()>=deadline)throw Error('action receipt unavailable or assignment expired');};
  const acknowledgeReady=frame=>{
   if(readyObserved||!acceptingObservations)return;if(failure)throw Error('failed supervisor cannot acknowledge readiness');
   if(clock.now()>=deadline)throw Error('ready delivery after assignment deadline');
@@ -112,7 +131,7 @@ export async function supervise(config,{input=process.stdin,stdout=s=>writeStrea
  const forwardOutput=createReadyFrameForwarder({persist:frame=>{
   if(clock.now()>=deadline||failure)throw Error('ready persistence after assignment deadline or failure');
   exclusiveBytes(path.join(c.cellDir,'ready-frame.jsonl'),frame);
- },emit:stdout,onReady:acknowledgeReady});
+ },emit:bytes=>{if(nativeAssignment&&readyObserved){if(!actionTracker)throw Error('worker feedback before coordinator acknowledgement');return actionTracker.feedback(bytes);}return stdout(bytes);},onReady:acknowledgeReady});
  const performControl=async frame=>{
   const handoff=verifyCellPublicHandoff({cellDir:c.cellDir});
   const request=parseCoordinatorDispatchControl(frame,{actorId:assignment.actorId,assignmentSHA256,handoffSHA256:handoff.handoffSHA256,capabilitySHA256:handoff.capabilitySHA256});
@@ -127,12 +146,18 @@ export async function supervise(config,{input=process.stdin,stdout=s=>writeStrea
   const ack=JSON.stringify({kind:'coordinator-dispatch-intent-ack',actorId:request.actorId,assignmentSHA256,handoffSHA256:request.handoffSHA256,capabilitySHA256:request.capabilitySHA256,intentSHA256,observedMonotonicMs:after.observedMonotonicMs,remainingMs:after.remainingMs})+'\n';
   if(Buffer.byteLength(ack)>COORDINATOR_CONTROL_BYTES)throw Error('coordinator acknowledgement too large');
   coordinatorOutputBytes+=Buffer.byteLength(ack);await stdout(ack);verify();
-  const acknowledged=observe('coordinator-control-ack',{actorId:request.actorId,assignmentSHA256,handoffSHA256:request.handoffSHA256,capabilitySHA256:request.capabilitySHA256,intentSHA256,bytes:Buffer.byteLength(ack)});if(acknowledged.monotonicMs>=deadline)throw Error('coordinator acknowledgement expired');acceptedHandoff=handoff;inputPhase='tools';
+  const acknowledged=observe('coordinator-control-ack',{actorId:request.actorId,assignmentSHA256,handoffSHA256:request.handoffSHA256,capabilitySHA256:request.capabilitySHA256,intentSHA256,bytes:Buffer.byteLength(ack)});if(acknowledged.monotonicMs>=deadline)throw Error('coordinator acknowledgement expired');acceptedHandoff=handoff;
+  actionTracker=createActionReceiptTracker({arm:c.arm,bindings:{assignmentSHA256,admissionSHA256,configSHA256,supervisorStartSHA256,dispatchIntentSHA256:intentSHA256},checkActive:assertReceiptActive,
+   persistInput(record,raw){actionStore.persistInput(record,raw);observe('action-received',{sequence:record.sequence,inputSHA256:record.inputSHA256,inputBytes:record.inputBytes,assignmentSHA256});},
+   persistFeedback(record,raw){actionStore.persistFeedback(record,raw);},
+   async emit(receiptFrame,raw){coordinatorActionReceiptBytes+=receiptFrame.length;await stdout(Buffer.concat([receiptFrame,raw]));},
+   persistAck(record){actionStore.persistAck(record);observe('action-receipt-ack',{sequence:record.sequence,receiptSHA256:record.receiptSHA256,receiptBytes:record.receiptBytes,feedbackSHA256:record.feedbackSHA256,feedbackBytes:record.feedbackBytes});}
+  });inputPhase='tools';
   if(inputEnded)child.stdin.end();else input.resume?.();
  };
  const onInput=chunk=>{
   if(clock.now()>=deadline)return fail('wall timeout; cleanup uncertain');
-  if(inputPhase==='tools'){bytesIn+=Buffer.byteLength(chunk);if(bytesIn>BOUNDS.inputBytes)return fail('input overflow; cleanup uncertain');if(nativeAssignment&&!actorInputObserved){try{const checked=readCellBootstrapReceipt({cellDir:c.cellDir});if(JSON.stringify(checked.description)!==JSON.stringify(acceptedHandoff))throw Error('public handoff changed before actor input');if(clock.now()>=deadline)throw Error('assignment expired during public bootstrap verification');bootstrap={receiptSHA256:checked.receiptSHA256,attemptSHA256:checked.attemptSHA256,handoffSHA256:checked.description.handoffSHA256,capabilitySHA256:checked.description.capabilitySHA256,outputBytes:checked.receipt.emittedOutput.bytes,outputSHA256:checked.receipt.emittedOutput.sha256,scope:'helper emitted bytes; not proof of actor tool delivery or model consumption'};observe('bootstrap-emission-verified',{...bootstrap});observe('actor-input-start',{actorId:assignment.actorId,assignmentSHA256,bootstrapReceiptSHA256:checked.receiptSHA256,bytes:Buffer.byteLength(chunk),scope:'first actor-action stdin bytes after coordinator acknowledgement and bootstrap emission; authorship remains procedural'});actorInputObserved=true;}catch(error){return fail(`public bootstrap unavailable: ${error.message}; cleanup uncertain`);}}if(!child.stdin.write(chunk))input.pause?.();return;}
+  if(inputPhase==='tools'){bytesIn+=Buffer.byteLength(chunk);if(bytesIn>BOUNDS.inputBytes)return fail('input overflow; cleanup uncertain');if(nativeAssignment&&!actorInputObserved){try{const checked=readCellBootstrapReceipt({cellDir:c.cellDir});if(JSON.stringify(checked.description)!==JSON.stringify(acceptedHandoff))throw Error('public handoff changed before actor input');if(clock.now()>=deadline)throw Error('assignment expired during public bootstrap verification');bootstrap={receiptSHA256:checked.receiptSHA256,attemptSHA256:checked.attemptSHA256,handoffSHA256:checked.description.handoffSHA256,capabilitySHA256:checked.description.capabilitySHA256,outputBytes:checked.receipt.emittedOutput.bytes,outputSHA256:checked.receipt.emittedOutput.sha256,scope:'helper emitted bytes; not proof of actor tool delivery or model consumption'};observe('bootstrap-emission-verified',{...bootstrap});observe('actor-input-start',{actorId:assignment.actorId,assignmentSHA256,bootstrapReceiptSHA256:checked.receiptSHA256,bytes:Buffer.byteLength(chunk),scope:'first actor-action stdin bytes after coordinator acknowledgement and bootstrap emission; authorship remains procedural'});actorInputObserved=true;}catch(error){return fail(`public bootstrap unavailable: ${error.message}; cleanup uncertain`);}}try{const raw=nativeAssignment?actionTracker.input(Buffer.isBuffer(chunk)?chunk:Buffer.from(chunk)):chunk;if(raw){if(nativeAssignment)assertReceiptActive();if(!child.stdin.write(raw,error=>{if(error&&nativeAssignment)fail('worker stdin write failed; effects uncertain');}))input.pause?.();}}catch(error){fail(`action input failed: ${error.message}; effects uncertain`);}return;}
   coordinatorInputBytes+=Buffer.byteLength(chunk);if(coordinatorInputBytes>COORDINATOR_CONTROL_BYTES)return fail('coordinator control overflow; cleanup uncertain');
   if(inputPhase!=='awaiting-control')return fail('coordinator control before ready or while acknowledgement pending; cleanup uncertain');
   controlBuffer=Buffer.concat([controlBuffer,Buffer.isBuffer(chunk)?chunk:Buffer.from(chunk)]);
@@ -141,12 +166,13 @@ export async function supervise(config,{input=process.stdin,stdout=s=>writeStrea
   inputPhase='control-pending';const frame=controlBuffer;controlBuffer=Buffer.alloc(0);
   controlPromise=performControl(frame).catch(error=>fail(`coordinator control failed: ${error.message}; cleanup uncertain`));
  };
- const onEnd=()=>{inputEnded=true;if(inputPhase==='tools')child.stdin.end();else if(inputPhase!=='control-pending')fail('EOF before coordinator acknowledgement; cleanup uncertain');};const onInputError=()=>fail('input error; cleanup uncertain');
- input.on('data',onInput);input.once('end',onEnd);input.once('error',onInputError);child.stdin.on('drain',()=>{if(inputPhase==='tools')input.resume?.();});child.stdin.on('error',()=>{});
- child.stdout.on('data',chunk=>{bytesOut+=chunk.length;if(bytesOut>BOUNDS.outputBytes)return fail('output overflow; cleanup uncertain');child.stdout.pause();outputQueue=outputQueue.then(()=>forwardOutput(chunk)).catch(()=>fail('output callback failed; cleanup uncertain')).finally(()=>child.stdout.resume());});
+ const onEnd=()=>{inputEnded=true;if(inputPhase==='tools'){try{if(nativeAssignment)actionTracker.inputEOF();child.stdin.end();}catch(error){fail(`action EOF failed: ${error.message}; cleanup uncertain`);}}else if(inputPhase!=='control-pending')fail('EOF before coordinator acknowledgement; cleanup uncertain');};const onInputError=()=>fail('input error; cleanup uncertain');
+ input.on('data',onInput);input.once('end',onEnd);input.once('error',onInputError);child.stdin.on('drain',()=>{if(inputPhase==='tools')input.resume?.();});child.stdin.on('error',()=>{if(nativeAssignment)fail('worker stdin error; effects uncertain');});
+ child.stdout.on('data',chunk=>{bytesOut+=chunk.length;if(bytesOut>BOUNDS.outputBytes)return fail('output overflow; cleanup uncertain');child.stdout.pause();outputQueue=outputQueue.then(()=>forwardOutput(chunk)).catch(error=>fail(`output callback failed: ${error.message}; cleanup uncertain`)).finally(()=>child.stdout.resume());});
  child.stderr.on('data',chunk=>{bytesErr+=chunk.length;if(bytesErr>BOUNDS.stderrBytes)return fail('stderr overflow; cleanup uncertain');child.stderr.pause();errorQueue=errorQueue.then(()=>stderr(chunk)).catch(()=>fail('stderr callback failed; cleanup uncertain')).finally(()=>child.stderr.resume());});
  await new Promise(resolve=>{child.once('error',e=>{failure??=`spawn failed: ${e.message}`;resolve();});child.once('exit',(code,signal)=>{observe('worker-exit',{code,signal});exitCode=code;exitSignal=signal;resolve();});});
  let drainTimer;try{await Promise.race([closed.then(()=>Promise.all([outputQueue,errorQueue,controlPromise])),new Promise((_,reject)=>{drainTimer=clock.setTimeout(()=>reject(new Error('stdio drain uncertain')),Math.max(0,Math.min(2000,deadline-clock.now())));})]);}catch{failure??='stdio drain uncertain';}finally{clock.clearTimeout(drainTimer);}
+ if(nativeAssignment&&!failure){try{actionTracker.feedbackEOF();actionTracker.assertComplete();}catch(error){failure=`action receipts incomplete: ${error.message}`;}}
  input.off('data',onInput);input.off('end',onEnd);input.off('error',onInputError);input.pause?.();child.stdin.destroy();
  // Sidecar owns separate groups: only its successful cooperative close can establish their normal cleanup.
  // After abnormal termination these groups cannot be exhaustively identified here; never accept that run.
@@ -161,11 +187,12 @@ export async function supervise(config,{input=process.stdin,stdout=s=>writeStrea
  let outcome;
  if(exitCode===0&&!exitSignal&&!failure){try{outcome=readSmallJson(path.join(c.cellDir,'worker-outcome.json'));if(outcome.status!=='submitted'||outcome.cleanupStatus!=='closed'||outcome.confirmedOutputBytes!==bytesOut)failure='worker incomplete or feedback not fully delivered';}catch(e){failure=`invalid worker outcome: ${e.message}`;}}
  else failure??='abnormal worker exit; cleanup uncertain';
+ if(!failure){try{if(digest(readBounded(path.join(c.cellDir,'check-runtime.json'),16384))!==checkRuntimeSHA256||digest(readBounded(path.join(c.cellDir,'check-runtime-preflight.json'),16384))!==checkRuntimePreflightSHA256)throw Error('retained runtime changed');inspectCheckRuntime(c.venv,temp,checkRuntime,Math.min(30000,deadline-clock.now()));}catch(error){failure=`offline checker final validation failed: ${error.message}`;}}
  observe('supervisor-close');const ended=clock.now();acceptingObservations=false;
  if(ended>=deadline)failure??='wall timeout; cleanup uncertain';
  if(!readyObserved)failure??='ready packet not delivered';
- const timing={scope:'supervisor launch-to-close; includes loader, ready, input idle, relay, actions and cleanup',startedMonotonicMs:started,endedMonotonicMs:ended,elapsedMs:ended-started,startedAtUTC,assignmentLimitMs:BOUNDS.wallMs,observations};
- const result={timing,supervisorStartSHA256,configSHA256,admissionSHA256,groupObservation,remainingGroup,status:failure?'incomplete':'submitted',cleanup:failure?'uncertain':'closed',cleanupScope:'cooperative sidecar close and worker process group; not hostile-process containment',reason:failure,exitCode,exitSignal,bytesIn,bytesOut,bytesErr,coordinatorInputBytes,coordinatorOutputBytes,coordinatorControls,bootstrap,outcome};
+ const timing={scope:'supervisor preflight-to-close; includes offline checker validation, loader, ready, input idle, relay, actions and cleanup',startedMonotonicMs:started,endedMonotonicMs:ended,elapsedMs:ended-started,startedAtUTC,assignmentLimitMs:BOUNDS.wallMs,observations};
+ const result={timing,supervisorStartSHA256,configSHA256,admissionSHA256,checkRuntimeSHA256,checkRuntimePreflightSHA256,groupObservation,remainingGroup,status:failure?'incomplete':'submitted',cleanup:failure?'uncertain':'closed',cleanupScope:'cooperative sidecar close and worker process group; not hostile-process containment',reason:failure,exitCode,exitSignal,bytesIn,bytesOut,bytesErr,coordinatorInputBytes,coordinatorOutputBytes,coordinatorControls,coordinatorActionReceiptBytes,actionReceipts:actionTracker?.snapshot,bootstrap,outcome};
  exclusive(resultPath,result);return result;
 }
 if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url)) {

@@ -127,3 +127,30 @@ test('reconstructed declaration cannot authorize unlisted paths or transplant an
  data.changes[0].path='experiments/native-dev/unlisted.py';data.changes[0].after.path=data.changes[0].path;fs.writeFileSync(file,JSON.stringify(data));
  assert.throws(()=>verifyPreservation(root),/declaration changed/);
 });
+
+/** Explicit native-only checker additions do not relax the preserved scope or old before-states. */
+test('native offline checker generated Python is an exact source copy',()=>{
+ for(const name of ['check.py','offline_check.py','offline_check_runtime.json']){
+  assert.deepEqual(fs.readFileSync(path.join(source,'packages/server/dist/python/aiw_sidecar',name)),fs.readFileSync(path.join(source,'packages/tools/python/aiw_sidecar',name)));
+ }
+});
+test('native offline checker addition rejects content drift',t=>{
+ const root=snapshot(t);fs.appendFileSync(path.join(root,'packages/tools/python/aiw_sidecar/offline_check.py'),'\n# unreviewed change\n');
+ assert.throws(()=>verifyPreservation(root),/Preserved content changed/);
+});
+test('native offline checker addition rejects a missing tracked file',t=>{
+ const root=snapshot(t);fs.unlinkSync(path.join(root,'packages/tools/python/aiw_sidecar/offline_check_runtime.json'));
+ assert.throws(()=>verifyPreservation(root),/ENOENT/);
+});
+test('native offline checker addition rejects executable mode drift',t=>{
+ const root=snapshot(t);fs.chmodSync(path.join(root,'packages/tools/test/offline-check.test.py'),0o755);
+ assert.throws(()=>verifyPreservation(root),/mode changed/);
+});
+test('native offline checker scope rejects extra tracked helpers',t=>{
+ const root=snapshot(t),file='packages/tools/python/aiw_sidecar/unreviewed_offline_check.py';fs.writeFileSync(path.join(root,file),'# extra\n');git(root,'add',file);
+ assert.throws(()=>verifyPreservation(root),/added or missing paths/);
+});
+test('native offline checker declaration cannot expand its reviewed changes',t=>{
+ const root=snapshot(t),file=path.join(root,'.specplane/native-offline-check-inventory.json');const declaration=JSON.parse(fs.readFileSync(file));declaration.changes.push(declaration.changes[0]);fs.writeFileSync(file,JSON.stringify(declaration)+'\n');
+ assert.throws(()=>verifyPreservation(root),/Native offline checker declaration changed/);
+});

@@ -8,7 +8,8 @@ import {createNativeSession} from './session.ts';
 // Invoked only by finite supervisor with an explicit minimal whole-process environment.
 const c=readConfig(process.argv[2]);
 if(!process.env.HOME)throw new Error('missing isolated home');
-const expected=sanitizedEnv(c,process.env.HOME);
+const runtime=JSON.parse(readBounded(path.join(c.cellDir,'check-runtime.json'),16384).toString('utf8'));
+const expected=sanitizedEnv(c,process.env.HOME,runtime);
 if(Object.keys(process.env).sort().join(',')!==Object.keys(expected).sort().join(',')||Object.entries(expected).some(([k,v])=>process.env[k]!==v))throw new Error('worker environment mismatch');
 process.stdout.on('error',()=>{});
 const publicTask=readBounded(path.join(c.cellDir,'TASK.md'),32768).toString('utf8');

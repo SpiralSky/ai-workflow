@@ -81,7 +81,7 @@ test('enforces independent source limits and counts duplicated task bytes', () =
 
 
 test('v2 common template fixes one-action turns and same-actor continuation without polling',()=>{
-  assert.equal(PROTOCOL_VERSION,'native-interactive-public-bootstrap-v2');
+  assert.equal(PROTOCOL_VERSION,'native-interactive-action-receipt-v3');
   assert.ok(PUBLIC_HANDOFF_TEMPLATE.startsWith('PUBLIC NATIVE ASSIGNMENT PROTOCOL v2\n'));
   for(const exact of [
     'Send exactly one JSON action line per turn',

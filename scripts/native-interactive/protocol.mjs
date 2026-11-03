@@ -1,6 +1,6 @@
 import {createHash} from 'node:crypto';
 
-export const PROTOCOL_VERSION='native-interactive-public-bootstrap-v2';
+export const PROTOCOL_VERSION='native-interactive-action-receipt-v3';
 export const LIMITS = Object.freeze({assignmentMs:900000, actionMs:60000, rounds:12, hostCalls:60, lineBytes:98304, sourceBytes:32768, feedbackBytes:1048576});
 /** Host monotonic observation; durations are derived only within the observing process. */
 export const monotonicNow = () => Number(process.hrtime.bigint()) / 1e6;

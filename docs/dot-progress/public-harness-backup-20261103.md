@@ -23,3 +23,19 @@ do not establish this partial export's full test-suite success.
 Export verification: 35/35 synthetic protocol/handoff/bootstrap tests passed,
 with no skipped tests, native actors or model calls. These do not exercise private
 grading or establish full suite success.
+
+## Public refresh
+
+Selected public action-receipt and native-only offline-checker changes copied from
+reviewed local source 24f20eec2ed2bf8997b6dbaa6e7fca438f7cc4ed. Its private history,
+grader, fixtures and detailed internal evidence notes remain excluded. The offline
+checker requires an already installed, exactly pinned runtime and fails closed on
+missing/drifted dependencies; this export installs nothing and bundles no runtime.
+
+Fresh export checks: 57/57 synthetic protocol/handoff/bootstrap/receipt controls;
+8/8 Python offline-launcher controls with the existing verified Python environment
+and pyright1.1.414, zero skipped tests. Before that valid Python run, two invocation
+setup failures executed zero tests: missing PYTHONPATH, then system Python missing
+pyright metadata. The first full traceback was overwritten; its final import error
+remains in tool history. The second failure and successful run have separate logs.
+No full-export suite, live actor, task-success or comparative cost result is claimed.

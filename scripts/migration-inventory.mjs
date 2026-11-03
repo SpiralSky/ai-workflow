@@ -129,5 +129,21 @@ export function applyDevelopmentAllowances(root, inventory, replacements, allowa
     assert.equal(entry.after.path,entry.path);validateInventory({version:1,source_ref:native.source_commit,files:[entry.after]});
     expected.set(entry.path,entry.after);
   }
+  // Separately reviewed native-only checker delta; the migration and fixture baselines remain immutable.
+  const offlineBytes=fs.readFileSync(path.join(root,'.specplane/native-offline-check-inventory.json'));
+  assert.equal(sha256(offlineBytes),'1b5debc210c407fe636f86f1e6469bd1efadefdbb260167d39bd2d68a67833da','Native offline checker declaration changed');
+  const offline=JSON.parse(offlineBytes);
+  assert.equal(offline.version,1);assert.equal(offline.kind,'native-offline-check-adaptation');
+  assert.equal(offline.base_commit,'b768e012e69008aacb1aec1e09014bc41837a182');assert.equal(offline.canonicalCampaign,false);
+  const offlinePaths=["packages/server/dist/python/aiw_sidecar/check.py", "packages/server/dist/python/aiw_sidecar/offline_check.py", "packages/server/dist/python/aiw_sidecar/offline_check_runtime.json", "packages/tools/python/aiw_sidecar/check.py", "packages/tools/python/aiw_sidecar/offline_check.py", "packages/tools/python/aiw_sidecar/offline_check_runtime.json", "packages/tools/test/offline-check.test.py"];
+  assert.deepEqual(offline.changes.map(change=>change.path).sort(),offlinePaths,'Native offline checker scope changed');
+  for(const change of offline.changes){
+    assert.deepEqual(change.before,expected.get(change.path)??null,`Native offline checker before-state mismatch: ${change.path}`);
+    assert.ok(change.after,'Native offline checker adaptation cannot delete preserved files');
+    assert.equal(change.after.path,change.path);assert.equal(change.after.mode,'100644');
+    validateInventory({version:1,source_ref:offline.base_commit,files:[change.after]});
+    assert.notDeepEqual(change.before,change.after,`Unnecessary native offline checker delta: ${change.path}`);
+    expected.set(change.path,change.after);
+  }
   return {...inventory,files:[...expected.values()]};
 }

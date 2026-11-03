@@ -39,7 +39,11 @@ def _target(root, path):
 
 
 def _pyright(root, arg):
-    r = _run([_bin("pyright"), "--outputjson", arg], root)
+    argv = [_bin("pyright"), "--outputjson", arg]
+    if "AIW_OFFLINE_CHECKS" in os.environ:
+        from .offline_check import pyright_argv
+        argv = pyright_argv(arg)
+    r = _run(argv, root)
     try:
         data = json.loads(r.stdout)
     except ValueError:

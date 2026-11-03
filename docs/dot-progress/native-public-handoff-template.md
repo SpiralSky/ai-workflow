@@ -23,7 +23,7 @@ The fixed bootstrap emits the exact public TASK bytes and the entire original UT
 A bootstrap receipt only records a local emission callback acknowledgement. It is not proof of transport delivery, model consumption, actor identity, hostile-actor isolation, task success, or billing/token usage.
 ```
 
-The v2 template is 4040 UTF-8 bytes with SHA256 6c084b967aa3685fc54c93d13cf25afaa83b110299032b6e29dfc0f11f19f2a8. It replaces the v1 implied waiting convention with explicit one-action turns and same-actor continuation. The protocol identifier is native-interactive-public-bootstrap-v2. No project runtime, limit, parser, transport, or supervisor behavior changes with this revision.
+The v2 template is 4040 UTF-8 bytes with SHA256 6c084b967aa3685fc54c93d13cf25afaa83b110299032b6e29dfc0f11f19f2a8. It replaces the v1 implied waiting convention with explicit one-action turns and same-actor continuation. The template was introduced with protocol identifier native-interactive-public-bootstrap-v2. The later coordinator-only native-interactive-action-receipt-v3 protocol retains these exact actor-visible template bytes; see native-action-receipt-proposal.md. No project runtime, limit, parser, transport, or supervisor behavior changes with this revision.
 
 ## Exact initial bootstrap message (v2)
 

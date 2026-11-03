@@ -1,3 +1,5 @@
+import {checkRuntimePolicy,verifyCellCheckRuntime} from './check-runtime.mjs';
+import {validateActionReceiptEvidence} from './action-receipt-files.mjs';
 import {publicHandoffPolicy,prepareCellPublicHandoff,verifyCellPublicHandoff,readCellBootstrapReceipt} from './handoff-files.mjs';
 import {verifyReadyLiveness}from './readiness.mjs';
 import {hotpathBinding}from './hotpath-source.mjs';
@@ -10,7 +12,7 @@ function write(p,value){fs.writeFileSync(p,JSON.stringify(value,null,2)+'\n',{fl
 function copyInventory(source,target,expected){fs.mkdirSync(target);for(const rel of Object.keys(expected)){const dest=path.join(target,rel);fs.mkdirSync(path.dirname(dest),{recursive:true});const bytes=readBounded(path.join(source,rel));if(digest(bytes)!==expected[rel].sha256)throw Error('source changed');fs.writeFileSync(dest,bytes,{flag:'wx',mode:expected[rel].mode});}if(JSON.stringify(inventory(target))!==JSON.stringify(expected))throw Error('copy mismatch');}
 function sourceBindings(){
  const tracked=execFileSync('git',['ls-files','-z','packages','experiments/native-dev'],{cwd:repo,maxBuffer:1048576,encoding:'utf8'}).split('\0').filter(Boolean);
- const bindings={};for(const p of [...tracked,'scripts/native-comparison/method.test.ts','.specplane/native-reconstruction-inventory.json','scripts/migration-inventory.mjs','scripts/check-specplane-migration.mjs','scripts/check-specplane-migration.test.mjs','scripts/test-cloud.mjs','scripts/test-cloud.test.mjs','scripts/native-fixture-controls.py','docs/dot-progress/native-interactive-reconstruction.md','docs/dot-progress/native-hotpath-extension-plan.md','docs/dot-progress/native-public-handoff-template.md','experiments/native-dev/manifest.json','experiments/native-dev/grade.py','package.json','package-lock.json',...fs.readdirSync(path.join(repo,'scripts/native-interactive')).filter(x=>/\.(?:mjs|mts|ts)$/.test(x)).map(x=>'scripts/native-interactive/'+x)]){const file=path.join(repo,p),st=fs.lstatSync(file);if(!st.isFile()||st.nlink!==1||st.size>8388608||fs.realpathSync(file)!==file)throw Error('unsafe source');bindings[p]=digest(readBounded(file,8388608));}
+ const bindings={};for(const p of [...tracked,'packages/tools/python/aiw_sidecar/offline_check.py','packages/tools/python/aiw_sidecar/offline_check_runtime.json','scripts/native-comparison/method.test.ts','.specplane/native-reconstruction-inventory.json','.specplane/native-offline-check-inventory.json','scripts/migration-inventory.mjs','scripts/check-specplane-migration.mjs','scripts/check-specplane-migration.test.mjs','scripts/test-cloud.mjs','scripts/test-cloud.test.mjs','scripts/native-fixture-controls.py','docs/dot-progress/native-interactive-reconstruction.md','docs/dot-progress/native-hotpath-extension-plan.md','docs/dot-progress/native-public-handoff-template.md','docs/dot-progress/native-action-receipt-proposal.md','docs/dot-progress/native-offline-check-adaptation.md','experiments/native-dev/manifest.json','experiments/native-dev/grade.py','package.json','package-lock.json',...fs.readdirSync(path.join(repo,'scripts/native-interactive')).filter(x=>/\.(?:mjs|mts|ts)$/.test(x)).map(x=>'scripts/native-interactive/'+x)]){const file=path.join(repo,p),st=fs.lstatSync(file);if(!st.isFile()||st.nlink!==1||st.size>8388608||fs.realpathSync(file)!==file)throw Error('unsafe source');bindings[p]=digest(readBounded(file,8388608));}
  return bindings;
 }
 function fingerprint(state){const keys=Object.keys(state).sort();if(keys.some(k=>/[^\x00-\x7f]/.test(k)))throw Error("non-ASCII fixture paths unsupported");return digest("{"+keys.map(k=>JSON.stringify(k)+": "+JSON.stringify(state[k].sha256)).join(", ")+"}");}
@@ -26,7 +28,7 @@ export function prepareCell({cellDir,fixtureId,arm,venv,evidenceMode='synthetic-
  const bindings=sourceBindings();
  const task=readBounded(path.join(repo,fixture.taskPath)).toString('utf8');fs.writeFileSync(path.join(cellDir,'TASK.md'),task,{flag:'wx'});
  const config={arm,root:path.join(cellDir,'workspace'),allowedWritePaths:fixture.allowedWritePaths,venv,journalDir:path.join(cellDir,'journal'),cellDir};
- write(path.join(cellDir,'admission.json'),{version:1,canonicalCampaign:false,evidenceMode,publicHandoffPolicy:publicHandoffPolicy(),fixtureId,arm,bindings,candidateBinding:hotpathBinding(),original,taskSHA256:digest(task),config});write(path.join(cellDir,'config.json'),config);
+ write(path.join(cellDir,'admission.json'),{version:1,canonicalCampaign:false,evidenceMode,publicHandoffPolicy:publicHandoffPolicy(),checkRuntimePolicy:checkRuntimePolicy(),fixtureId,arm,bindings,candidateBinding:hotpathBinding(),original,taskSHA256:digest(task),config});write(path.join(cellDir,'config.json'),config);
  return config;
 }
 /** Coordinator only, after normal cooperative close plus supervisor process-group check. */
@@ -40,10 +42,11 @@ export function snapshotSubmission({cellDir}){
  const terminal=readJSON(path.join(config.journalDir,names.at(-1)));if(terminal.type!=='terminal'||terminal.outcome.status!=='submitted'||terminal.outcome.cleanupStatus!=='closed')throw Error('missing successful terminal');
  if(JSON.stringify(supervision.outcome)!==JSON.stringify(terminal.outcome)||supervision.configSHA256!==digest(readBounded(path.join(cellDir,'config.json')))||supervision.admissionSHA256!==digest(readBounded(path.join(cellDir,'admission.json'))))throw Error('supervisor binding mismatch');
  const state=inventory(config.root);assertPermittedDelta(admission.original,state,config.allowedWritePaths);
+ const checkRuntimeSHA256=supervision.checkRuntimeSHA256!==undefined||admission.evidenceMode==='native-assignment'?verifyCellCheckRuntime({cellDir,admission,supervision}):undefined;
  const dispatch=nativeEvidence(cellDir,admission);
  const snapshot=path.join(cellDir,'submission');copyInventory(config.root,snapshot,state);
  if(JSON.stringify(inventory(config.root))!==JSON.stringify(state))throw Error('workspace changed during snapshot');
- const result={evidenceMode:admission.evidenceMode,dispatch,status:'review_required',fullTaskSuccess:null,snapshot,inventory:state,admissionSHA256:digest(readBounded(path.join(cellDir,'admission.json'))),supervisorSHA256:digest(readBounded(path.join(cellDir,'supervisor-result.json'))),journalSHA256:digest(names.map(n=>[n,digest(readBounded(path.join(config.journalDir,n)))]))};
+ const result={evidenceMode:admission.evidenceMode,dispatch,checkRuntimeSHA256,status:'review_required',fullTaskSuccess:null,snapshot,inventory:state,admissionSHA256:digest(readBounded(path.join(cellDir,'admission.json'))),supervisorSHA256:digest(readBounded(path.join(cellDir,'supervisor-result.json'))),journalSHA256:digest(names.map(n=>[n,digest(readBounded(path.join(config.journalDir,n)))]))};
  write(path.join(cellDir,'submission-result.json'),result);return result;
 }
 /** Freeze order before actor assignments; failed cells stop this campaign rather than being skipped. */
@@ -51,10 +54,11 @@ export function freezeCampaign({campaignDir,cells,evidenceMode='synthetic-contro
  if(!['synthetic-control','native-assignment'].includes(evidenceMode))throw Error('invalid evidence mode');
  if(!path.isAbsolute(campaignDir)||!Array.isArray(cells)||!cells.length||cells.length>100)throw Error('invalid campaign');
  const seen=new Set();for(const c of cells){if(!/^[a-z0-9-]+$/.test(c.id)||seen.has(c.id)||!ARMS.includes(c.arm)||typeof c.fixtureId!=='string')throw Error('invalid cell');seen.add(c.id);}
- fs.mkdirSync(campaignDir);write(path.join(campaignDir,'campaign.json'),{version:1,canonicalCampaign:false,evidenceMode,publicHandoffPolicy:publicHandoffPolicy(),cells,bindings:sourceBindings(),candidateBinding:hotpathBinding(),limits:LIMITS,costMetric:'visible byte lower bound; no measured tokens/cache/billing',purpose:'small-set screening'});
+ fs.mkdirSync(campaignDir);write(path.join(campaignDir,'campaign.json'),{version:1,canonicalCampaign:false,evidenceMode,publicHandoffPolicy:publicHandoffPolicy(),checkRuntimePolicy:checkRuntimePolicy(),cells,bindings:sourceBindings(),candidateBinding:hotpathBinding(),limits:LIMITS,costMetric:'visible byte lower bound; no measured tokens/cache/billing',purpose:'small-set screening'});
 }
 export function admitNext({campaignDir,index,venv,actorId}){
  const campaign=readJSON(path.join(campaignDir,'campaign.json'));
+ if(JSON.stringify(campaign.checkRuntimePolicy)!==JSON.stringify(checkRuntimePolicy()))throw Error('frozen checker runtime policy changed');
  if(JSON.stringify(campaign.candidateBinding)!==JSON.stringify(hotpathBinding()))throw Error('frozen candidate changed');
  if(JSON.stringify(campaign.bindings)!==JSON.stringify(sourceBindings())||JSON.stringify(campaign.limits)!==JSON.stringify(LIMITS))throw Error('frozen campaign sources/limits changed');
  if(!Number.isInteger(index)||index<0||index>=campaign.cells.length||typeof actorId!=='string'||!actorId)throw Error('invalid assignment');
@@ -134,9 +138,11 @@ export function recordActorDispatchReceipt({cellDir,actorId,nativeTaskId,receipt
 function nativeEvidence(cellDir,admission,expected){
  if(admission.evidenceMode==='synthetic-control'){if(expected!==undefined&&expected!==null)throw Error('synthetic dispatch mismatch');return null;}
  if(admission.evidenceMode!=='native-assignment')throw Error('unknown evidence mode');
+ const checkRuntimeSHA256=verifyCellCheckRuntime({cellDir,admission,supervision:readJSON(path.join(cellDir,'supervisor-result.json'))});
  const assignment=readJSON(path.join(cellDir,'assignment.json')),intent=readJSON(path.join(cellDir,'actor-dispatch-intent.json')),receipt=readJSON(path.join(cellDir,'actor-dispatch-receipt.json')),ready=readJSON(path.join(cellDir,'supervisor-ready.json'));
  const bootstrap=readCellBootstrapReceipt({cellDir});
- const hashes={handoffSHA256:bootstrap.description.handoffSHA256,capabilitySHA256:bootstrap.description.capabilitySHA256,bootstrapReceiptSHA256:bootstrap.receiptSHA256,bootstrapAttemptSHA256:bootstrap.attemptSHA256,bootstrapOutputBytes:bootstrap.receipt.emittedOutput.bytes,bootstrapOutputSHA256:bootstrap.receipt.emittedOutput.sha256,supervisorSHA256:digest(readBounded(path.join(cellDir,'supervisor-result.json'))),intentSHA256:digest(readBounded(path.join(cellDir,'actor-dispatch-intent.json'))),receiptSHA256:digest(readBounded(path.join(cellDir,'actor-dispatch-receipt.json'))),nativeTaskId:receipt.nativeTaskId,receiptReference:receipt.receiptReference};
+ const actionReceipts=validateActionReceiptEvidence({cellDir,supervision:readJSON(path.join(cellDir,'supervisor-result.json'))});
+ const hashes={checkRuntimeSHA256,actionReceipts,handoffSHA256:bootstrap.description.handoffSHA256,capabilitySHA256:bootstrap.description.capabilitySHA256,bootstrapReceiptSHA256:bootstrap.receiptSHA256,bootstrapAttemptSHA256:bootstrap.attemptSHA256,bootstrapOutputBytes:bootstrap.receipt.emittedOutput.bytes,bootstrapOutputSHA256:bootstrap.receipt.emittedOutput.sha256,supervisorSHA256:digest(readBounded(path.join(cellDir,'supervisor-result.json'))),intentSHA256:digest(readBounded(path.join(cellDir,'actor-dispatch-intent.json'))),receiptSHA256:digest(readBounded(path.join(cellDir,'actor-dispatch-receipt.json'))),nativeTaskId:receipt.nativeTaskId,receiptReference:receipt.receiptReference};
  if(intent.actorId!==assignment.actorId||receipt.actorId!==assignment.actorId||typeof receipt.nativeTaskId!=='string'||!receipt.nativeTaskId.trim()||typeof receipt.receiptReference!=='string'||!receipt.receiptReference.trim()||receipt.intentSHA256!==hashes.intentSHA256||intent.assignmentSHA256!==digest(readBounded(path.join(cellDir,'assignment.json')))||intent.readySHA256!==digest(readBounded(path.join(cellDir,'supervisor-ready.json')))||ready.admissionSHA256!==digest(readBounded(path.join(cellDir,'admission.json'))))throw Error('native dispatch lineage mismatch');
  const supervision=readJSON(path.join(cellDir,'supervisor-result.json')),start=readJSON(path.join(cellDir,'supervisor-start.json'));
  const observations=supervision.timing?.observations,acks=observations?.filter(e=>e.type==='coordinator-control-ack')??[],inputs=observations?.filter(e=>e.type==='actor-input-start')??[];
