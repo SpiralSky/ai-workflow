@@ -1,10 +1,10 @@
 # AI Workflow status
 
-Updated: 2026-11-03 16:37 UTC. This is the single current status file; dated notes and Git history retain earlier milestones.
+Updated: 2026-11-03 16:40 UTC. This is the single current status file; dated notes and Git history retain earlier milestones.
 
 ## Running and since when
 
-**Investigating minimal pinned actual-orchestrate wiring**, active as of 16:32 UTC. Existing candidate: [commit `8dcf05ba`](https://github.com/SpiralSky/ai-workflow/commit/8dcf05bad0c0f7c806db3d7350060435018773f8), with a planned feature-flag off/on contrast on that same commit. **Candidate actor execution stopped before launch:** metadata inspection identified **18 hidden-test/reference paths** in the public candidate checkout. Their contents were not opened or deleted by that inspection. A sanitized operational export without Git history and bounded cleanup of the recoverable checkout are under review, not completed. No actors/model runs are underway; two completed direct controls are **not evaluations of the actual orchestrate implementation**.
+**Investigating minimal pinned actual-orchestrate wiring**, active as of 16:32 UTC. Existing candidate: [commit `8dcf05ba`](https://github.com/SpiralSky/ai-workflow/commit/8dcf05bad0c0f7c806db3d7350060435018773f8), with a planned feature-flag off/on contrast on that same commit. **Actors remain held:** expanded metadata-only inspection found the same set of **18 unrelated public benchmark hidden-test/reference paths in five older checkouts, including their histories**, in addition to the candidate finding. No contents were read or deleted. Sanitized export and recoverable-checkout cleanup remain under review; no-model investigation continues. No actors/model runs are underway; two completed direct controls are **not evaluations of the actual orchestrate implementation**.
 
 Reviews and private evidence have been recorded. The final **644-file private bundle was independently verified before cleanup**. Completion of sensitive/candidate-file cleanup is not asserted here; verify scoped absence before any future solve. Three-hour checkpointing remains enabled.
 
@@ -12,7 +12,7 @@ Reviews and private evidence have been recorded. The final **644-file private bu
 
 [Published direct-harness baseline report](https://github.com/SpiralSky/ai-workflow/blob/fa3111fa9cca7129b6a8f42473108f7ba07304a9/docs/dot-progress/calendar-direct-baseline-repeats-20261103.md), verified readable today.
 
-Both sequential `calendar-window` direct-arm assignments used commit `7819bf1a124f2a7606708dc5989e74fa0a1a3dd7`, identical declared task/handoff/runtime/limits, and froze before private grading. First-cell backup/restore (161 files), scoped answer-copy removal and bounded absence checking preceded the second solve.
+Both sequential `calendar-window` direct-arm assignments used commit `7819bf1a124f2a7606708dc5989e74fa0a1a3dd7`, identical declared task/handoff/runtime/limits, and froze before private grading. First-cell backup/restore (161 files), scoped answer-copy removal and bounded calendar-grader/known-path absence checking preceded the second solve. Later metadata checks found unrelated legacy benchmark/reference paths outside that scope; these results never establish whole-machine absence.
 
 | Observation | Repeat one | Repeat two |
 |---|---:|---:|
@@ -29,10 +29,11 @@ Independent review confirmed permitted changes, protected-test preservation and 
 
 ## Limits and remaining gates
 
-- **Candidate checkout contains reference paths:** metadata inspection found 18 hidden-test/reference paths at candidate `8dcf05ba`; no identified file contents were read or deleted. Do not expose the original checkout to actors. The proposed no-Git operational export and bounded recoverable-checkout cleanup require review and verification; neither procedural withholding nor removing Git history establishes isolation.
+- **Expanded legacy-path finding:** metadata-only inspection found the same 18 unrelated public benchmark hidden/reference paths in five older checkouts and their histories, as well as the candidate checkout. No bodies were read or deleted. This broadens the cleanup/admission scope; actors stay held. Any sanitized export or bounded recoverable cleanup requires review/verification and is not an isolation boundary.
+- **Earlier v2 absence-check scope clarified:** those checks covered the calendar private grader and enumerated known paths, **not these legacy public benchmark files or their histories**. No whole-machine absence or comprehensive reference-withholding claim is justified. The metadata finding does not establish that either actor read these unrelated files; it adds a known accessibility/detection limitation to the screening result.
 - **Actual candidate identified, execution path incomplete:** pin `8dcf05bad0c0f7c806db3d7350060435018773f8` for both flag-off/on arms. The existing native relay constructs baseline/branch-only, not this orchestrate candidate, so relabeling it would not exercise the treatment. A completion bridge is absent. Minimal pinned wiring is being investigated with no-model controls only; no model evaluation has run.
 - **Unknown usage must remain unknown:** the existing numeric usage contract cannot honestly represent unavailable native usage. A faithful representation is under investigation; do not fill missing usage with zero, invent token/cost measurements, or claim the current adapter already satisfies that contract. No broader infrastructure is planned.
-- **Cooperative reach limitation remains accepted and explicit.** Graders/reference answers were withheld procedurally from known solve-time copies; submitted code may reach grader resources during post-solve grading under the same OS user. Shared plugin access and unknown copies are not isolated.
+- **Cooperative reach limitation remains accepted and explicit.** The calendar private grader and known listed copies were withheld procedurally; the expanded legacy paths were outside that earlier check. Submitted code may reach grader resources during post-solve grading under the same OS user. Shared plugin access, legacy histories and other copies are not isolated.
 - **Audit incomplete.** Available submission/relay/journal evidence reported no literal canary hits or observed out-of-workspace host arguments. Full native tool logs were unavailable; subprocess reads were unobserved. Unmarked copies remain a detection gap. No-hit evidence is not proof of no leakage.
 - **Future-solve hygiene:** verify private grader/reference/candidate evidence is checkpointed and off the scoped solving filesystem before another actor. Do not infer absence everywhere from bounded checks.
 - **No new isolated runner.** The user accepts cooperative screening; later isolated confirmation is separate. Do not build that runner now or infer paid/API authority from code or status publication.
@@ -69,7 +70,7 @@ At three-hour reflection, report observable rework, retries, dead ends, blocked 
 
 ## Independent work instead
 
-Review a sanitized no-Git operational export from pinned `8dcf05ba` and bounded cleanup of its recoverable checkout so reference paths are absent from the intended solving environment. Preserve exact source provenance without exposing excluded content. Continue no-model wiring and honest unknown-usage investigation; do not start actors, claim isolation or expand into broader infrastructure while these gates remain unresolved. Preserve the completed direct-control result and verify final private-bundle retention/cleanup before future solves. Do not launch another actor merely to avoid recording a blocker, alter old outcomes, weaken grading or treat direct controls as an optimization experiment. Keep useful authorized preparation moving around blockers; respect denials and ask when additional authority is required.
+Review a sanitized no-Git operational export from pinned `8dcf05ba` and the expanded bounded cleanup/admission scope across recoverable legacy checkouts and histories. Do not silently delete those checkouts or imply removing one export resolves shared access elsewhere. Preserve exact source provenance without exposing excluded content. Continue no-model wiring and honest unknown-usage investigation; do not start actors, claim isolation or expand into broader infrastructure while these gates remain unresolved. Preserve the completed direct-control result and verify final private-bundle retention/cleanup before future solves. Do not launch another actor merely to avoid recording a blocker, alter old outcomes, weaken grading or treat direct controls as an optimization experiment. Keep useful authorized preparation moving around blockers; respect denials and ask when additional authority is required.
 
 ## Idea ledger
 
@@ -79,7 +80,7 @@ See the [deduplicated registry](../ideas/experiment-registry.md) for historical 
 |---|---|---|
 | Classifier filtering | Optional implementation; named-model effectiveness deferred. | Matched actual quality/recall/task-cost results. |
 | Scoped selector reuse | Prototype `3adfa8c`, library-only. | Task/runner wiring and eligible repeat opportunities; historical synthetic 6→4 calls are not savings. |
-| Known-good hot paths | Actual candidate `8dcf05ba`; 120 core tests and four-arm synthetic probe pass. Earlier two-snippet policy remains parked. | Metadata found 18 reference/test paths; sanitized export/cleanup review pending. Completion bridge and honest usage also unresolved; no actual matched model result. |
+| Known-good hot paths | Actual candidate `8dcf05ba`; 120 core tests and four-arm synthetic probe pass. Earlier two-snippet policy remains parked. | Metadata found 18 legacy reference/test paths across additional checkouts/histories; expanded cleanup review pending. Completion bridge and honest usage also unresolved; no matched model result. |
 | Static-context/type interning | Candidate documented with focused checks/survey. | Aggregate/native quality evidence; declaration bytes are not tokens or dollars. |
 
 Existing rerank-none, lazy tool search, reference passing and BM25 caching are controls/mechanisms, not newly measured ideas. **Qualified for later isolated confirmation: none.**
@@ -88,7 +89,7 @@ Existing rerank-none, lazy tool search, reference passing and BM25 caching are c
 
 - **Status branch:** local `dot/status-ledger-20261103` began at `21fcab0`; remote branch began at public backup `3e3b715`. Only this sanitized status file is transferred. Each published revision is checked for exact contents, branch head and status-only diff; the containing commit identifies this checkpoint.
 - **Public results/code:** report and implementation checkpoints are linked above. **Private raw evidence:** final 644-file bundle independently verified; no raw candidate, grader, reference, receipt or real canary is published here. Cleanup must be confirmed before the next solve.
-- **Candidate checkout/export:** original recoverable checkout contains the 18 metadata-identified paths. Sanitized operational export and cleanup are proposed/under review, not represented as completed or externally checkpointed. This status publishes neither path lists nor private contents.
+- **Candidate/legacy checkout scope:** 18 metadata-identified legacy public benchmark/reference paths also appear in five older checkouts and histories. No content read or deletion occurred in that inspection. Sanitized export/cleanup remain under review, not completed. This status publishes neither path lists nor their contents; earlier bounded calendar checks are not whole-machine absence evidence.
 - Other local branches remain preserved without a blanket claim of remote equivalence. Historical `620a421` remains unavailable. Original source checkpoints are not silently merged or reset.
 - **Three-hour schedule enabled**, per coordinator confirmation. A schedule is not evidence of successful execution or environment persistence.
 - No default/protected-branch edits, PR approvals, merges, force pushes, destructive actions, Codex tasks or paid/model calls occurred in this status task. Future writes remain scoped and authorized.
