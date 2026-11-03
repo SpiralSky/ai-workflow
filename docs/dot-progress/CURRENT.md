@@ -4,7 +4,7 @@ Updated: 2026-11-03 14:11 UTC. This is the single current status file; dated not
 
 ## Running and since when
 
-- Status reconciliation: local recovery completed 2026-11-03 14:07 UTC; sanitized external checkpoint preparation resumed at 14:08 UTC, in isolated worktree `ai-workflow-status-ledger`, branch `dot/status-ledger-20261103`, from `21fcab098837dced6d034905ae9bfe809c4c401a`.
+- Status reconciliation: ran 2026-11-03 14:03–14:07 UTC; external checkpoint work resumed at 14:08 UTC and first exact remote verification passed at 14:11 UTC. Documentation work is complete in isolated worktree `ai-workflow-status-ledger`, branch `dot/status-ledger-20261103`, from `21fcab098837dced6d034905ae9bfe809c4c401a`.
 - Anti-cheating list and PR guides: delivered directly in chat, as reported by the coordinator today. Security reconstruction/review remains a separate unfinished action; its execution start is not established here.
 - Real model evaluation: **not running**. No current baseline repetitions, timing/token measurement, or baseline-versus-idea comparison has been established. The local process-name check found no Node, Python, Docker, or Podman job; it does not prove remote jobs are absent.
 
@@ -38,12 +38,12 @@ No Codex task is started for this work. No default/protected branch changes, app
 
 - **Later isolated confirmation:** neither `docker` nor `podman` is on this executor's PATH today. This does not block user-authorized native screening once its immediate safety gates pass. Do not build an isolated runner now; record qualifying ideas for later confirmation.
 - **Security and experiment admission:** the prior data-only persistence patch `620a421` is unavailable here and unverified externally; reconstruct and independently review it before actor runs. The verified [public backup checkpoint](https://github.com/SpiralSky/ai-workflow/commit/3e3b7152eb29878aa1f0f85f697672eb0e6369ba) lacks private grading pieces; the private backup has now passed archive and manifest verification, but usable code reconstruction and independent security review are still pending. No live model backend or token usage is verified. Native actor tests were authorized, but are not equivalent to production orchestration or comparable benchmark results. Provider authorization is not declared missing; its exact applicable scope must be checked before any action requiring it.
-- **External checkpoint of this file:** publication preparation is active; exact remote readback must pass before calling it verified. The remote public-backup head was freshly read as `3e3b7152eb29878aa1f0f85f697672eb0e6369ba`; only this sanitized file will be added on a dedicated status branch, not the older local source tree.
+- **External status checkpoint resolved:** first remote checkpoint [`4d830205`](https://github.com/SpiralSky/ai-workflow/commit/4d8302058d006ff64173962a9b442fc58dd7a355) passed exact content/blob readback and branch-head verification. Comparison against freshly read `3e3b715` confirms only this status file changed. This receipt-only update does not publish the older local source tree.
 - **Historical Codebase Memory graph blocker:** Nov 1 notes record Unix IPC denial and no successful index/query. Not retried or represented as verified working today.
 
 ## Independent work instead
 
-Evidence-ledger recovery is locally committed; sanitized external checkpoint preparation is active. Preserve the already delivered anti-cheating/PR guidance. Continue independently authorized shell-safety reconstruction/review, hostile-character tests, source/fixture recovery, and leakage-control preparation. Do not start actor runs before the safety fix is externally checkpointed; do not build the later isolated runner. Preserve each blocked action's state. Do not retry canceled actions or route around denials. If these independent actions finish and no authorized work remains, replace this section with **STOPPED**, name the remaining dependency, and notify the user.
+Evidence-ledger recovery and the first sanitized external checkpoint are complete; this documentation task has stopped after recording verification. Preserve the already delivered anti-cheating/PR guidance. Continue independently authorized shell-safety reconstruction/review, hostile-character tests, source/fixture recovery, and leakage-control preparation. Do not start actor runs before the safety fix is externally checkpointed; do not build the later isolated runner. Preserve each blocked action's state. Do not retry canceled actions or route around denials. If these independent actions finish and no authorized work remains, replace this section with **STOPPED**, name the remaining dependency, and notify the user.
 
 ## Idea ledger
 
@@ -60,7 +60,7 @@ Use the [deduplicated registry](../ideas/experiment-registry.md) for full histor
 
 ## Local-only work and checkpoints
 
-- **This ledger:** `docs/dot-progress/CURRENT.md`, local branch `dot/status-ledger-20261103` from `21fcab0`; intended remote branch of the same name from freshly verified `3e3b715`. Their Git ancestry differs intentionally: only this sanitized file is transferred. Commit-linked publication/readback evidence will identify the remote checkpoint; local Git history does not by itself prove publication.
+- **This ledger:** `docs/dot-progress/CURRENT.md`, local branch `dot/status-ledger-20261103` from `21fcab0`; remote branch of the same name from freshly verified `3e3b715`. Their Git ancestry differs intentionally: only this sanitized file was transferred. Initial externally verified file blob: `09e64a4d82c84ec7e14b6f64f6535c097f82889d` at commit `4d830205`; the containing remote commit records this later receipt update.
 - **Other local source branches:** preserved unchanged. A matching remote branch/tree must be verified before calling any local source externally backed up; prior recorded PR commits were created through the API and differ from local commit IDs.
 - **Missing prior checkpoint:** `620a421` remains unrecovered in this checkout. This status task attempted no deletion, replacement, cherry-pick, or fabricated recreation. Any reconstruction must have a new identity and fresh evidence.
 - **Scheduled checkpoints:** coordinator reports an automation created every three hours, first scheduled 2026-11-04 01:05 Singapore time (2026-11-03 17:05 UTC). Execution and environment persistence are unverified; a schedule is not a successful backup.
