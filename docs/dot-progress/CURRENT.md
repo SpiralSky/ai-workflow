@@ -1,10 +1,10 @@
 # AI Workflow status
 
-Updated: 2026-11-03 16:31 UTC. This is the single current status file; dated notes and Git history retain earlier milestones.
+Updated: 2026-11-03 16:33 UTC. This is the single current status file; dated notes and Git history retain earlier milestones.
 
 ## Running and since when
 
-**Investigating an actual orchestrate-matched comparison path**, reported active at 16:29 UTC. No actors are running. Two direct-harness repeats are complete and their sanitized report is published; they are **not evaluations of the actual orchestrate implementation**.
+**Investigating minimal pinned actual-orchestrate wiring**, active as of 16:32 UTC. Existing candidate: [commit `8dcf05ba`](https://github.com/SpiralSky/ai-workflow/commit/8dcf05bad0c0f7c806db3d7350060435018773f8), with a planned feature-flag off/on contrast on that same commit. No actors or model runs are underway. Two completed direct-harness controls are **not evaluations of the actual orchestrate implementation**.
 
 Reviews and private evidence have been recorded. The final **644-file private bundle was independently verified before cleanup**. Completion of sensitive/candidate-file cleanup is not asserted here; verify scoped absence before any future solve. Three-hour checkpointing remains enabled.
 
@@ -29,7 +29,8 @@ Independent review confirmed permitted changes, protected-test preservation and 
 
 ## Limits and remaining gates
 
-- **Actual implementation comparison remains open.** Identify an existing actual orchestrate candidate and a faithful matched baseline path before freezing the small task set and comparison order. Direct-harness controls cannot stand in for this evaluation.
+- **Actual candidate identified, execution path incomplete:** pin `8dcf05bad0c0f7c806db3d7350060435018773f8` for both flag-off/on arms. The existing native relay constructs baseline/branch-only, not this orchestrate candidate, so relabeling it would not exercise the treatment. A completion bridge is absent. Minimal pinned wiring is being investigated with no-model controls only; no model evaluation has run.
+- **Unknown usage must remain unknown:** the existing numeric usage contract cannot honestly represent unavailable native usage. A faithful representation is under investigation; do not fill missing usage with zero, invent token/cost measurements, or claim the current adapter already satisfies that contract. No broader infrastructure is planned.
 - **Cooperative reach limitation remains accepted and explicit.** Graders/reference answers were withheld procedurally from known solve-time copies; submitted code may reach grader resources during post-solve grading under the same OS user. Shared plugin access and unknown copies are not isolated.
 - **Audit incomplete.** Available submission/relay/journal evidence reported no literal canary hits or observed out-of-workspace host arguments. Full native tool logs were unavailable; subprocess reads were unobserved. Unmarked copies remain a detection gap. No-hit evidence is not proof of no leakage.
 - **Future-solve hygiene:** verify private grader/reference/candidate evidence is checkpointed and off the scoped solving filesystem before another actor. Do not infer absence everywhere from bounded checks.
@@ -41,7 +42,7 @@ Independent review confirmed permitted changes, protected-test preservation and 
 2. Two same-task/same-commit direct controls now have measured wall times and matching local fixture outcomes. Two observations are preliminary; actual orchestrate baseline noise is not measured.
 3. Declared inputs and sequential workspaces were matched; separation is procedural, not a security boundary.
 4. Real direct-harness wall time is measured above. Native token usage remains unavailable.
-5. Baseline-versus-idea comparison on a small fixed task set **has not started**. Establish the faithful actual implementation path first.
+5. Baseline-versus-idea comparison on a small fixed task set **has not started**. Candidate `8dcf05ba` is identified for matched flag-off/on arms; completion bridging and honest unknown-usage handling remain prerequisites.
 
 ## Completed technical checkpoints
 
@@ -66,7 +67,7 @@ At three-hour reflection, report observable rework, retries, dead ends, blocked 
 
 ## Independent work instead
 
-Investigate a faithful actual orchestrate-matched path while preserving this completed direct-control result. Verify final private-bundle retention and bounded cleanup before future solves. Do not launch another actor merely to avoid recording a blocker, alter old outcomes, weaken grading or treat direct controls as an optimization experiment. Keep useful authorized preparation moving around blockers; respect denials and ask when additional authority is required.
+Investigate minimal pinned no-model wiring for actual orchestrate at `8dcf05ba` and an honest unknown-usage representation. Do not expand into broader infrastructure or start model runs while that path is incomplete. Preserve the completed direct-control result and verify final private-bundle retention/cleanup before future solves. Do not launch another actor merely to avoid recording a blocker, alter old outcomes, weaken grading or treat direct controls as an optimization experiment. Keep useful authorized preparation moving around blockers; respect denials and ask when additional authority is required.
 
 ## Idea ledger
 
@@ -76,7 +77,7 @@ See the [deduplicated registry](../ideas/experiment-registry.md) for historical 
 |---|---|---|
 | Classifier filtering | Optional implementation; named-model effectiveness deferred. | Matched actual quality/recall/task-cost results. |
 | Scoped selector reuse | Prototype `3adfa8c`, library-only. | Task/runner wiring and eligible repeat opportunities; historical synthetic 6→4 calls are not savings. |
-| Known-good hot paths | Prototype `8dcf05b`; current two-snippet policy parked. | Actual matched evaluation; earlier bounded payload pilot is not orchestrate superiority or family-wide disproof. |
+| Known-good hot paths | Actual orchestrate candidate `8dcf05ba` identified for matched flag-off/on arms. Earlier two-snippet presentation policy remains parked. | Completion bridge and honest unknown-usage contract unresolved; no actual matched model result. Earlier direct/payload pilots do not prove orchestrate benefit. |
 | Static-context/type interning | Candidate documented with focused checks/survey. | Aggregate/native quality evidence; declaration bytes are not tokens or dollars. |
 
 Existing rerank-none, lazy tool search, reference passing and BM25 caching are controls/mechanisms, not newly measured ideas. **Qualified for later isolated confirmation: none.**
