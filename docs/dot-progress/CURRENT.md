@@ -1,12 +1,12 @@
 # AI Workflow status
 
-Updated: 2026-11-03 14:12 UTC. This is the single current status file; dated notes are historical evidence, not a live queue. Update this file at each milestone or blocker.
+Updated: 2026-11-03 14:14 UTC. This is the single current status file; dated notes are historical evidence, not a live queue. Update this file at each milestone or blocker.
 
 ## Running and since when
 
-- Status reconciliation: ran 2026-11-03 14:03–14:07 UTC; external checkpoint work resumed at 14:08 UTC and first exact remote verification passed at 14:11 UTC. Documentation work is complete in isolated worktree `ai-workflow-status-ledger`, branch `dot/status-ledger-20261103`, from `21fcab098837dced6d034905ae9bfe809c4c401a`.
-- Anti-cheating list and PR guides: delivered directly in chat, as reported by the coordinator today. Security reconstruction/review remains a separate unfinished action; its execution start is not established here.
-- Real model evaluation: **not running**. No current baseline repetitions, timing/token measurement, or baseline-versus-idea comparison has been established. The local process-name check found no Node, Python, Docker, or Podman job; it does not prove remote jobs are absent.
+- Shell-safety rebuild: **active since approximately 2026-11-03 14:12 UTC**, as reported by the coordinator. Hostile-character validation, independent review and external checkpoint are required before actor runs. No claim that these gates have passed.
+- Anti-cheating list and PR guides: delivered directly in chat. Status recovery and its first external checkpoint are complete; this file is being refreshed for the safety-rebuild milestone.
+- Native actor or real model evaluation: **not running**. No current baseline repetitions, timing/token measurement, or baseline-versus-idea comparison has been established. The local process-name check found no Node, Python, Docker, or Podman job; it does not prove remote jobs are absent.
 
 ## Latest decisions and immediate blocker
 
@@ -32,10 +32,13 @@ No Codex task is started for this work. No default/protected branch changes, app
 - **Historical implementation evidence retained:** the Nov 1 classifier composition record at `b810601` reports 591 package +22 script checks, typecheck, original-spec preservation and 42 focused checks. This session has inspected that record/source; it has **not rerun those checks**. Fixtures at `b1190e3` are a separate composition, not a current classifier benchmark.
 - **External review state:** draft PRs [#1 migration](https://github.com/SpiralSky/ai-workflow/pull/1), [#2 sign-in](https://github.com/SpiralSky/ai-workflow/pull/2), [#3 DeepSeek](https://github.com/SpiralSky/ai-workflow/pull/3), [#4 classifier](https://github.com/SpiralSky/ai-workflow/pull/4); classifier native CI [run 41279632208](https://github.com/SpiralSky/ai-workflow/actions/runs/41279632208). The coordinator reports no recorded reviews and zero current-head CI statuses for PRs #1–4 today; old CI is not current-head validation. Links and earlier CI success are recorded in `21fcab0`. Fixture/native CI success is not model task success.
 - **Later remote evidence recovered:** the verified public backup at `3e3b715` includes a [Nov 2 registry](../ideas/experiment-registry.md), shared-framework acceptance record (755 Node +12 normal/12 optimized Python checks and TypeScript checks), and bounded native pilot records. These are historical records read today, not tests rerun by this status task; they do not establish current same-commit baseline noise or a production cost comparison.
+- **Public controls rerun:** the coordinator reports **57/57 public harness controls passed** in the recovered public setup. These are control tests, not actor comparisons, private grading or benchmark task success.
 - **Private backup integrity verified:** an independent restoration worker reports Space backup version 0 has SHA-256 `034b849ac81401e4d2ab624a5024cec466c2854beea2b0b1abf59abde05490eb`; ZIP integrity passes. All 26 manifest entries match SHA-256, size, and recorded Git blob IDs; one manifest is self-excluded. Static verification only: no restored code executed, no private content published, no isolation or benchmark-success claim.
 
 ## Blocked, and on what
 
+- **Grading outside actor reach remains unresolved:** private graders can be withheld from the solve filesystem using Space, but Space access is shared. During post-solve grading, candidate Python can potentially access grader resources through ordinary same-user process access. Withholding files during solve alone does **not** satisfy the user's outside-reach grading requirement. No stronger isolation claim is made.
+- **Tool-log audit incomplete:** audit access/coverage is partial or unavailable. No complete outside-workspace-read audit, clean-canary result, or absence-of-contamination finding is claimed.
 - **Later isolated confirmation:** neither `docker` nor `podman` is on this executor's PATH today. This does not block user-authorized native screening once its immediate safety gates pass. Do not build an isolated runner now; record qualifying ideas for later confirmation.
 - **Security and experiment admission:** the prior data-only persistence patch `620a421` is unavailable here and unverified externally; reconstruct and independently review it before actor runs. The verified [public backup checkpoint](https://github.com/SpiralSky/ai-workflow/commit/3e3b7152eb29878aa1f0f85f697672eb0e6369ba) lacks private grading pieces; the private backup has now passed archive and manifest verification, but usable code reconstruction and independent security review are still pending. No live model backend or token usage is verified. Native actor tests were authorized, but are not equivalent to production orchestration or comparable benchmark results. Provider authorization is not declared missing; its exact applicable scope must be checked before any action requiring it.
 - **External status checkpoint resolved:** first remote checkpoint [`4d830205`](https://github.com/SpiralSky/ai-workflow/commit/4d8302058d006ff64173962a9b442fc58dd7a355) passed exact content/blob readback and branch-head verification. Comparison against freshly read `3e3b715` confirms only this status file changed. This receipt-only update does not publish the older local source tree.
@@ -43,7 +46,7 @@ No Codex task is started for this work. No default/protected branch changes, app
 
 ## Independent work instead
 
-Evidence-ledger recovery and the first sanitized external checkpoint are complete; this documentation task has stopped after recording verification. Preserve the already delivered anti-cheating/PR guidance. Continue independently authorized shell-safety reconstruction/review, hostile-character tests, source/fixture recovery, and leakage-control preparation. Do not start actor runs before the safety fix is externally checkpointed; do not build the later isolated runner. Preserve each blocked action's state. Do not retry canceled actions or route around denials. If these independent actions finish and no authorized work remains, replace this section with **STOPPED**, name the remaining dependency, and notify the user.
+Evidence-ledger recovery and external checkpoint are complete. Shell-safety reconstruction is active; continue its independently authorized hostile-character tests/review and assess the unresolved grading-access and audit limitations. Preserve the already delivered anti-cheating/PR guidance and verified private backup. Do not start actor runs before the safety fix is externally checkpointed; do not build the later isolated runner. Preserve each blocked action's state. Do not retry canceled actions or route around denials. If these independent actions finish and no authorized work remains, replace this section with **STOPPED**, name the remaining dependency, and notify the user.
 
 ## Idea ledger
 
