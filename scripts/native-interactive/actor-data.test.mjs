@@ -114,5 +114,7 @@ test('real CLI uses pipe data only, exits normally, emits bounded metadata, and 
 test('native supervisor source binds capture verification before worker forwarding',()=>{
  const source=fs.readFileSync(path.resolve(import.meta.dirname,'cli.mjs'),'utf8');
  assert.ok(source.includes("import {verifyCapturedActorData} from './actor-data.mjs'"));
- assert.ok(source.includes('verifyCapturedActorData({cellDir:c.cellDir,arm:c.arm,sequence:actionTracker.snapshot.receivedCount,raw});assertReceiptActive();}if(!child.stdin.write(raw,'));
+ const captured=source.indexOf('verifyCapturedActorData({cellDir:c.cellDir,arm:c.arm,sequence:actionTracker.snapshot.receivedCount,raw});assertReceiptActive();}');
+ assert.ok(captured>=0);
+ for(const effect of ['child.stdin.end(raw,','child.stdin.write(raw,'])assert.ok(source.indexOf(effect)>captured,`capture receipt must precede ${effect}`);
 });
