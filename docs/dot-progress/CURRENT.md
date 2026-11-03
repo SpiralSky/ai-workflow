@@ -1,10 +1,10 @@
 # AI Workflow status
 
-Updated: 2026-11-03 15:26 UTC. This is the single current status file; dated notes and Git history retain earlier milestones.
+Updated: 2026-11-03 15:29 UTC. This is the single current status file; dated notes and Git history retain earlier milestones.
 
 ## Running and since when
 
-**RESUMED by 2026-11-03 14:59 UTC:** the user chose cooperative screening with explicit grading-reach and read-audit limits. Cooperative controls are independently reviewed and externally checkpointed at `771bd36c`, with **199/199 selected tests** and all 11 public files verified against reviewed source. Private canary artifacts are saved in Space, with independently verified bounded local absence. **Two frozen sequential baseline cells are being prepared; no actors have started as of the 15:25 UTC milestone.** The first intended noise experiment is **one fixed task twice, sequentially**, from the same frozen commit/configuration. No new baseline result, native token measurement or cost comparison is claimed.
+**RESUMED by 2026-11-03 14:59 UTC:** the user chose cooperative screening with explicit grading-reach and read-audit limits. Cooperative controls are independently reviewed and externally checkpointed at `771bd36c`, with **199/199 selected tests** and all 11 public files verified against reviewed source. Private canary artifacts are saved in Space, with independently verified bounded local absence. **First native cooperative baseline actor launched at approximately 15:28 UTC:** `calendar-window`, direct arm, from externally verified `771bd36c`. Bounded private-absence and readiness checks passed before dispatch; the private grader has not been restored. No task result yet. The second solve is planned sequentially after the first is frozen and audited within available log coverage. The first intended noise experiment is **one fixed task twice, sequentially**, from the same frozen commit/configuration. No new baseline result, native token measurement or cost comparison is claimed.
 
 Shell-safety recovery ran from approximately 14:12 UTC through external verification at 14:28 UTC. Public preparation then completed its tests, independent review and external checkpoint by 14:46 UTC. The temporary stop began at 14:46 UTC and ended after the user's decision. The three-hour checkpoint schedule is re-enabled; a scheduled checkpoint is not proof it has executed.
 
@@ -22,12 +22,16 @@ Native subagent comparisons are **screening only**, never proof that an idea bea
 Leakage requirements for the accepted cooperative mode: keep graders/reference answers absent during solving, grade afterward with submitted-code reach explicitly disclosed, use unique canaries, mark unexpected exposure contaminated, and inspect available tool logs while stating the incomplete read-audit. No real canary or private grader content belongs in this public status file.
 
 1. **Anti-cheating list:** delivered directly in chat, with prevention and unenforceable limits. Disclosure does not itself satisfy technical gates.
-2. **Baseline noise:** first run one fixed task twice, sequentially, from the same frozen commit/configuration and report differences. **Not measured; no actors yet.** Two runs alone are not a reliable variance estimate.
+2. **Baseline noise:** one fixed task twice, sequentially, from the same frozen commit/configuration. **First solve running; second unstarted; no difference/result measured yet.** Freeze and audit the first before the second. Two runs alone are not a reliable variance estimate.
 3. **Isolation/equal starts:** verify exact starting commits and separation for each run. Development worktrees are verified; native isolation remains procedural, as accepted for screening, not a security boundary.
-4. **One real run:** report elapsed time. **Not measured on the current frozen setup.** Native token usage is unavailable and must remain unknown; mock checks and CI duration do not substitute.
+4. **One real run:** first actor is underway from approximately 15:28 UTC; report elapsed time when its run boundary is established. **No completed duration yet.** Native token usage is unavailable and must remain unknown; mock checks and CI duration do not substitute.
 5. **Small fixed comparison only afterward:** freeze tasks, source/configuration and comparison rules. **Not started.** The older 60-cell/300-potential-cell design is not the next dispatch plan.
 
 At three-hour checkpoint reflection, assess observable waste: rework, retries, dead ends, machinery time versus useful outcomes, blocked time and unusable runs. Use rough wall-clock/run counts and the largest observed source, never invented native token or money totals.
+
+## Observed waste and setup failures
+
+- A setup attempt failed with `ENOENT` before any actor launched. Preserve it as a setup failure, **not an actor attempt or benchmark outcome**. Its separate wall-clock cost is not yet measured. The later first-actor launch is a distinct successful dispatch; no failed setup is silently discarded.
 
 ## Done, with evidence
 
@@ -46,7 +50,7 @@ Implementation test/review results below were reported by the coordinator; this 
 
 ## Independent work instead
 
-**ACTIVE: preparation for limited cooperative baseline screening.** Prepare the two frozen baseline cells from the reviewed cooperative checkpoint, verify their identical source/task/configuration and bounded grader absence, then run the one-task/two-run noise check sequentially under the accepted screening limits. Retain tested local `b56a016`, the verified external checkpoint and earlier failed publication evidence. Continue safe, documented workarounds overnight within existing permissions, avoiding unnecessary blocking decisions. Preserve exact source/configuration, attempts, timing, grader absence during solving, disclosed grading reach, available audit evidence and contamination flags. Do not silently relax other admission/grading requirements, retry canceled actions, bypass denials, build an isolated runner, or treat this as new permission for paid/API work. When a step blocks, preserve it and continue independent authorized work; ask when policy requires authorization. No superiority claim can follow from this screening alone.
+**ACTIVE: first limited cooperative baseline solve.** Preserve the first actor's full available output, freeze its result and audit available logs before starting the second identical sequential cell. Keep the grader absent during solving. Tool-log coverage remains partial, and a completed solve will still be screening evidence only. No result is yet available. Retain tested local `b56a016`, the verified external checkpoint and earlier failed publication evidence. Continue safe, documented workarounds overnight within existing permissions, avoiding unnecessary blocking decisions. Preserve exact source/configuration, attempts, timing, grader absence during solving, disclosed grading reach, available audit evidence and contamination flags. Do not silently relax other admission/grading requirements, retry canceled actions, bypass denials, build an isolated runner, or treat this as new permission for paid/API work. When a step blocks, preserve it and continue independent authorized work; ask when policy requires authorization. No superiority claim can follow from this screening alone.
 
 ## Idea ledger
 
