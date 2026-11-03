@@ -1,10 +1,10 @@
 # AI Workflow status
 
-Updated: 2026-11-03 14:14 UTC. This is the single current status file; dated notes are historical evidence, not a live queue. Update this file at each milestone or blocker.
+Updated: 2026-11-03 14:21 UTC. This is the single current status file; dated notes are historical evidence, not a live queue. Update this file at each milestone or blocker.
 
 ## Running and since when
 
-- Shell-safety rebuild: **active since approximately 2026-11-03 14:12 UTC**, as reported by the coordinator. Hostile-character validation, independent review and external checkpoint are required before actor runs. No claim that these gates have passed.
+- Shell-safety rebuild: **active since approximately 2026-11-03 14:12 UTC**, in an isolated clone based on the public checkpoint. Initial controls passed; independent review identified a late-output-chunk issue, now patched, and a raw-mode startup issue still being fixed. Final revalidation, review completion and external checkpoint remain pending. No actor runs.
 - Anti-cheating list and PR guides: delivered directly in chat. Status recovery and its first external checkpoint are complete; this file is being refreshed for the safety-rebuild milestone.
 - Native actor or real model evaluation: **not running**. No current baseline repetitions, timing/token measurement, or baseline-versus-idea comparison has been established. The local process-name check found no Node, Python, Docker, or Podman job; it does not prove remote jobs are absent.
 
@@ -33,6 +33,7 @@ No Codex task is started for this work. No default/protected branch changes, app
 - **External review state:** draft PRs [#1 migration](https://github.com/SpiralSky/ai-workflow/pull/1), [#2 sign-in](https://github.com/SpiralSky/ai-workflow/pull/2), [#3 DeepSeek](https://github.com/SpiralSky/ai-workflow/pull/3), [#4 classifier](https://github.com/SpiralSky/ai-workflow/pull/4); classifier native CI [run 41279632208](https://github.com/SpiralSky/ai-workflow/actions/runs/41279632208). The coordinator reports no recorded reviews and zero current-head CI statuses for PRs #1–4 today; old CI is not current-head validation. Links and earlier CI success are recorded in `21fcab0`. Fixture/native CI success is not model task success.
 - **Later remote evidence recovered:** the verified public backup at `3e3b715` includes a [Nov 2 registry](../ideas/experiment-registry.md), shared-framework acceptance record (755 Node +12 normal/12 optimized Python checks and TypeScript checks), and bounded native pilot records. These are historical records read today, not tests rerun by this status task; they do not establish current same-commit baseline noise or a production cost comparison.
 - **Public controls rerun:** the coordinator reports **57/57 public harness controls passed** in the recovered public setup. These are control tests, not actor comparisons, private grading or benchmark task success.
+- **Shell-safety interim checks:** hostile-character, 98,305-byte input-boundary, deadline, output-failure and receipt controls initially passed. An independent reviewer reproduced **88 focused/aggregate-contract passes on an earlier candidate**. These do not validate the later fixes: the late-chunk patch and raw-mode startup repair still require final checks and review. Exact final commit is not yet supplied; no external safety checkpoint is claimed.
 - **Private backup integrity verified:** an independent restoration worker reports Space backup version 0 has SHA-256 `034b849ac81401e4d2ab624a5024cec466c2854beea2b0b1abf59abde05490eb`; ZIP integrity passes. All 26 manifest entries match SHA-256, size, and recorded Git blob IDs; one manifest is self-excluded. Static verification only: no restored code executed, no private content published, no isolation or benchmark-success claim.
 
 ## Blocked, and on what
@@ -46,7 +47,7 @@ No Codex task is started for this work. No default/protected branch changes, app
 
 ## Independent work instead
 
-Evidence-ledger recovery and external checkpoint are complete. Shell-safety reconstruction is active; continue its independently authorized hostile-character tests/review and assess the unresolved grading-access and audit limitations. Preserve the already delivered anti-cheating/PR guidance and verified private backup. Do not start actor runs before the safety fix is externally checkpointed; do not build the later isolated runner. Preserve each blocked action's state. Do not retry canceled actions or route around denials. If these independent actions finish and no authorized work remains, replace this section with **STOPPED**, name the remaining dependency, and notify the user.
+Evidence-ledger recovery and external status checkpoint are complete. Finish the raw-mode startup repair, rerun affected and aggregate safety controls on the final candidate, complete independent review, then externally checkpoint the sanitized fix. Keep the earlier passing checks and discovered failures distinct; continue assessing unresolved grading-access and audit limitations. Preserve the already delivered anti-cheating/PR guidance and verified private backup. Do not start actor runs before the safety fix is externally checkpointed; do not build the later isolated runner. Preserve each blocked action's state. Do not retry canceled actions or route around denials. If these independent actions finish and no authorized work remains, replace this section with **STOPPED**, name the remaining dependency, and notify the user.
 
 ## Idea ledger
 
