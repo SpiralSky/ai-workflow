@@ -191,3 +191,46 @@ test("history projection refuses unknown costs instead of projecting zero", asyn
   const plan = buildPlan(run.config, root);
   assert.equal(plan.projectedCostUsd, undefined);
 });
+
+test("recovered findTools selection failure keeps complete attempt cost unknown", async (t) => {
+  const { buildFramework, buildRegistry, quickJSRuntime } = await import("@aiw/core");
+  const { createReporter, FileSink, LLM_COST_INCOMPLETE_KEY } = await import("@aiw/telemetry");
+  const { runLoop } = await import("../src/loop.ts");
+  const root = temp(t), eventsPath = join(root, "events.jsonl"), sink = new FileSink(eventsPath);
+  const runner = createReporter({ sink, writer: "r" });
+  const server = createReporter({ sink, writer: "s" });
+  const decls = ["readFile", "runTests"].map(name => ({ name, description: name,
+    inputSchema: { type: "object", properties: {} }, meta: { whenToUse: name, effect: "read" as const } }));
+  const host = { tools: async () => decls, call: async () => "contents", close: async () => {} };
+  const completion = (message: object) => ({ response: { choices: [{ message }] }, usage: { input: 1, output: 1 }, costUsd: 1 });
+  let secondaryCalls = 0, selectionCalls = 0, mainCalls = 0;
+  const client: import("@aiw/telemetry").LLMClient = { async complete(req) {
+    if (!req.tools.length) { selectionCalls++; throw new Error("selection request lost after dispatch"); }
+    secondaryCalls++;
+    return secondaryCalls === 1 ? completion({ tool_calls: [{ id: "inner", type: "function", function: { name: "branch",
+      arguments: JSON.stringify({ code: 'async (tools) => await tools.findTools({ need: "runTests" })' }) } }] })
+      : completion({ content: "Ending after failed tool search." });
+  } };
+  const framework = buildFramework("orchestrate", buildRegistry(decls), { host, runtime: quickJSRuntime,
+    orchestrate: { client, model: "fixture", workspaceRoot: root } });
+  let outerError: boolean | undefined;
+  const loop = await runLoop({ client: { complete: async () => {
+    mainCalls++;
+    return mainCalls === 1 ? completion({ tool_calls: [{ id: "outer", type: "function", function: { name: "do",
+      arguments: JSON.stringify({ instruction: "Inspect task", tools: ["readFile"] }) } }] }) : completion({ content: "Finished." });
+  } }, reporter: runner, session: { tools: [], _client: { callTool: async (req: any) => {
+    const result = await framework.tools.find(tool => tool.name === "do")!.handle(req.arguments, { reporter: server });
+    outerError = result.isError;
+    return { content: [{ type: "text", text: result.text }], isError: result.isError };
+  } } as any }, systemPrompt: "fixture", taskText: "fixture", model: "fixture", temperature: 0, turnLimit: 5, framework: "orchestrate" });
+  sink.close();
+  assert.equal(selectionCalls, 1);
+  assert.equal(outerError, false, "outer do recovers; its success cannot erase nested charge uncertainty");
+  assert.equal(loop.outcome, "done");
+  const cost = readAttemptCost(eventsPath, loop.metrics.costIncompleteReasons);
+  assert.equal(cost.knownCostUsd, 4);
+  assert.equal(cost.costUsd, null);
+  assert.deepEqual(cost.costIncompleteReasons, ["unobserved-failed-model-request"]);
+  const events = readFileSync(eventsPath, "utf8").trim().split("\n").map(line => JSON.parse(line));
+  assert.equal(events.filter(event => event.kind === "attach" && event.key === LLM_COST_INCOMPLETE_KEY).length, 1);
+});

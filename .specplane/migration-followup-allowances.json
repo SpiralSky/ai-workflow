@@ -1,0 +1,55 @@
+{
+  "version": 1,
+  "base_ref": "be2500de70b9b29b0a97ee03a4561b47df4f5a30",
+  "reason": "Independently reproduced fixes: preserve nested failed-model cost uncertainty, regenerate stale server distribution, and test the source and shipped bundle. Original migration inventories and approval boundaries remain unchanged.",
+  "changes": [
+    {
+      "path": "packages/runner/src/accounting.ts",
+      "mode": "100644",
+      "before_sha256": "b4732368acd4e0cd52d587fb3aca8b09bf797680e4ed2ee8a5ae3db5eb7c8458",
+      "after_sha256": "ea3b96b84ed5aeb83bf10199d7336848c987286710a19e00e760458a2cb629b8"
+    },
+    {
+      "path": "packages/runner/test/accounting.test.ts",
+      "mode": "100644",
+      "before_sha256": "e301cdafb384fd069eb6975464e74b0903e279b8ec03c5c0d86ea83c55612aa6",
+      "after_sha256": "69d4b4704ea4a4930cba35dd8eab78fa6f2a65fbdc73cc935e53c720bcc14c3f"
+    },
+    {
+      "path": "packages/server/dist/aiw-server.mjs",
+      "mode": "100755",
+      "before_sha256": "8c22450ec0249dd085bb39242c30e98ab4171b8f89cab21a0e62851980e4d96c",
+      "after_sha256": "45cd85183c23aa4a5964cd6d4b9ae08053b90d0634f2dceef4ec5cd11c2b41db"
+    },
+    {
+      "path": "packages/server/test/telemetry-session.test.ts",
+      "mode": "100644",
+      "before_sha256": "b9aec64519f75fb9a0cf60396fe4473e29783269a2579603a82cc396897fa7c4",
+      "after_sha256": "19c93f5429e40c1a0854fe66ca4ba4721ed859a38ce1af98f4c3924ab40a2318"
+    },
+    {
+      "path": "packages/server/test/variant-cli.test.ts",
+      "mode": "100644",
+      "before_sha256": "ecf1ea50ffaac23a45524bf47513104b72bdd97cd99743967aa9d9ddee25bad1",
+      "after_sha256": "ba645ac80236013ad85dacee6badf012559a601a7f840397b23f199a8e0e9221"
+    },
+    {
+      "path": "packages/telemetry/src/tree.ts",
+      "mode": "100644",
+      "before_sha256": "5401cb19e9329ad1d2858c92a7af58afedb18caef7e874d4c886566ed747a390",
+      "after_sha256": "b4a4b1f8c24d1eb84bf6d3000b6b15d9dfe4ffb5bb02125a3d9b245603353d87"
+    },
+    {
+      "path": "packages/telemetry/src/wrap.ts",
+      "mode": "100644",
+      "before_sha256": "95d922a317c90485a11caf0a0f2cba201fc9935f33e49c96fcf3b29f553a69cc",
+      "after_sha256": "121c375cd3ad5899345fdf4fbfc208bd339f4c1576038927abb559ee05c5950e"
+    },
+    {
+      "path": "packages/telemetry/test/telemetry.test.ts",
+      "mode": "100644",
+      "before_sha256": "13359e834ad308c90a33aa1b9b065c40769aee5ff147b33e15d4d5501b4c80bf",
+      "after_sha256": "5d477dc4847d8116dddbf409b1e54540db02d4d83e77c5497d53e8753874fbae"
+    }
+  ]
+}

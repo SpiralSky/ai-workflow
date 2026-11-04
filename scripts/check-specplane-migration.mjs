@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import {fileURLToPath} from 'node:url';
-import {RUNTIME_SCOPE, sha256 as hash, validateInventory, trackedEntries, workingEntry, verifyWorkingInventory, verifyHistoricalInventory} from './migration-inventory.mjs';
+import {RUNTIME_SCOPE, sha256 as hash, validateInventory, trackedEntries, workingEntry, verifyWorkingInventory, verifyHistoricalInventory, runtimeAllowanceHashes} from './migration-inventory.mjs';
 export function verifyPreservation(root) {
 const read = p => fs.readFileSync(path.join(root, p), 'utf8');
 
@@ -63,10 +63,22 @@ assert.equal(testEntry.after,'node --import tsx --test test/*.test.ts');
 assert.equal(currentViewer.scripts.test,testEntry.after);
 currentViewer.scripts.test=baseViewer.scripts.test;
 assert.deepEqual(currentViewer,baseViewer,'Only the recorded viewer test entry may change');
-verifyWorkingInventory(root,runtimeInventory,{[testEntry.path]:testEntry.after_sha256});
+let runtimeReplacements = {};
+let runtimeFollowup;
+if (manifest.runtime_followup_allowances) {
+  const content = read(manifest.runtime_followup_allowances);
+  assert.equal(hash(content), manifest.runtime_followup_allowances_sha256, 'Runtime allowance ledger changed');
+  runtimeFollowup = JSON.parse(content);
+  runtimeReplacements = runtimeAllowanceHashes(runtimeInventory, runtimeFollowup);
+}
+verifyWorkingInventory(root,runtimeInventory,{...runtimeReplacements,[testEntry.path]:testEntry.after_sha256});
 const historyVerification = {
   source:verifyHistoricalInventory(root,sourceInventory),
   runtime:verifyHistoricalInventory(root,runtimeInventory),
+  ...(runtimeFollowup ? {runtimeFollowup:verifyHistoricalInventory(root, {
+    version:1, source_ref:runtimeFollowup.base_ref,
+    files:runtimeFollowup.changes.map(e=>({path:e.path,mode:e.mode,sha256:e.before_sha256})),
+  })} : {}),
 };
 const config = read('.specplane/config.yaml');
 assert.match(config, /require_approved_specs: none/);

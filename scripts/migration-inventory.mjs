@@ -62,6 +62,28 @@ export function verifyWorkingInventory(root, inventory, replacements = {}) {
   }
 }
 
+/** Bind a reviewed follow-on patch to existing inventory bytes without rewriting the baseline. */
+export function runtimeAllowanceHashes(inventory, allowance) {
+  assert.equal(allowance.version, 1);
+  assert.match(allowance.base_ref, /^[a-f0-9]{40}$/);
+  assert.ok(typeof allowance.reason === 'string' && allowance.reason.trim());
+  assert.ok(Array.isArray(allowance.changes) && allowance.changes.length > 0);
+  validateInventory({ version: 1, source_ref: allowance.base_ref,
+    files: allowance.changes.map(e => ({path: e.path, mode: e.mode, sha256: e.after_sha256})) });
+  const originals = new Map(inventory.files.map(e => [e.path, e]));
+  const hashes = {};
+  for (const change of allowance.changes) {
+    const original = originals.get(change.path);
+    assert.ok(original, `Allowance cannot add a runtime path: ${change.path}`);
+    assert.notEqual(change.path, 'packages/viewer/package.json', 'Viewer test allowance remains separate');
+    assert.equal(change.mode, original.mode, `Allowance cannot change mode: ${change.path}`);
+    assert.equal(change.before_sha256, original.sha256, `Allowance before hash differs from inventory: ${change.path}`);
+    assert.notEqual(change.after_sha256, change.before_sha256, `Redundant runtime allowance: ${change.path}`);
+    hashes[change.path] = change.after_sha256;
+  }
+  return hashes;
+}
+
 /** Verify inventory provenance against history if available; missing objects never skip worktree checks. */
 export function verifyHistoricalInventory(root, inventory) {
   validateInventory(inventory);

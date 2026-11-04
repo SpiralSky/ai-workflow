@@ -197,5 +197,7 @@
     "skill_sha256": "cc7c62f08578e36d6086ab820925960404f9559025d28b917a7803a21109d07f"
   },
   "migration_runtime_inventory": ".specplane/migration-runtime-inventory.json",
-  "migration_source_inventory": ".specplane/migration-source-inventory.json"
+  "migration_source_inventory": ".specplane/migration-source-inventory.json",
+  "runtime_followup_allowances": ".specplane/migration-followup-allowances.json",
+  "runtime_followup_allowances_sha256": "7e56ae4dba1131879b86b3da3cb43052dc13875c78e03b80a69348eef5c35188"
 }

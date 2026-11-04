@@ -5,6 +5,7 @@ import path from 'node:path';
 import os from 'node:os';
 import {execFileSync} from 'node:child_process';
 import {verifyPreservation} from './check-specplane-migration.mjs';
+import {runtimeAllowanceHashes} from './migration-inventory.mjs';
 const source = path.resolve(import.meta.dirname,'..');
 const git = (root,...args) => execFileSync('git',args,{cwd:root,encoding:'utf8',stdio:['pipe','pipe','pipe']});
 
@@ -62,4 +63,22 @@ test('viewer allowance rejects unrelated package edits',t=>{
 test('historical record missing from tracked tree is rejected even when bytes remain',t=>{
   const root=snapshot(t);git(root,'update-index','--force-remove','HANDOFF.md');
   assert.throws(()=>verifyPreservation(root),/tracked source record/);
+});
+
+test('runtime follow-on allowances cannot change baseline hashes, modes or path scope',()=>{
+  const p='packages/example.ts', before='1'.repeat(64), after='2'.repeat(64);
+  const inventory={version:1,source_ref:'a'.repeat(40),files:[{path:p,mode:'100644',sha256:before}]};
+  const valid={version:1,base_ref:'b'.repeat(40),reason:'Independently reviewed regression fix',
+    changes:[{path:p,mode:'100644',before_sha256:before,after_sha256:after}]};
+  assert.deepEqual(runtimeAllowanceHashes(inventory,valid),{[p]:after});
+  for (const patch of [{before_sha256:after},{mode:'100755'},{path:'packages/added.ts'},{path:'../escape'},{after_sha256:before},{after_sha256:'bad'}]) {
+    assert.throws(()=>runtimeAllowanceHashes(inventory,{...valid,changes:[{...valid.changes[0],...patch}]}));
+  }
+  assert.throws(()=>runtimeAllowanceHashes(inventory,{...valid,changes:[...valid.changes,...valid.changes]}),/Duplicate/);
+});
+
+test('tampered allowed runtime bytes remain rejected',t=>{
+  const root=snapshot(t);
+  fs.appendFileSync(path.join(root,'packages/telemetry/src/wrap.ts'),'\n// tampered\n');
+  assert.throws(()=>verifyPreservation(root),/Preserved content changed/);
 });

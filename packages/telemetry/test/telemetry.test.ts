@@ -6,7 +6,7 @@ import path from "node:path";
 import {
   BlobStore, FileSink, NoopBlobStore, NoopSink, TranscriptWriter, buildTree, createReporter, currentReporter,
   fromMeta, parseEvents, runWithReporter, reconstruct, rollups, wrapLLM, wrapTools, writeJobEnd, writeJobStart,
-  TranscriptEntrySchema, type EventRecord, type Sink, type LLMClient,
+  TranscriptEntrySchema, LLM_COST_INCOMPLETE_KEY, type EventRecord, type Sink, type LLMClient,
 } from "../src/index.ts";
 
 const tmp = () => fs.mkdtempSync(path.join(os.tmpdir(), "aiw-tel-"));
@@ -159,6 +159,23 @@ test("wrapLLM writes turn and transcript entry with matching turnId", async () =
   assert.equal(TranscriptEntrySchema.safeParse(tr.lines[0]).success, true);
 });
 
+for (const role of ["main", "selection", "secondary"] as const) {
+  for (const failure of [new Error("request lost"), "request lost"]) {
+    test(`wrapLLM retains ${role} uncertainty and original ${typeof failure} rejection`, async () => {
+      const ev = new MemSink();
+      const r = createReporter({ sink: ev, writer: "s" }).scopedTo("r:7");
+      const client: LLMClient = { complete: async () => { throw failure; } };
+      const w = wrapLLM(client, r, role);
+      await assert.rejects(w.complete({ model: "fixture", system: "fixture", tools: [], messages: [] }), error => error === failure);
+      assert.equal(ev.lines.length, 1);
+      assert.equal(ev.lines[0].kind, "attach");
+      assert.equal(ev.lines[0].key, LLM_COST_INCOMPLETE_KEY);
+      assert.equal(ev.lines[0].parent, "r:7");
+      assert.deepEqual(ev.lines[0].data, { role, model: "fixture" });
+    });
+  }
+}
+
 test("transcript delta, reset, reconstruct", () => {
   const sink = new MemSink();
   const t = new TranscriptWriter({ sink, blobs: new NoopBlobStore() });
@@ -235,6 +252,10 @@ test("rollups", () => {
   assert.deepEqual(r.editCalls, { refactor: 1, manual: 1 });
   const noCost = rollups([turn("a", null, "main"), { ...turn("b", null, "main"), costUsd: undefined } as EventRecord], { externalTools: [], refactorTools: [] });
   assert.equal(noCost.costUsd, null);
+  const failedRequest = { ...base, id: "failed", kind: "attach", key: LLM_COST_INCOMPLETE_KEY } as EventRecord;
+  const incomplete = rollups([turn("a", null, "main"), failedRequest], { externalTools: [], refactorTools: [] });
+  assert.equal(incomplete.costUsd, null);
+  assert.equal(incomplete.mainTurns, 1, "uncertainty is not an additional charged turn");
 });
 
 test("parseEvents tolerates a truncated last line", () => {

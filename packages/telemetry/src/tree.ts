@@ -1,4 +1,5 @@
 import type { EventOf, EventRecord, Role, Usage } from "./schema.ts";
+import { LLM_COST_INCOMPLETE_KEY } from "./wrap.ts";
 
 export interface TreeNode {
   /** null for the synthetic root. */
@@ -65,7 +66,8 @@ export interface Rollups {
 }
 
 /**
- * Computes the telemetry §7 rollups from `turn` and `tool` events only.
+ * Computes the telemetry §7 rollups from `turn` and `tool` events. An uncertainty marker
+ * can invalidate cost completeness, but never contributes a charge or token count.
  * `tokens` always has all three roles (zero input/output when a role had no turns); `cachedRead`
  * and `cacheWrite` appear only if some turn of that role reported them.
  * @param events - parsed events
@@ -98,7 +100,7 @@ export function rollups(
     secondary: { input: 0, output: 0 },
     selection: { input: 0, output: 0 },
   };
-  let cost: number | null = 0;
+  let cost: number | null = events.some(e => e.kind === "attach" && e.key === LLM_COST_INCOMPLETE_KEY) ? null : 0;
   for (const t of turns) {
     const s = tokens[t.role];
     const u: Usage = t.usage;

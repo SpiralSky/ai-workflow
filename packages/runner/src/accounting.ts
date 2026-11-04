@@ -1,5 +1,5 @@
 import { readFileSync } from "node:fs";
-import { EventSchema } from "@aiw/telemetry";
+import { EventSchema, LLM_COST_INCOMPLETE_KEY } from "@aiw/telemetry";
 
 /** Complete billed cost or a known lower bound when telemetry is incomplete. */
 export interface CostSummary {
@@ -24,6 +24,9 @@ export function readAttemptCost(eventsPath: string, extraReasons: string[] = [])
     let event;
     try { event = EventSchema.parse(JSON.parse(line)); }
     catch { reasons.add("malformed-event"); continue; }
+    if (event.kind === "attach" && event.key === LLM_COST_INCOMPLETE_KEY) {
+      reasons.add("unobserved-failed-model-request");
+    }
     if (event.kind !== "turn") continue;
     if (ids.has(event.id)) { reasons.add("duplicate-turn-id"); continue; }
     ids.add(event.id);
