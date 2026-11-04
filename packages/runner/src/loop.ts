@@ -3,7 +3,7 @@
  * Runner architecture §4.2, §4.3.
  */
 
-import { wrapLLM } from "@aiw/telemetry";
+import { wrapLLM, assertNumericCompletion, rejectNativeFormat } from "@aiw/telemetry";
 import { LLMError } from "@aiw/llm";
 import type { LLMClient } from "@aiw/telemetry";
 import type { Reporter } from "@aiw/telemetry";
@@ -170,7 +170,13 @@ async function dispatchToolCalls(
  * @returns loop outcome and aggregated metrics
  */
 export async function runLoop(opts: LoopOptions): Promise<LoopResult> {
-  const wrappedClient = wrapLLM(opts.client, opts.reporter, "main");
+  rejectNativeFormat(opts);
+  const numericClient: LLMClient = { async complete(req) {
+    const result = await opts.client.complete(req);
+    assertNumericCompletion(result);
+    return result;
+  } };
+  const wrappedClient = wrapLLM(numericClient, opts.reporter, "main");
   const tools = mcpToolsToSchemas(opts.session.tools);
   const messages: unknown[] = [{ role: "user", content: opts.taskText }];
 

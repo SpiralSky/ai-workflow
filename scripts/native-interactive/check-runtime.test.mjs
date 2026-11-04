@@ -47,7 +47,7 @@ test('missing checker runtime is rejected by supervisor before worker, ready or 
 });
 test('real native supervisors produce matched default types and lint across all three arms',async()=>{
  const normalized=[];
- for(const arm of ARMS){
+ for(const arm of ARMS.filter(a=>!a.startsWith('orchestrate-'))){
   const c=fixture(arm),before=inventory(c.root);let output='',stderr='';
   const request=(sequence,file)=>arm==='direct'?{kind:'tools',sequence,calls:[{name:'check',args:{path:file}}]}:{kind:'branch',sequence,code:`async (tools) => await tools.check({path:${JSON.stringify(file)}})`};
   const input=Readable.from([JSON.stringify(request(1,'bad.py'))+'\n'+JSON.stringify(request(2,'good.py'))+'\n'+JSON.stringify({kind:'submit',sequence:3})+'\n']);

@@ -1,21 +1,11 @@
+import { NativeTurnSchema } from "./schema.ts";
 import type { Blobs } from "./blobs.ts";
-import type { EventRecord, Role, Usage } from "./schema.ts";
+import type { EventRecord, EventOf } from "./schema.ts";
 import type { Sink } from "./sink.ts";
 
 export interface Reporter {
   readonly scope: string | null;
-  turn(e: {
-    model: string;
-    providerModel?: string;
-    providerSystemFingerprint?: string;
-    role: Role;
-    usage?: Usage;
-    classifierEstimate?: { basis: string; estimatedUsd: number; inputTokens: number; outputTokens: number };
-    deepseekEstimate?: { basis: string; estimatedUsd: number; cacheHitTokens: number; cacheMissTokens: number; outputTokens: number };
-    costUsd?: number;
-    cacheHit?: boolean;
-    latencyMs: number;
-  }): string;
+  turn(e: Omit<EventOf<"turn">, "v" | "id" | "parent" | "ts" | "kind">): string;
   tool(e: {
     id?: string;
     name: string;
@@ -71,6 +61,9 @@ export class ReporterImpl implements Reporter {
 
   turn(e: Parameters<Reporter["turn"]>[0]): string {
     const id = this.newId();
+    if (e.usageStatus === "unavailable" || e.usage === null) {
+      NativeTurnSchema.parse({ ...e, v: 1, id, parent: this.scope, ts: this.shared.clock(), kind: "turn" });
+    }
     this.emit("turn", id, this.scope, e);
     return id;
   }

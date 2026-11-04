@@ -215,7 +215,7 @@ for(const completion of ['complete','deadline'])test(`ordinary same-session obse
 /** Exercise module evaluation as the real executable, not an already-imported library.
  * The retained one-cell campaign is explicitly synthetic; no native actor or native receipt is created.
  */
-for(const arm of ARMS)test(`executable CLI pairs exact raw action receipts with unchanged feedback (${arm})`,async t=>{
+for(const arm of ARMS.filter(a=>!a.startsWith('orchestrate-')))test(`executable CLI pairs exact raw action receipts with unchanged feedback (${arm})`,async t=>{
  const {c,base,request,prepare}=nativeControlFixture(arm),cellDir=c.cellDir,actorId=request.actorId,assignmentSHA256=request.assignmentSHA256;
  t.diagnostic(`Retained executable receipt evidence: ${base}`);
  const query={pattern:'query_events|café 🐢',path:'window.py'};

@@ -1,3 +1,4 @@
+import { rejectNativeFormat } from "@aiw/telemetry";
 /**
  * `aiw report` command: load run directories, validate provenance, aggregate results.
  * Runner architecture §8; data-formats §4.
@@ -93,6 +94,7 @@ export function mdd(passA: number, passB: number, n: number): number {
 function readRunJSON(runDir: string): RunJSON {
   const path = join(runDir, "run.json");
   const run = JSON.parse(readFileSync(path, "utf8")) as RunJSON;
+  rejectNativeFormat(run);
   if (run?.format !== FORMAT_VERSION) {
     throw new Error(`Unsupported run format in ${path}: ${JSON.stringify(run?.format)}`);
   }
@@ -124,6 +126,7 @@ function readJobs(runDir: string): JobJSON[] {
       // Preserve the existing behavior for malformed JSON; schema validation is separate.
       continue;
     }
+    rejectNativeFormat(job);
     if (job?.format !== FORMAT_VERSION) {
       throw new Error(`Unsupported job format in ${jobPath}: ${JSON.stringify(job?.format)}`);
     }

@@ -1,4 +1,4 @@
-import type { LLMClient, LLMCompletion } from "@aiw/telemetry";
+import type { NumericLLMClient, NumericLLMCompletion } from "@aiw/telemetry";
 import { LLMError, classifyAPIError } from "./errors.ts";
 
 /** Official tariff snapshot, not a measured bill or a guarantee of future pricing. */
@@ -34,7 +34,7 @@ export interface DeepSeekEstimate {
   cacheMissTokens: number;
   outputTokens: number;
 }
-export interface DeepSeekCompletion extends LLMCompletion { deepseekEstimate: DeepSeekEstimate }
+export interface DeepSeekCompletion extends NumericLLMCompletion { deepseekEstimate: DeepSeekEstimate }
 
 /** Validate complete provider token accounting. Absent/inconsistent tokens are not zero. */
 export function deepSeekUsage(body: any): Pick<DeepSeekCompletion, "usage" | "cacheHit" | "deepseekEstimate"> {
@@ -58,7 +58,7 @@ export function deepSeekUsage(body: any): Pick<DeepSeekCompletion, "usage" | "ca
 /** Direct host-only client. No endpoint override, redirect, retry, paid fallback or peak dispatch.
  * Thinking history is forwarded intact; response messages retain reasoning_content for tool turns.
  * Timeout/abort is best effort: requests accepted by the provider may still incur charges. */
-export function createDeepSeekClient(opts: { apiKey: string; fetch?: typeof fetch; now?: () => number; timeoutMs?: number }): LLMClient {
+export function createDeepSeekClient(opts: { apiKey: string; fetch?: typeof fetch; now?: () => number; timeoutMs?: number }): NumericLLMClient {
   if (!opts.apiKey || /[\r\n]/.test(opts.apiKey)) throw new Error("DeepSeek API key required");
   const timeoutMs = opts.timeoutMs ?? 300_000;
   if (!Number.isSafeInteger(timeoutMs) || timeoutMs <= 0 || timeoutMs > 2_147_483_647) throw new Error("Invalid DeepSeek timeout");

@@ -1,3 +1,4 @@
+import { rejectNativeFormat } from "./schema.ts";
 import type { EventOf, EventRecord, Role, Usage } from "./schema.ts";
 
 export interface TreeNode {
@@ -15,6 +16,7 @@ export interface TreeNode {
  * @param events - parsed events in file order
  */
 export function buildTree(events: EventRecord[]): TreeNode {
+  events.forEach(rejectNativeFormat);
   const nodes = new Map<string, TreeNode>();
   const list: TreeNode[] = [];
   for (const event of events) {
@@ -77,6 +79,7 @@ export function rollups(
   events: EventRecord[],
   groups: { externalTools: string[]; refactorTools: string[] },
 ): Rollups {
+  events.forEach(rejectNativeFormat);
   const turns = events.filter((e): e is EventOf<"turn"> => e.kind === "turn");
   const tools = events.filter((e): e is EventOf<"tool"> => e.kind === "tool");
   const toolIds = new Set(tools.map((t) => t.id));

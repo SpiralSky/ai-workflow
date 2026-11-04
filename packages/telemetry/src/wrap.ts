@@ -1,6 +1,6 @@
 import { runWithReporter } from "./context.ts";
 import { ReporterImpl, type Reporter } from "./reporter.ts";
-import type { Role, Usage } from "./schema.ts";
+import { NativeCompletionSchema, rejectNativeFormat, type Role, type Usage } from "./schema.ts";
 import type { TranscriptWriter } from "./transcript.ts";
 
 type ToolFn = (args: any, ...rest: any[]) => Promise<unknown> | unknown;
@@ -70,12 +70,25 @@ export function fromMeta(meta: Record<string, unknown> | undefined, root: Report
   );
 }
 
-export interface LLMCompletion {
+export interface NumericLLMCompletion {
+  usageStatus?: never;
+  usageReason?: never;
+  completionEvidence?: never;
   response: unknown;
   usage: Usage;
   deepseekEstimate?: { basis: string; estimatedUsd: number; cacheHitTokens: number; cacheMissTokens: number; outputTokens: number };
   costUsd?: number;
   cacheHit?: boolean;
+}
+
+/** Unknown native usage is not numeric provider accounting. */
+export type NativeLLMCompletion = import("zod").z.infer<typeof NativeCompletionSchema> & {
+  costUsd?: never; cacheHit?: never; deepseekEstimate?: never;
+};
+export type LLMCompletion = NumericLLMCompletion | NativeLLMCompletion;
+/** Narrow before numeric accounting; never cast or manufacture token counts. */
+export function assertNumericCompletion(value: LLMCompletion): asserts value is NumericLLMCompletion {
+  rejectNativeFormat(value);
 }
 
 export interface LLMClient {
@@ -86,6 +99,11 @@ export interface LLMClient {
     messages: unknown[];
     [k: string]: unknown;
   }): Promise<LLMCompletion>;
+}
+
+/** Provider clients retain a statically numeric completion contract. */
+export interface NumericLLMClient extends LLMClient {
+  complete(req: Parameters<LLMClient["complete"]>[0]): Promise<NumericLLMCompletion>;
 }
 
 /**
@@ -112,7 +130,10 @@ export function wrapLLM(
         ...(typeof response?.model === "string" && response.model ? { providerModel: response.model } : {}),
         ...(typeof response?.system_fingerprint === "string" && response.system_fingerprint ? { providerSystemFingerprint: response.system_fingerprint } : {}),
       };
-      const turnId = reporter.turn({
+      const turnId = res.usageStatus === "unavailable" ? reporter.turn({
+        ...NativeCompletionSchema.omit({ response: true }).parse(resWithoutResponse(res)),
+        model: req.model, role, latencyMs,
+      }) : reporter.turn({
         ...observed,
         model: req.model, role, usage: res.usage, deepseekEstimate: res.deepseekEstimate, costUsd: res.costUsd, cacheHit: res.cacheHit, latencyMs,
       });
@@ -125,4 +146,10 @@ export function wrapLLM(
       return res;
     },
   };
+}
+
+/** Remove the response payload before strict native turn metadata validation. */
+function resWithoutResponse(res: NativeLLMCompletion) {
+  const { response, ...metadata } = res;
+  return metadata;
 }

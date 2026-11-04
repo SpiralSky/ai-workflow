@@ -11,3 +11,5 @@ export type { LockMode } from "./task.ts";
 export { doTool, plannerResolveTool, PLANNER_RESOLVE_MAX_CHARS } from "./planner-tools.ts";
 export type { PlannerToolsInput } from "./planner-tools.ts";
 export * from "./selection/index.ts";
+
+export { hotPathCatalogFingerprint, HOT_PATH_PROMPT_KEY } from "./hot-paths/fingerprint.ts";

@@ -1,5 +1,5 @@
 import { readFileSync } from "node:fs";
-import { EventSchema } from "@aiw/telemetry";
+import { EventSchema, rejectNativeFormat, UnsupportedNativeFormatError } from "@aiw/telemetry";
 
 /** Complete billed cost or a known lower bound when telemetry is incomplete. */
 export interface CostSummary {
@@ -22,8 +22,8 @@ export function readAttemptCost(eventsPath: string, extraReasons: string[] = [])
   for (const line of text.split("\n")) {
     if (!line.trim()) continue;
     let event;
-    try { event = EventSchema.parse(JSON.parse(line)); }
-    catch { reasons.add("malformed-event"); continue; }
+    try { const raw = JSON.parse(line); rejectNativeFormat(raw); event = EventSchema.parse(raw); }
+    catch (error) { if (error instanceof UnsupportedNativeFormatError) throw error; reasons.add("malformed-event"); continue; }
     if (event.kind !== "turn") continue;
     if (ids.has(event.id)) { reasons.add("duplicate-turn-id"); continue; }
     ids.add(event.id);

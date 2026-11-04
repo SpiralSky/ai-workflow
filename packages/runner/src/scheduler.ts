@@ -1,3 +1,4 @@
+import { rejectNativeFormat, UnsupportedNativeFormatError } from "@aiw/telemetry";
 /** Job scheduler: all attempts count; unknown spend invalidates monetary-budget runs. */
 import type { Job, JobJSON, AttemptRecord, RunConfig, RunJSON } from "./types.ts";
 import { assertCompleteProvenance } from "./provenance.ts";
@@ -21,6 +22,8 @@ export interface SchedulerOptions {
 
 /** Schedules bounded concurrent jobs and records each attempt's complete cost or lower bound. */
 export async function runScheduler(opts: SchedulerOptions, runJSON: RunJSON): Promise<string | undefined> {
+  rejectNativeFormat(opts.config);
+  rejectNativeFormat(runJSON);
   if (!Number.isSafeInteger(opts.config.concurrency) || opts.config.concurrency < 1) throw new Error("concurrency must be a positive integer");
   const estimatedMode = opts.config.provider === "deepseek" && opts.config.usageMode === "estimated";
   if ((opts.config.provider === "deepseek" || opts.config.usageMode === "estimated") && !estimatedMode) throw new Error("Invalid DeepSeek usage mode");
@@ -75,10 +78,12 @@ export async function runScheduler(opts: SchedulerOptions, runJSON: RunJSON): Pr
       try {
         result = await attempt({ ...opts, job, provenance: runJSON.provenance, onProvenance: () => writeRunJSON(opts.runPath, runJSON), attempt: n, signal: controller.signal,
           onFailure: () => stop(`job-failed:${job.problem}.${job.framework}.${job.rep}`) });
+        rejectNativeFormat(result);
         cost = { costUsd: result.costUsd, knownCostUsd: result.knownCostUsd ?? result.costUsd ?? 0,
           costIncompleteReasons: [...(result.costIncompleteReasons ?? [])] };
         durationMs += result.durationMs;
       } catch (e) {
+        if (e instanceof UnsupportedNativeFormatError) throw e;
         error = e;
         failed = true;
         cost = e instanceof AttemptFailure

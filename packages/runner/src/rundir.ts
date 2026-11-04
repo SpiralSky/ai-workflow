@@ -1,3 +1,4 @@
+import { rejectNativeFormat } from "@aiw/telemetry";
 /**
  * Run directory writer: creates and updates the run directory structure.
  * Data-formats §1; runner §7.
@@ -57,6 +58,7 @@ export function createRunDir(
   config: RunConfig,
   provenance: Provenance,
 ): RunDir {
+  rejectNativeFormat(config);
   const path = join(repoRoot, "experiments", "runs", runId);
   mkdirSync(path, { recursive: true });
 
@@ -80,6 +82,7 @@ export function createRunDir(
  * @param data - run data to serialize
  */
 export function writeRunJSON(runPath: string, data: RunJSON): void {
+  rejectNativeFormat(data);
   const target = join(runPath, "run.json");
   const tmp = `${target}.tmp`;
   writeFileSync(tmp, JSON.stringify(data, null, 2) + "\n", "utf8");
@@ -126,5 +129,6 @@ export function createAttemptDir(jobDir: string, attemptN: number): string {
  * @param data - job result data
  */
 export function writeJobJSON(jobDir: string, data: JobJSON): void {
+  rejectNativeFormat(data);
   writeFileSync(join(jobDir, "job.json"), JSON.stringify(data, null, 2) + "\n", "utf8");
 }

@@ -1,3 +1,5 @@
+import { rejectNativeFormat } from "./native-format.ts";
+export { rejectNativeFormat, UnsupportedNativeFormatError } from "./native-format.ts";
 import { z } from "zod";
 
 /** Token usage of one model request. Optional fields are omitted when the API did not report them. */
@@ -19,7 +21,7 @@ const common = {
   ts: z.number(),
 };
 
-export const EventSchema = z.discriminatedUnion("kind", [
+const NumericEventSchema = z.discriminatedUnion("kind", [
   z.object({
     ...common,
     kind: z.literal("job"),
@@ -38,6 +40,9 @@ export const EventSchema = z.discriminatedUnion("kind", [
     providerSystemFingerprint: z.string().optional(),
     role: RoleSchema,
     usage: UsageSchema.optional(),
+    usageStatus: z.never().optional(),
+    usageReason: z.never().optional(),
+    completionEvidence: z.never().optional(),
     classifierEstimate: z.object({ basis: z.string(), estimatedUsd: z.number().finite().nonnegative(), inputTokens: z.number().int().nonnegative(), outputTokens: z.number().int().nonnegative() }).optional(),
     deepseekEstimate: z.object({ basis: z.string(), estimatedUsd: z.number().nonnegative(), cacheHitTokens: z.number().int().nonnegative(), cacheMissTokens: z.number().int().nonnegative(), outputTokens: z.number().int().nonnegative() }).optional(),
     costUsd: z.number().optional(),
@@ -77,6 +82,27 @@ export const EventSchema = z.discriminatedUnion("kind", [
     reason: z.string().optional(),
   }),
 ]);
+/** Receipt identity supplied by the trusted native adapter, never usage inferred from text. */
+export const CompletionEvidenceSchema = z.object({
+  completionId: z.string().min(1).max(256),
+  requestSHA256: z.string().regex(/^[a-f0-9]{64}$/),
+  responseSHA256: z.string().regex(/^[a-f0-9]{64}$/),
+}).strict();
+export const NativeCompletionSchema = z.object({
+  response: z.unknown(), usage: z.null(), usageStatus: z.literal("unavailable"),
+  usageReason: z.literal("native-harness-unreported"), completionEvidence: CompletionEvidenceSchema,
+}).strict();
+export const NativeTurnSchema = z.object({
+  ...common, kind: z.literal("turn"), model: z.string(), role: RoleSchema,
+  latencyMs: z.number(), usage: z.null(), usageStatus: z.literal("unavailable"),
+  usageReason: z.literal("native-harness-unreported"), completionEvidence: CompletionEvidenceSchema,
+  costUsd: z.never().optional(), cacheHit: z.never().optional(),
+  deepseekEstimate: z.never().optional(), classifierEstimate: z.never().optional(),
+  providerModel: z.never().optional(), providerSystemFingerprint: z.never().optional(),
+}).strict();
+/** Native events are accepted only for the separately versioned native evidence writer. */
+export const EventSchema = z.union([NumericEventSchema, NativeTurnSchema]);
+
 export type EventRecord = z.infer<typeof EventSchema>;
 export type EventOf<K extends EventRecord["kind"]> = Extract<EventRecord, { kind: K }>;
 
@@ -125,6 +151,7 @@ export function parseEvents(text: string): ParseResult {
       else errors.push({ line: i + 1, message: (e as Error).message });
       continue;
     }
+    rejectNativeFormat(json);
     const r = EventSchema.safeParse(json);
     if (r.success) events.push(r.data);
     else errors.push({ line: i + 1, message: r.error.message });

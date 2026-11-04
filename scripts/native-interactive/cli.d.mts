@@ -1,6 +1,6 @@
 import type {Readable,Writable} from 'node:stream';
 import type {ObservationClock} from './controller.mjs';
-export interface CellConfig {arm:'direct'|'branch-expanded'|'branch-hotpath2';root:string;allowedWritePaths:string[];venv:string;journalDir:string;cellDir:string}
+export interface CellConfig {arm:'direct'|'branch-expanded'|'branch-hotpath2'|'orchestrate-off'|'orchestrate-on';root:string;allowedWritePaths:string[];venv:string;journalDir:string;cellDir:string}
 export const BOUNDS:Readonly<{wallMs:number;inputBytes:number;outputBytes:number;stderrBytes:number}>;
 export function readConfig(file:string):CellConfig;
 export function validateConfig(config:unknown):CellConfig;

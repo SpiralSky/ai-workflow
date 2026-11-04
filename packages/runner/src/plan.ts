@@ -1,3 +1,4 @@
+import { rejectNativeFormat, UnsupportedNativeFormatError } from "@aiw/telemetry";
 /**
  * Expand a RunConfig into a list of jobs and compute a cost projection.
  * Runner architecture §3 (project cost), plan.ts responsibility from §1.
@@ -22,6 +23,7 @@ export interface Plan {
  * @returns flat list of jobs
  */
 export function expandJobs(config: RunConfig): Job[] {
+  rejectNativeFormat(config);
   const jobs: Job[] = [];
   // Interleave: for each rep, iterate problems, for each problem iterate frameworks
   for (let rep = 0; rep < config.reps; rep++) {
@@ -53,8 +55,10 @@ function readRunJobRecords(runDir: string): JobJSON[] {
     if (!existsSync(jobPath)) continue;
     try {
       const raw = JSON.parse(readFileSync(jobPath, "utf8")) as JobJSON;
+      rejectNativeFormat(raw);
       results.push(raw);
-    } catch {
+    } catch (error) {
+      if (error instanceof UnsupportedNativeFormatError) throw error;
       // Skip malformed records
     }
   }

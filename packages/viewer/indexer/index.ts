@@ -7,6 +7,8 @@
  *   node indexer/dist/index.js [--runs-dir <path>] [--out-dir <path>] [--watch]
  */
 
+import { rejectNativeFormat, UnsupportedNativeFormatError } from "../../telemetry/src/native-format.ts";
+
 import {
   readdirSync,
   readFileSync,
@@ -54,8 +56,11 @@ function parseJSONL(path: string): unknown[] {
     .filter(Boolean)
     .map((line) => {
       try {
-        return JSON.parse(line) as unknown;
-      } catch {
+        const value: unknown = JSON.parse(line);
+        rejectNativeFormat(value);
+        return value;
+      } catch (error) {
+        if (error instanceof UnsupportedNativeFormatError) throw error;
         return null;
       }
     })
@@ -196,6 +201,7 @@ function processRun(
     console.warn(`[indexer] Skipping ${runDirName}: invalid run.json`);
     return null;
   }
+  rejectNativeFormat(run);
   if (run.format !== 1) {
     console.warn(`[indexer] Skipping ${runDirName}: unknown format ${run.format}`);
     return null;
@@ -228,8 +234,10 @@ function processRun(
     if (existsSync(jobJSONPath)) {
       try {
         const raw = JSON.parse(readFileSync(jobJSONPath, "utf8")) as JobJSON;
+        rejectNativeFormat(raw);
         if (raw.format === 1) jobMeta = raw;
-      } catch {
+      } catch (error) {
+        if (error instanceof UnsupportedNativeFormatError) throw error;
         // fall through to derivation
       }
     }

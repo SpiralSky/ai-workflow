@@ -1,5 +1,5 @@
-import type { LLMClient } from "@aiw/telemetry";
-import { DEEPSEEK_PRICE_BASIS, LLMError, type DeepSeekCompletion } from "@aiw/llm";
+import { assertNumericCompletion, type LLMClient } from "@aiw/telemetry";
+import { DEEPSEEK_PRICE_BASIS, LLMError } from "@aiw/llm";
 import { boundSubscriptionClient, type SubscriptionLimits, type SubscriptionUsage } from "./subscription.ts";
 
 export interface EstimatedLimits extends SubscriptionLimits { estimateLimitUsd: number }
@@ -17,7 +17,8 @@ export function boundEstimatedClient(client: LLMClient, limits: EstimatedLimits)
   let estimate = 0, misses = 0;
   const bounded = boundSubscriptionClient({ async complete(request) {
     if (estimate >= limits.estimateLimitUsd) throw new LLMError("other", "estimated-cost-threshold");
-    const completion = await client.complete(request) as DeepSeekCompletion;
+    const completion = await client.complete(request);
+    assertNumericCompletion(completion);
     const e = completion.deepseekEstimate;
     if (!e || e.basis !== DEEPSEEK_PRICE_BASIS || !Number.isFinite(e.estimatedUsd) || e.estimatedUsd < 0 ||
         !Number.isSafeInteger(e.cacheMissTokens) || e.cacheMissTokens < 0 || completion.costUsd !== undefined) {

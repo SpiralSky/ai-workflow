@@ -1,4 +1,4 @@
-import type { LLMClient, LLMCompletion } from "@aiw/telemetry";
+import type { NumericLLMClient, NumericLLMCompletion } from "@aiw/telemetry";
 import { LLMError, classifyAPIError } from "./errors.ts";
 import { normaliseUsage } from "./usage.ts";
 
@@ -23,14 +23,14 @@ export interface ChatClientOptions {
  * @returns client whose `complete()` returns the raw response body with normalised usage
  * @throws LLMError from `complete()`, classified per runner §4.4
  */
-export function createChatClient(opts: ChatClientOptions): LLMClient {
+export function createChatClient(opts: ChatClientOptions): NumericLLMClient {
   const url = `${opts.baseURL.replace(/\/+$/, "")}/chat/completions`;
   const openRouter = /openrouter\.ai/.test(opts.baseURL);
   const doFetch = opts.fetch ?? fetch;
   const timeoutMs = opts.timeoutMs ?? 300_000;
 
   return {
-    async complete(req): Promise<LLMCompletion> {
+    async complete(req): Promise<NumericLLMCompletion> {
       const { system, tools, messages, signal, ...rest } = req;
       const body: Record<string, unknown> = {
         ...rest,

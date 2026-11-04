@@ -2,10 +2,11 @@ import type { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { RequestSchema, NotificationSchema, McpError, ErrorCode } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
 import { LLMError, validateDecisionsRequest, type DecisionsClient } from "@aiw/llm";
-import type { LLMClient } from "@aiw/telemetry";
+import { NativeCompletionSchema, assertNumericCompletion, type LLMClient } from "@aiw/telemetry";
 
 /** Opt-in reverse LLM channel. Credentials and provider settings remain on the host. */
 export interface HostLLMBrokerOptions {
+  nativeMode?: true;
   secondaryClient: LLMClient;
   secondaryModel: string;
   classifierClient?: DecisionsClient;
@@ -17,6 +18,7 @@ const BrokerRequestSchema = RequestSchema.extend({
   method: z.literal("aiw/llm/complete"),
   params: z.object({
     requestId: z.string().uuid(),
+    nativeMode: z.literal(true).optional(),
     system: z.string().max(1_048_576),
     messages: z.array(z.unknown()).max(4096),
     tools: z.array(z.unknown()).max(512),
@@ -61,6 +63,9 @@ export function installHostLLMBroker(client: Client, opts: HostLLMBrokerOptions)
     if (!admitted || session.signal.aborted || opts.signal?.aborted) {
       throw new McpError(ErrorCode.InvalidRequest, "Host LLM admission is closed");
     }
+    if ((request.params.nativeMode === true) !== (opts.nativeMode === true)) {
+      throw new McpError(ErrorCode.InvalidParams, "Native completion mode mismatch");
+    }
     const requestId = request.params.requestId;
     if (seen.has(requestId) || seen.size >= 10000) {
       throw new McpError(ErrorCode.InvalidParams, "LLM broker request ID reused or session limit reached");
@@ -82,6 +87,8 @@ export function installHostLLMBroker(client: Client, opts: HostLLMBrokerOptions)
         signal,
       });
       signal.throwIfAborted();
+      if (opts.nativeMode) return NativeCompletionSchema.parse(completion);
+      assertNumericCompletion(completion);
       // No access tokens or connection configuration are returned across this channel.
       return { response: completion.response, usage: completion.usage,
         ...(completion.deepseekEstimate ? { deepseekEstimate: completion.deepseekEstimate } : {}),

@@ -4,7 +4,12 @@
  * window.__aiw.register is called by the loaded script.
  */
 
+import { rejectNativeFormat } from "../../../telemetry/src/native-format.ts";
+
 import type { AIWGlobal } from "../types.js";
+
+const failures = new Map<string, unknown>();
+const rejectors = new Map<string, Array<(reason: unknown) => void>>();
 
 /** Initialises window.__aiw if not already present. */
 function ensureGlobal(): void {
@@ -15,7 +20,15 @@ function ensureGlobal(): void {
     _data,
     _waiters,
     register(key: string, data: unknown) {
+      try { rejectNativeFormat(data); } catch (error) {
+        failures.set(key, error);
+        for (const reject of rejectors.get(key) ?? []) reject(error);
+        rejectors.delete(key);
+        _waiters.delete(key);
+        return;
+      }
       _data.set(key, data);
+      rejectors.delete(key);
       const waiters = _waiters.get(key);
       if (waiters) {
         for (const resolve of waiters) resolve(data);
@@ -34,19 +47,23 @@ function ensureGlobal(): void {
  */
 export function loadScript(src: string, key: string): Promise<unknown> {
   ensureGlobal();
+  if (failures.has(key)) return Promise.reject(failures.get(key));
   const existing = window.__aiw._data.get(key);
-  if (existing !== undefined) return Promise.resolve(existing);
+  if (existing !== undefined) return Promise.resolve(existing).then(data => { rejectNativeFormat(data); return data; });
 
   return new Promise<unknown>((resolve, reject) => {
     const waiters = window.__aiw._waiters.get(key) ?? [];
-    waiters.push(resolve);
+    waiters.push(data => {
+      try { rejectNativeFormat(data); resolve(data); } catch (error) { reject(error); }
+    });
+    rejectors.set(key, [...(rejectors.get(key) ?? []), reject]);
     window.__aiw._waiters.set(key, waiters);
 
     // Check again after registering waiter (race guard)
     const already = window.__aiw._data.get(key);
     if (already !== undefined) {
       window.__aiw._waiters.delete(key);
-      resolve(already);
+      try { rejectNativeFormat(already); resolve(already); } catch (error) { reject(error); }
       return;
     }
 

@@ -1,12 +1,15 @@
-import {boundedLines,Ledger,LIMITS,monotonicNow} from './protocol.mjs';
+import {boundedLines,Ledger,LIMITS,LOCAL_WATCHDOGS,monotonicNow} from './protocol.mjs';
 
 const CLOCK=Object.freeze({now:monotonicNow,setTimeout,clearTimeout});
 /** Finite deterministic tool loop, without model transport. The supervisor owns the earlier
  * launch-to-close deadline; these observations cover only this worker's measured lifetime.
  * Clock injection is for deterministic controls, never an actor-selectable budget.
  */
-export async function runCell({arm,input,emit,journal,createSession,onSubmit,clock=CLOCK}) {
+export async function runCell({arm,input,emit,journal,createSession,onSubmit,evidenceMode='synthetic-control',clock=CLOCK}) {
  const ledger=new Ledger(arm),started=clock.now(),deadline=started+LIMITS.assignmentMs;
+ let fatalReason;
+ const latchFatal=error=>{fatalReason??=String(error);activeAbort?.abort(error);ledger.fail(fatalReason);};
+ const assertHealthy=()=>{if(session?.fatalReason)latchFatal(session.fatalReason);if(fatalReason)throw Error(fatalReason);};
  let session,submitted=false,visibleInputBytes=0,visibleFeedbackBytes=0,initialBytes=0,outcome,closePromise,cleanupStatus='pending',confirmedOutputBytes=0;
  let phase='setup',phaseStarted=started,lastObserved=started,recording=true,activeAbort,initializationPending=false,cleanupRequested=false;
  const phasesMs={setup:0,input:0,action:0,emit:0,submit:0,close:0};
@@ -31,7 +34,7 @@ export async function runCell({arm,input,emit,journal,createSession,onSubmit,clo
   // Always request cooperative cleanup once, even when no wait budget remains.
   const pending=session?Promise.resolve().then(()=>session.close()):Promise.resolve();
   pending.catch(()=>{});
-  try{await bounded(()=>pending,'cleanup',LIMITS.actionMs);if(initializationPending)throw Error('session initialization unresolved');if(observationError)throw observationError;cleanupStatus='closed';observation('close-end',{status:'closed'});}
+  try{await bounded(()=>pending,'cleanup',LOCAL_WATCHDOGS.cleanupMs);if(initializationPending)throw Error('session initialization unresolved');if(observationError)throw observationError;cleanupStatus='closed';observation('close-end',{status:'closed'});}
   catch(error){cleanupStatus='uncertain';try{observation('close-end',{status:'uncertain',reason:String(error)});}catch{}throw error;}
  })();
  const output=async(value,initial=false)=>{
@@ -46,24 +49,25 @@ export async function runCell({arm,input,emit,journal,createSession,onSubmit,clo
  try {
   observation('worker-start');
   session=await bounded(async()=>{initializationPending=true;try{const created=await createSession({
+   onFatal:latchFatal,
    onHostAttempt(name,args){ledger.hostAttempt(name,args);observation('host-attempt',{name,args});},
    onHostResult(event){if(recording)observation('host-result',{event});},
   });if(cleanupRequested){Promise.resolve().then(()=>created.close()).catch(()=>{});}else session=created;return created;}finally{initializationPending=false;}},'session initialization');
-  await output({kind:'ready',packet:session.packet},true);observation('ready');
+  assertHealthy();await output({kind:'ready',packet:session.packet},true);observation('ready');
   const lines=boundedLines(input)[Symbol.asyncIterator]();
   while(true) {
    enter('input');const next=await bounded(()=>lines.next(),'assignment');if(next.done)break;
    visibleInputBytes+=Buffer.byteLength(next.value)+1;
-   const action=ledger.reserve(next.value);observation('reserved',{action});
+   assertHealthy();const action=ledger.reserve(next.value);observation('reserved',{action});
    if(action.kind==='submit') {
-    observation('submit-received',{sequence:action.sequence});await close();
+    observation('submit-received',{sequence:action.sequence});assertHealthy();await close();assertHealthy();
     enter('submit');const submission=await bounded(()=>onSubmit(),'submission');
-    ledger.finish({kind:'submitted',submission},true);observation('result',{result:{kind:'submitted',submission}});
+    assertHealthy();ledger.finish({kind:'submitted',submission},true);observation('result',{result:{kind:'submitted',submission}});
     await output({kind:'submitted',submission});submitted=true;break;
    }
    enter('action');activeAbort=new AbortController();observation('action-start',{sequence:action.sequence});
    let result;
-   try{result=await bounded(()=>session.dispatch(action,activeAbort.signal),'action',LIMITS.actionMs,activeAbort);observation('action-end',{sequence:action.sequence,status:'returned'});}
+   try{result=await bounded(()=>{assertHealthy();return session.dispatch(action,activeAbort.signal);},'action',LIMITS.actionMs,activeAbort);assertHealthy();observation('action-end',{sequence:action.sequence,status:'returned'});}
    catch(error){observation('action-end',{sequence:action.sequence,status:'incomplete',reason:String(error)});throw error;}
    finally{activeAbort=undefined;}
    ledger.finish(result);observation('result',{result});await output({kind:'result',sequence:action.sequence,result});
@@ -71,14 +75,15 @@ export async function runCell({arm,input,emit,journal,createSession,onSubmit,clo
   if(!submitted)throw Error('EOF before submission');
   outcome={status:'submitted'};
  } catch(error) {
-  activeAbort?.abort(error);ledger.fail(String(error));try{observation('failure',{reason:String(error)});}catch{/* preserve the original error */}
+  activeAbort?.abort(error);if(fatalReason)error=Error(fatalReason);ledger.fail(String(error));try{observation('failure',{reason:String(error)});}catch{/* preserve the original error */}
   outcome={status:'incomplete',reason:String(error)};
  } finally {
-  try{await close();}catch{outcome={status:'incomplete',reason:'cleanup uncertain'};}
+  try{await close();}catch{outcome={status:'incomplete',reason:fatalReason??'cleanup uncertain'};}
+  if(fatalReason)outcome={status:'incomplete',reason:fatalReason};
  }
  const ended=now();phasesMs[phase]+=ended-phaseStarted;
  const timing={scope:'worker-local observations; supervisor owns launch-to-close ceiling',startedMonotonicMs:started,endedMonotonicMs:ended,elapsedMs:ended-started,inputWaitMs:phasesMs.input,helperActiveMs:ended-started-phasesMs.input,phasesMs};
- outcome={...outcome,visibleInputBytes,visibleFeedbackBytes,initialBytes,hostAttempts:ledger.calls,confirmedOutputBytes,cleanupStatus,timing};
+ outcome={...outcome,evidenceMode,...(fatalReason?{fatalReason}:{}),visibleInputBytes,visibleFeedbackBytes,initialBytes,hostAttempts:ledger.calls,confirmedOutputBytes,cleanupStatus,timing};
  try{observation('terminal',{outcome});}catch{outcome={...outcome,status:'incomplete',reason:'terminal journal failure'};}
  recording=false;return outcome;
 }

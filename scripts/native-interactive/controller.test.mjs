@@ -40,7 +40,7 @@ async function flush(){for(let i=0;i<30;i++)await Promise.resolve();}
 function synthetic(overrides={}) {return {arm:'direct',input:input([{kind:'submit',sequence:1}]),emit(){},journal:{append(){}},createSession:async()=>({packet:{},async dispatch(){return ['ok'];},async close(){}}),onSubmit:async()=>({provisional:true}),...overrides};}
 
 test('fixed limits reserve the twelfth round for submit',async()=>{
- const {LIMITS}=await import('./protocol.mjs');assert.equal(LIMITS.assignmentMs,900000);assert.equal(LIMITS.actionMs,60000);assert.equal(LIMITS.hostCalls,60);
+ const {LIMITS}=await import('./protocol.mjs');assert.equal(LIMITS.assignmentMs,900000);assert.equal(LIMITS.actionMs,300000);assert.equal(LIMITS.hostCalls,60);
  let effects=0;const createSession=async()=>({packet:{},async dispatch(){effects++;return ['ok'];},async close(){}});
  const actions=Array.from({length:11},(_,i)=>({...action,sequence:i+1}));
  const valid=await runCell(synthetic({input:input([...actions,{kind:'submit',sequence:12}]),createSession}));assert.equal(valid.status,'submitted');assert.equal(effects,11);
@@ -58,8 +58,8 @@ test('stdin idle is charged to fixed assignment ceiling without a native actor',
 test('action deadline aborts the actual dispatch signal and late success cannot submit',async()=>{
  const clock=fakeClock(),records=[];let resolveAction,signal,closes=0,submits=0;
  const running=runCell(synthetic({clock,input:input([action,submit]),journal:{append:e=>records.push(e)},createSession:async()=>({packet:{},dispatch(a,s){signal=s;return new Promise(r=>{resolveAction=r;});},async close(){closes++;}}),onSubmit:async()=>{submits++;}}));
- await flush();assert.ok(signal instanceof AbortSignal);assert.equal(signal.aborted,false);clock.advance(60000);await flush();const result=await running;
- assert.equal(signal.aborted,true);assert.equal(result.status,'incomplete');assert.match(result.reason,/action timeout/);assert.equal(closes,1);assert.equal(submits,0);assert.equal(result.timing.phasesMs.action,60000);
+ await flush();assert.ok(signal instanceof AbortSignal);assert.equal(signal.aborted,false);clock.advance(300000);await flush();const result=await running;
+ assert.equal(signal.aborted,true);assert.equal(result.status,'incomplete');assert.match(result.reason,/action timeout/);assert.equal(closes,1);assert.equal(submits,0);assert.equal(result.timing.phasesMs.action,300000);
  const count=records.length;resolveAction(['late success']);await flush();assert.equal(records.length,count);assert.equal(records.at(-1).type,'terminal');assert.equal(clock.pending(),0);
 });
 
@@ -72,7 +72,7 @@ test('remaining assignment time takes precedence over the per-action allowance',
 
 test('a returned action at the exact deadline is incomplete even before its timer runs',async()=>{
  const clock=fakeClock();let signal,submits=0;
- const result=await runCell(synthetic({clock,input:input([action,submit]),createSession:async()=>({packet:{},async dispatch(a,s){signal=s;clock.jump(60000);return ['too late'];},async close(){}}),onSubmit:async()=>{submits++;}}));
+ const result=await runCell(synthetic({clock,input:input([action,submit]),createSession:async()=>({packet:{},async dispatch(a,s){signal=s;clock.jump(300000);return ['too late'];},async close(){}}),onSubmit:async()=>{submits++;}}));
  assert.equal(result.status,'incomplete');assert.equal(signal.aborted,true);assert.equal(submits,0);assert.equal(clock.pending(),0);
 });
 
@@ -108,4 +108,16 @@ test('a failed public test is ordinary feedback until submission',async()=>{
 test('failed cleanup observation does not suppress cooperative resource close',async()=>{
  let closes=0;const result=await runCell(synthetic({input:input([action]),journal:{append(e){if(['reserved','close-start','close-end'].includes(e.type))throw Error('journal unavailable');}},createSession:async()=>({packet:{},async close(){closes++;}})}));
  assert.equal(result.status,'incomplete');assert.equal(result.cleanupStatus,'uncertain');assert.equal(closes,1);
+});
+
+for(const arm of ['orchestrate-off','orchestrate-on'])for(const elapsed of [60001,299999])test(`whole action succeeds before the new ceiling (${arm}, ${elapsed}ms)`,async()=>{
+ const clock=fakeClock(),doAction={sequence:1,kind:'do',args:{instruction:'Synthetic timing control'}};
+ const result=await runCell(synthetic({arm,clock,input:input([doAction,submit]),createSession:async()=>({packet:{},async dispatch(){clock.jump(elapsed);return ['synthetic success'];},async close(){}})}));
+ assert.equal(result.status,'submitted');assert.equal(result.timing.phasesMs.action,elapsed);assert.equal(clock.pending(),0);
+});
+
+test('late action at max+1 is incomplete and cancels before any submission',async()=>{
+ const clock=fakeClock();let signal,submits=0;
+ const result=await runCell(synthetic({clock,input:input([action,submit]),createSession:async()=>({packet:{},async dispatch(a,s){signal=s;clock.jump(300001);return ['late'];},async close(){}}),onSubmit(){submits++;}}));
+ assert.equal(result.status,'incomplete');assert.equal(signal.aborted,true);assert.equal(submits,0);
 });

@@ -5,7 +5,7 @@ const MAX_ENTRIES = 256, MAX_SOURCES = 256, MAX_BYTES = 16 * 1024 * 1024, MAX_HI
 const HASH = /^[a-f0-9]{64}$/, ID = /^[A-Za-z0-9][A-Za-z0-9._:/-]{0,159}$/;
 const MARKER = /^AIW_CANARY_[a-f0-9]{32}$/;
 const PHASES = ['solve', 'grade', 'audit'], ROLES = ['coordinator', 'solver', 'candidate'];
-const KINDS = ['solver-output', 'submission', 'submission-record', 'relay', 'host-journal', 'native-tool-log', 'grading-output', 'audit-output', 'run-output'];
+const KINDS = ['completion-request', 'completion-response', 'completion-control', 'native-event', 'solver-output', 'submission', 'submission-record', 'relay', 'host-journal', 'native-tool-log', 'grading-output', 'audit-output', 'run-output'];
 const REQUIRED_KINDS = ['solver-output', 'relay', 'host-journal'];
 const hash = bytes => createHash('sha256').update(bytes).digest('hex');
 

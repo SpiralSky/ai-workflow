@@ -1,3 +1,4 @@
+import {createSupervisorCompletionLane,createCompletionFramer,createCompletionIPCFramer,completionBinding,COMPLETION_TRANSPORT_LIMITS,NATIVE_LIMITS_MANIFEST,encodeFinalSubmissionFrame} from './completion-lane.mjs';
 import {verifyCapturedActorData} from './actor-data.mjs';
 import {nativeCheckEnv,inspectCheckRuntime,checkRuntimePolicy} from './check-runtime.mjs';
 import {createActionReceiptTracker} from './action-receipts.mjs';
@@ -19,7 +20,7 @@ function readSmallJson(file) {return JSON.parse(new TextDecoder('utf-8',{fatal:t
 export function readConfig(file) {return validateConfig(readSmallJson(file));}
 export function validateConfig(c) {
  if(!c || typeof c!=='object'||Array.isArray(c)||Object.keys(c).some(k=>!['arm','root','allowedWritePaths','venv','journalDir','cellDir'].includes(k)))throw new Error('invalid config');
- if(!['direct','branch-expanded','branch-hotpath2'].includes(c.arm)||!Array.isArray(c.allowedWritePaths)||c.allowedWritePaths.some(p=>typeof p!=='string'))throw new Error('invalid config');
+ if(!['direct','branch-expanded','branch-hotpath2','orchestrate-off','orchestrate-on'].includes(c.arm)||!Array.isArray(c.allowedWritePaths)||c.allowedWritePaths.some(p=>typeof p!=='string'))throw new Error('invalid config');
  for(const key of ['root','venv','journalDir','cellDir'])if(typeof c[key]!=='string'||!path.isAbsolute(c[key])||path.resolve(c[key])!==c[key])throw new Error('absolute canonical paths required');
  for(const key of ['root','venv','cellDir'])if(fs.realpathSync(c[key])!==c[key]||!fs.lstatSync(c[key]).isDirectory())throw new Error('canonical directory required');
  if(path.dirname(c.journalDir)!==c.cellDir||c.root===c.cellDir||c.root.startsWith(c.cellDir+path.sep)===false)throw new Error('cell containment required');
@@ -74,13 +75,18 @@ async function recordCoordinatorIntent(options){const {recordActorDispatchIntent
 
 export const writeStream=(stream,data)=>new Promise((resolve,reject)=>{const onError=error=>reject(error);stream.once('error',onError);stream.write(data,error=>{if(error)reject(error);else{stream.off('error',onError);resolve();}});});
 /** Finite worker, no model bridge. Clean means cooperative close + absent worker group, not an OS sandbox. */
-export async function supervise(config,{input=process.stdin,stdout=s=>writeStream(process.stdout,s),stderr=s=>writeStream(process.stderr,s),clock={now:monotonicNow,setTimeout,clearTimeout},recordDispatchIntent=recordCoordinatorIntent}={}) {
- const c=validateConfig(config);if(process.platform!=='linux')throw new Error('cleanup assurance unsupported on this platform');
+export async function supervise(config,{input=process.stdin,stdout:rawStdout=s=>writeStream(process.stdout,s),stderr=s=>writeStream(process.stderr,s),clock={now:monotonicNow,setTimeout,clearTimeout},recordDispatchIntent=recordCoordinatorIntent}={}) {
+ const c=validateConfig(config);
+ const orchestrate=c.arm==='orchestrate-off'||c.arm==='orchestrate-on';
+ let transportInputBytes=0,transportOutputBytes=0,externalQueue=Promise.resolve();
+ const stdout=data=>{transportOutputBytes+=Buffer.byteLength(data);if(transportOutputBytes>COMPLETION_TRANSPORT_LIMITS.outputBytes-(orchestrate?COMPLETION_TRANSPORT_LIMITS.terminalReserveBytes:0))throw Error('overall external output overflow; terminal reserve');const pending=externalQueue.then(()=>rawStdout(data));externalQueue=pending.catch(()=>{});return pending;};if(process.platform!=='linux')throw new Error('cleanup assurance unsupported on this platform');
  const configBytes=readBounded(path.join(c.cellDir,'config.json'),16384),admissionBytes=readBounded(path.join(c.cellDir,'admission.json'));
  if(JSON.stringify(c)!==JSON.stringify(JSON.parse(configBytes.toString('utf8')))||JSON.stringify(JSON.parse(admissionBytes.toString('utf8')).config)!==JSON.stringify(c))throw new Error('config/admission mismatch');
- const admission=JSON.parse(admissionBytes.toString('utf8')),nativeAssignment=admission.evidenceMode==='native-assignment';
- const assignmentBytes=nativeAssignment?readBounded(path.join(c.cellDir,'assignment.json'),16384):undefined,assignment=assignmentBytes?JSON.parse(assignmentBytes.toString('utf8')):undefined;
- if(nativeAssignment&&(typeof assignment?.actorId!=='string'||!assignment.actorId))throw Error('native assignment identity required');
+ const admission=JSON.parse(admissionBytes.toString('utf8')),receiptMode=admission.evidenceMode==='native-assignment'||orchestrate;
+ if(orchestrate&&!['native-assignment','synthetic-control'].includes(admission.evidenceMode))throw Error('explicit orchestrate evidence mode required');
+ if(orchestrate&&JSON.stringify(admission.nativeCompletionLimits)!==JSON.stringify(NATIVE_LIMITS_MANIFEST))throw Error('frozen native limits mismatch');
+ const assignmentBytes=receiptMode?readBounded(path.join(c.cellDir,'assignment.json'),16384):undefined,assignment=assignmentBytes?JSON.parse(assignmentBytes.toString('utf8')):undefined;
+ if(receiptMode&&(typeof assignment?.actorId!=='string'||!assignment.actorId))throw Error('framed assignment identity required');
  const assignmentSHA256=assignmentBytes?digest(assignmentBytes):undefined;
  const configSHA256=digest(configBytes),admissionSHA256=digest(admissionBytes);
  const resultPath=path.join(c.cellDir,'supervisor-result.json');
@@ -90,7 +96,7 @@ export async function supervise(config,{input=process.stdin,stdout=s=>writeStrea
  const observe=(type,fields={})=>{if(!acceptingObservations)return;const monotonicMs=clock.now();if(!Number.isFinite(monotonicMs)||monotonicMs<(observations.at(-1)?.monotonicMs??started))throw Error('invalid monotonic clock');const event={type,monotonicMs,observedAtUTC:new Date().toISOString(),...fields};observations.push(event);return event;};
  if(!Number.isFinite(started)||started<0)throw Error('invalid monotonic clock');
  const runtimePolicy=checkRuntimePolicy();
- if((nativeAssignment||admission.checkRuntimePolicy)&&JSON.stringify(admission.checkRuntimePolicy)!==JSON.stringify(runtimePolicy))throw Error('offline check runtime: admission policy mismatch');
+ if((receiptMode||admission.checkRuntimePolicy)&&JSON.stringify(admission.checkRuntimePolicy)!==JSON.stringify(runtimePolicy))throw Error('offline check runtime: admission policy mismatch');
  observe('check-runtime-preflight-start');
  const temp=fs.mkdtempSync(path.join(os.tmpdir(),'native-worker-'));
  let checkRuntime;
@@ -104,21 +110,33 @@ export async function supervise(config,{input=process.stdin,stdout=s=>writeStrea
  const checkRuntimePreflightSHA256=digest(readBounded(path.join(c.cellDir,'check-runtime-preflight.json'),16384));
  exclusive(path.join(c.cellDir,'check-runtime.json'),checkRuntime);
  const checkRuntimeSHA256=digest(readBounded(path.join(c.cellDir,'check-runtime.json'),16384));
- const actionStore=nativeAssignment?createActionReceiptStore({cellDir:c.cellDir}):undefined;
+ const actionStore=receiptMode?createActionReceiptStore({cellDir:c.cellDir}):undefined;
  const configPath=path.join(c.cellDir,'worker-config.json');exclusive(configPath,c);
  const env=sanitizedEnv(c,temp,checkRuntime);
  let failure,bytesIn=0,bytesOut=0,bytesErr=0,exitCode,exitSignal,coordinatorInputBytes=0,coordinatorOutputBytes=0,coordinatorControls=0,coordinatorActionReceiptBytes=0;
- let inputPhase=nativeAssignment?'waiting-ready':'tools',controlBuffer=Buffer.alloc(0),controlPromise=Promise.resolve(),inputEnded=false,readyEvidence,actorInputObserved=false,acceptedHandoff,bootstrap,actionTracker;
+ let inputPhase=receiptMode?'waiting-ready':'tools',controlBuffer=Buffer.alloc(0),controlPromise=Promise.resolve(),inputEnded=false,readyEvidence,actorInputObserved=false,acceptedHandoff,bootstrap,actionTracker,completionLane,actionTimer,completionFramer,externalFramer,externalFramePendingAction;
  observe('worker-spawn');
  exclusive(path.join(c.cellDir,'supervisor-start.json'),{kind:'supervisor-launch-observation',startedMonotonicMs:started,startedAtUTC,assignmentLimitMs:BOUNDS.wallMs,deadlineMonotonicMs:deadline,supervisorIdentity,assignmentSHA256,configSHA256,admissionSHA256,checkRuntimeSHA256,checkRuntimePreflightSHA256,checkRuntimePolicy:runtimePolicy,scope:'observation before spawn; assignment includes bounded checker preflight; not proof child executed'});
  const supervisorStartBytes=readBounded(path.join(c.cellDir,'supervisor-start.json'),16384),supervisorStartSHA256=digest(supervisorStartBytes),startEvidence=JSON.parse(supervisorStartBytes.toString('utf8'));
- const child=spawn(process.execPath,['--import',path.join(REPO,'node_modules/tsx/dist/loader.mjs'),path.join(HERE,'worker.ts'),configPath],{cwd:REPO,env,detached:true,stdio:['pipe','pipe','pipe']});
- let outputQueue=Promise.resolve(),errorQueue=Promise.resolve();
+ const child=spawn(process.execPath,['--import',path.join(REPO,'node_modules/tsx/dist/loader.mjs'),path.join(HERE,'worker.ts'),configPath],{cwd:REPO,env,detached:true,stdio:orchestrate?['pipe','pipe','pipe','pipe']:['pipe','pipe','pipe']});
+ let outputQueue=Promise.resolve(),errorQueue=Promise.resolve(),completionQueue=Promise.resolve();
  const closed=new Promise(resolve=>child.once('close',()=>{observe('worker-close');resolve();}));
  const kill=()=>{if(child.pid)try{process.kill(-child.pid,'SIGKILL');}catch(e){if(e.code!=='ESRCH')failure??='group kill uncertain';}};
- const fail=reason=>{if(!acceptingObservations)return;failure??=reason;input.pause?.();child.stdin.destroy();kill();};
+ const fail=reason=>{if(!acceptingObservations)return;if(!failure&&orchestrate){try{const external=externalFramer?.retained??Buffer.alloc(0),worker=completionFramer?.retained??Buffer.alloc(0);exclusiveBytes(path.join(c.cellDir,'native-lane-rejected-external.raw'),external);exclusiveBytes(path.join(c.cellDir,'native-lane-rejected-worker.raw'),worker);exclusive(path.join(c.cellDir,'native-lane-failure.json'),{version:'native-lane-failure-v1',reason:String(reason),externalBytesObserved:externalFramer?.total??0,workerBytesObserved:completionFramer?.total??0,externalPrefixSHA256:digest(external),workerPrefixSHA256:digest(worker),scope:'last bounded observed frame prefixes; oversized rejected chunks are counted, not silently accepted'});}catch{}}failure??=reason;input.pause?.();child.stdin.destroy();kill();};
  const timer=clock.setTimeout(()=>{observe('assignment-timeout');fail('wall timeout; cleanup uncertain');},Math.max(0,deadline-clock.now()));
- const assertReceiptActive=()=>{if(failure||!acceptingObservations||clock.now()>=deadline)throw Error('action receipt unavailable or assignment expired');};
+ const assertReceiptActive=()=>{if(failure||!acceptingObservations||clock.now()>=deadline)throw Error('action receipt unavailable or assignment expired');
+  if(orchestrate){if(digest(readBounded(path.join(c.cellDir,'admission.json')))!==admissionSHA256||digest(readBounded(path.join(c.cellDir,'config.json'),16384))!==configSHA256)throw Error('completion source binding changed');
+   for(const [rel,sha] of Object.entries(admission.bindings)){if(path.isAbsolute(rel)||rel.split('/').some(p=>!p||p==='.'||p==='..')||digest(readBounded(path.join(REPO,rel),8388608))!==sha)throw Error('completion source drift');}
+  }
+ };
+ completionFramer=orchestrate?createCompletionIPCFramer():undefined;
+ if(orchestrate){
+  completionLane=createSupervisorCompletionLane({cellDir:c.cellDir,binding:completionBinding(admission,admissionSHA256,path.basename(c.cellDir)),checkActive:assertReceiptActive,onFatal:fail,now:clock.now,
+   emitWorker:raw=>writeStream(child.stdio[3],raw),emitExternal:stdout});
+  child.stdio[3].on('data',chunk=>{try{for(const raw of completionFramer.push(chunk))completionQueue=completionQueue.then(()=>completionLane.worker(raw)).catch(error=>fail(error.message));}catch(error){fail(error.message);}});
+  child.stdio[3].on('end',()=>{try{completionFramer.eof();}catch(error){fail(error.message);}});
+  child.stdio[3].on('error',()=>fail('completion IPC error; close agreement unavailable'));
+ }
  const acknowledgeReady=frame=>{
   if(readyObserved||!acceptingObservations)return;if(failure)throw Error('failed supervisor cannot acknowledge readiness');
   if(clock.now()>=deadline)throw Error('ready delivery after assignment deadline');
@@ -127,12 +145,12 @@ export async function supervise(config,{input=process.stdin,stdout=s=>writeStrea
   const ready=observe('ready-delivered',{readySHA256:digest(frame),readyFrameBytes:frame.length,readyFraming:'utf8-json-line-including-lf'});
   readyEvidence={kind:'supervisor-ready-acknowledgement',...ready,processes,processIdentityScope:'Linux procfs observer namespace; missing time namespace is unknown',supervisorStartSHA256,assignmentSHA256,configSHA256,admissionSHA256,scope:'stdout callback acknowledged exact ready frame; not proof of actor consumption'};
   exclusive(path.join(c.cellDir,'supervisor-ready.json'),readyEvidence);
-  readyObserved=true;if(nativeAssignment)inputPhase='awaiting-control';
+  readyObserved=true;if(receiptMode)inputPhase='awaiting-control';
  };
  const forwardOutput=createReadyFrameForwarder({persist:frame=>{
   if(clock.now()>=deadline||failure)throw Error('ready persistence after assignment deadline or failure');
   exclusiveBytes(path.join(c.cellDir,'ready-frame.jsonl'),frame);
- },emit:bytes=>{if(nativeAssignment&&readyObserved){if(!actionTracker)throw Error('worker feedback before coordinator acknowledgement');return actionTracker.feedback(bytes);}return stdout(bytes);},onReady:acknowledgeReady});
+ },emit:bytes=>{if(receiptMode&&readyObserved){if(!actionTracker)throw Error('worker feedback before coordinator acknowledgement');return actionTracker.feedback(bytes);}return stdout(bytes);},onReady:acknowledgeReady});
  const performControl=async frame=>{
   const handoff=verifyCellPublicHandoff({cellDir:c.cellDir});
   const request=parseCoordinatorDispatchControl(frame,{actorId:assignment.actorId,assignmentSHA256,handoffSHA256:handoff.handoffSHA256,capabilitySHA256:handoff.capabilitySHA256});
@@ -149,19 +167,19 @@ export async function supervise(config,{input=process.stdin,stdout=s=>writeStrea
   coordinatorOutputBytes+=Buffer.byteLength(ack);await stdout(ack);verify();
   const acknowledged=observe('coordinator-control-ack',{actorId:request.actorId,assignmentSHA256,handoffSHA256:request.handoffSHA256,capabilitySHA256:request.capabilitySHA256,intentSHA256,bytes:Buffer.byteLength(ack)});if(acknowledged.monotonicMs>=deadline)throw Error('coordinator acknowledgement expired');acceptedHandoff=handoff;
   actionTracker=createActionReceiptTracker({arm:c.arm,bindings:{assignmentSHA256,admissionSHA256,configSHA256,supervisorStartSHA256,dispatchIntentSHA256:intentSHA256},checkActive:assertReceiptActive,
-   persistInput(record,raw){actionStore.persistInput(record,raw);observe('action-received',{sequence:record.sequence,inputSHA256:record.inputSHA256,inputBytes:record.inputBytes,assignmentSHA256});},
+   persistInput(record,raw){actionStore.persistInput(record,raw);if(orchestrate){completionLane.beginAction(JSON.parse(raw));clock.clearTimeout(actionTimer);actionTimer=clock.setTimeout(()=>fail('original action timeout'),Math.min(LIMITS.actionMs,deadline-clock.now()));}observe('action-received',{sequence:record.sequence,inputSHA256:record.inputSHA256,inputBytes:record.inputBytes,assignmentSHA256});},
    persistFeedback(record,raw){actionStore.persistFeedback(record,raw);},
    async emit(receiptFrame,raw){coordinatorActionReceiptBytes+=receiptFrame.length;await stdout(Buffer.concat([receiptFrame,raw]));},
-   persistAck(record){actionStore.persistAck(record);observe('action-receipt-ack',{sequence:record.sequence,receiptSHA256:record.receiptSHA256,receiptBytes:record.receiptBytes,feedbackSHA256:record.feedbackSHA256,feedbackBytes:record.feedbackBytes});}
+   persistAck(record){actionStore.persistAck(record);if(orchestrate){completionLane.endAction();clock.clearTimeout(actionTimer);}observe('action-receipt-ack',{sequence:record.sequence,receiptSHA256:record.receiptSHA256,receiptBytes:record.receiptBytes,feedbackSHA256:record.feedbackSHA256,feedbackBytes:record.feedbackBytes});}
   });inputPhase='tools';
   if(inputEnded)child.stdin.end();else input.resume?.();
  };
- const onInput=chunk=>{
+ const onInputFrame=chunk=>{
   if(clock.now()>=deadline)return fail('wall timeout; cleanup uncertain');
   if(inputPhase==='submitted'){bytesIn+=Buffer.byteLength(chunk);return fail('input after submitted frame; cleanup uncertain');}
-  if(inputPhase==='tools'){bytesIn+=Buffer.byteLength(chunk);if(bytesIn>BOUNDS.inputBytes)return fail('input overflow; cleanup uncertain');if(nativeAssignment&&!actorInputObserved){try{const checked=readCellBootstrapReceipt({cellDir:c.cellDir});if(JSON.stringify(checked.description)!==JSON.stringify(acceptedHandoff))throw Error('public handoff changed before actor input');if(clock.now()>=deadline)throw Error('assignment expired during public bootstrap verification');bootstrap={receiptSHA256:checked.receiptSHA256,attemptSHA256:checked.attemptSHA256,handoffSHA256:checked.description.handoffSHA256,capabilitySHA256:checked.description.capabilitySHA256,outputBytes:checked.receipt.emittedOutput.bytes,outputSHA256:checked.receipt.emittedOutput.sha256,scope:'helper emitted bytes; not proof of actor tool delivery or model consumption'};observe('bootstrap-emission-verified',{...bootstrap});observe('actor-input-start',{actorId:assignment.actorId,assignmentSHA256,bootstrapReceiptSHA256:checked.receiptSHA256,bytes:Buffer.byteLength(chunk),scope:'first actor-action stdin bytes after coordinator acknowledgement and bootstrap emission; authorship remains procedural'});actorInputObserved=true;}catch(error){return fail(`public bootstrap unavailable: ${error.message}; cleanup uncertain`);}}try{const raw=nativeAssignment?actionTracker.input(Buffer.isBuffer(chunk)?chunk:Buffer.from(chunk)):chunk;if(raw){if(nativeAssignment){assertReceiptActive();verifyCapturedActorData({cellDir:c.cellDir,arm:c.arm,sequence:actionTracker.snapshot.receivedCount,raw});assertReceiptActive();}
+  if(inputPhase==='tools'){bytesIn+=Buffer.byteLength(chunk);if(bytesIn>BOUNDS.inputBytes)return fail('input overflow; cleanup uncertain');if(receiptMode&&!actorInputObserved){try{const checked=readCellBootstrapReceipt({cellDir:c.cellDir});if(JSON.stringify(checked.description)!==JSON.stringify(acceptedHandoff))throw Error('public handoff changed before actor input');if(clock.now()>=deadline)throw Error('assignment expired during public bootstrap verification');bootstrap={receiptSHA256:checked.receiptSHA256,attemptSHA256:checked.attemptSHA256,handoffSHA256:checked.description.handoffSHA256,capabilitySHA256:checked.description.capabilitySHA256,outputBytes:checked.receipt.emittedOutput.bytes,outputSHA256:checked.receipt.emittedOutput.sha256,scope:'helper emitted bytes; not proof of actor tool delivery or model consumption'};observe('bootstrap-emission-verified',{...bootstrap});observe('actor-input-start',{actorId:assignment.actorId,assignmentSHA256,bootstrapReceiptSHA256:checked.receiptSHA256,bytes:Buffer.byteLength(chunk),scope:'first actor-action stdin bytes after coordinator acknowledgement and bootstrap emission; authorship remains procedural'});actorInputObserved=true;}catch(error){return fail(`public bootstrap unavailable: ${error.message}; cleanup uncertain`);}}try{const raw=receiptMode?actionTracker.input(Buffer.isBuffer(chunk)?chunk:Buffer.from(chunk)):chunk;if(raw){if(receiptMode){assertReceiptActive();verifyCapturedActorData({cellDir:c.cellDir,arm:c.arm,sequence:actionTracker.snapshot.receivedCount,raw});assertReceiptActive();}
  // The final validated request closes only worker input; feedback and receipt acknowledgements still drain.
- const submitted=nativeAssignment&&JSON.parse(raw.toString('utf8')).kind==='submit';if(submitted){inputPhase='submitted';child.stdin.end(raw,error=>{if(error)fail('worker stdin final write failed; effects uncertain');});}else if(!child.stdin.write(raw,error=>{if(error&&nativeAssignment)fail('worker stdin write failed; effects uncertain');}))input.pause?.();}}catch(error){fail(`action input failed: ${error.message}; effects uncertain`);}return;}
+ const submitted=receiptMode&&JSON.parse(raw.toString('utf8')).kind==='submit';if(submitted){inputPhase='submitted';child.stdin.end(raw,error=>{if(error)fail('worker stdin final write failed; effects uncertain');});}else if(!child.stdin.write(raw,error=>{if(error&&receiptMode)fail('worker stdin write failed; effects uncertain');}))input.pause?.();}}catch(error){fail(`action input failed: ${error.message}; effects uncertain`);}return;}
   coordinatorInputBytes+=Buffer.byteLength(chunk);if(coordinatorInputBytes>COORDINATOR_CONTROL_BYTES)return fail('coordinator control overflow; cleanup uncertain');
   if(inputPhase!=='awaiting-control')return fail('coordinator control before ready or while acknowledgement pending; cleanup uncertain');
   controlBuffer=Buffer.concat([controlBuffer,Buffer.isBuffer(chunk)?chunk:Buffer.from(chunk)]);
@@ -170,24 +188,41 @@ export async function supervise(config,{input=process.stdin,stdout=s=>writeStrea
   inputPhase='control-pending';const frame=controlBuffer;controlBuffer=Buffer.alloc(0);
   controlPromise=performControl(frame).catch(error=>fail(`coordinator control failed: ${error.message}; cleanup uncertain`));
  };
- const onEnd=()=>{inputEnded=true;if(inputPhase==='tools'||inputPhase==='submitted'){try{if(nativeAssignment)actionTracker.inputEOF();if(inputPhase==='tools')child.stdin.end();}catch(error){fail(`action EOF failed: ${error.message}; cleanup uncertain`);}}else if(inputPhase!=='control-pending')fail('EOF before coordinator acknowledgement; cleanup uncertain');};const onInputError=()=>fail('input error; cleanup uncertain');
- input.on('data',onInput);input.once('end',onEnd);input.once('error',onInputError);child.stdin.on('drain',()=>{if(inputPhase==='tools')input.resume?.();});child.stdin.on('error',()=>{if(nativeAssignment)fail('worker stdin error; effects uncertain');});
+ externalFramer=orchestrate?createCompletionFramer({totalBytes:COMPLETION_TRANSPORT_LIMITS.inputBytes}):undefined;
+ const onInput=chunk=>{
+  transportInputBytes+=Buffer.byteLength(chunk);if(transportInputBytes>COMPLETION_TRANSPORT_LIMITS.inputBytes)return fail('overall external input overflow');
+  if(!orchestrate)return onInputFrame(chunk);
+  if(inputPhase==='submitted')return fail('input after submitted frame; cleanup uncertain');
+  if(inputPhase==='waiting-ready'||inputPhase==='control-pending')return fail('coordinator control before ready or while acknowledgement pending; cleanup uncertain');
+  if(!externalFramer.pending)externalFramePendingAction=actionTracker?.snapshot.pending??null;
+  try{const raw=externalFramer.push(Buffer.isBuffer(chunk)?chunk:Buffer.from(chunk));if(!raw)return;
+   const frame=JSON.parse(raw.toString('utf8'));
+   if(frame.version==='native-completion-response-v1'){
+    if(inputPhase!=='tools'||!actionTracker?.snapshot.pending)throw Error('completion response outside pending action');
+    input.pause?.();completionQueue=completionQueue.then(()=>completionLane.response(raw)).catch(error=>fail(error.message)).finally(()=>{if(!failure)input.resume?.();});return;
+   }
+   if(externalFramePendingAction!==null)throw Error('planner input began while action pending');
+   onInputFrame(raw);
+  }catch(error){fail(`external frame failed: ${error.message}`);}
+ };
+ const onEnd=()=>{inputEnded=true;try{externalFramer?.eof();}catch(error){fail(error.message);}if(inputPhase==='tools'||inputPhase==='submitted'){try{if(receiptMode)actionTracker.inputEOF();if(inputPhase==='tools')child.stdin.end();}catch(error){fail(`action EOF failed: ${error.message}; cleanup uncertain`);}}else if(inputPhase!=='control-pending')fail('EOF before coordinator acknowledgement; cleanup uncertain');};const onInputError=()=>fail('input error; cleanup uncertain');const onInputClose=()=>{if(!inputEnded&&inputPhase!=='submitted')fail('input disconnected; cleanup uncertain');};
+ input.on('data',onInput);input.once('end',onEnd);input.once('error',onInputError);input.once('close',onInputClose);child.stdin.on('drain',()=>{if(inputPhase==='tools')input.resume?.();});child.stdin.on('error',()=>{if(receiptMode)fail('worker stdin error; effects uncertain');});
  child.stdout.on('data',chunk=>{bytesOut+=chunk.length;if(bytesOut>BOUNDS.outputBytes)return fail('output overflow; cleanup uncertain');child.stdout.pause();outputQueue=outputQueue.then(()=>forwardOutput(chunk)).catch(error=>fail(`output callback failed: ${error.message}; cleanup uncertain`)).finally(()=>child.stdout.resume());});
  child.stderr.on('data',chunk=>{bytesErr+=chunk.length;if(bytesErr>BOUNDS.stderrBytes)return fail('stderr overflow; cleanup uncertain');child.stderr.pause();errorQueue=errorQueue.then(()=>stderr(chunk)).catch(()=>fail('stderr callback failed; cleanup uncertain')).finally(()=>child.stderr.resume());});
  await new Promise(resolve=>{child.once('error',e=>{failure??=`spawn failed: ${e.message}`;resolve();});child.once('exit',(code,signal)=>{observe('worker-exit',{code,signal});exitCode=code;exitSignal=signal;resolve();});});
- let drainTimer;try{await Promise.race([closed.then(()=>Promise.all([outputQueue,errorQueue,controlPromise])),new Promise((_,reject)=>{drainTimer=clock.setTimeout(()=>reject(new Error('stdio drain uncertain')),Math.max(0,Math.min(2000,deadline-clock.now())));})]);}catch{failure??='stdio drain uncertain';}finally{clock.clearTimeout(drainTimer);}
- if(nativeAssignment&&!failure){try{actionTracker.feedbackEOF();actionTracker.assertComplete();}catch(error){failure=`action receipts incomplete: ${error.message}`;}}
- input.off('data',onInput);input.off('end',onEnd);input.off('error',onInputError);input.pause?.();child.stdin.destroy();
+ let drainTimer;try{await Promise.race([closed.then(()=>Promise.all([outputQueue,errorQueue,controlPromise,completionQueue,externalQueue])),new Promise((_,reject)=>{drainTimer=clock.setTimeout(()=>reject(new Error('stdio drain uncertain')),Math.max(0,Math.min(2000,deadline-clock.now())));})]);}catch{failure??='stdio drain uncertain';}finally{clock.clearTimeout(drainTimer);}
+ if(receiptMode&&!failure){try{actionTracker.feedbackEOF();actionTracker.assertComplete();if(orchestrate)completionLane.assertComplete();}catch(error){failure=`action receipts incomplete: ${error.message}`;}}
+ input.off('data',onInput);input.off('end',onEnd);input.off('error',onInputError);input.off('close',onInputClose);input.pause?.();child.stdin.destroy();
  // Sidecar owns separate groups: only its successful cooperative close can establish their normal cleanup.
  // After abnormal termination these groups cannot be exhaustively identified here; never accept that run.
  let groupAbsent=false,groupObservation,remainingGroup;
  try{if(child.pid){groupObservation=await awaitGroupExit(child.pid,Math.min(deadline,clock.now()+1000),{now:clock.now});groupAbsent=groupObservation.absent;if(groupObservation.observations.some(o=>o.group?.complete===false))failure??='group observation unavailable; cleanup uncertain';}else groupAbsent=true;
   if(!groupAbsent){remainingGroup=groupMembers(child.pid);failure??='remaining worker descendants; cleanup uncertain';kill();for(let i=0;i<40;i++){if(!aliveGroup(child.pid))break;await delay(25);}}
  }catch{failure??='cleanup check failed';kill();}
- clock.clearTimeout(timer);
+ clock.clearTimeout(timer);clock.clearTimeout(actionTimer);
  if(clock.now()>=deadline)failure??='wall timeout; cleanup uncertain';
  if(!groupAbsent)failure??='worker group persists; cleanup uncertain';
- child.stdout.destroy();child.stderr.destroy();
+ child.stdout.destroy();child.stderr.destroy();if(orchestrate)child.stdio[3].destroy();
  let outcome;
  if(exitCode===0&&!exitSignal&&!failure){try{outcome=readSmallJson(path.join(c.cellDir,'worker-outcome.json'));if(outcome.status!=='submitted'||outcome.cleanupStatus!=='closed'||outcome.confirmedOutputBytes!==bytesOut)failure='worker incomplete or feedback not fully delivered';}catch(e){failure=`invalid worker outcome: ${e.message}`;}}
  else failure??='abnormal worker exit; cleanup uncertain';
@@ -196,9 +231,9 @@ export async function supervise(config,{input=process.stdin,stdout=s=>writeStrea
  if(ended>=deadline)failure??='wall timeout; cleanup uncertain';
  if(!readyObserved)failure??='ready packet not delivered';
  const timing={scope:'supervisor preflight-to-close; includes offline checker validation, loader, ready, input idle, relay, actions and cleanup',startedMonotonicMs:started,endedMonotonicMs:ended,elapsedMs:ended-started,startedAtUTC,assignmentLimitMs:BOUNDS.wallMs,observations};
- const result={timing,supervisorStartSHA256,configSHA256,admissionSHA256,checkRuntimeSHA256,checkRuntimePreflightSHA256,groupObservation,remainingGroup,status:failure?'incomplete':'submitted',cleanup:failure?'uncertain':'closed',cleanupScope:'cooperative sidecar close and worker process group; not hostile-process containment',reason:failure,exitCode,exitSignal,bytesIn,bytesOut,bytesErr,coordinatorInputBytes,coordinatorOutputBytes,coordinatorControls,coordinatorActionReceiptBytes,actionReceipts:actionTracker?.snapshot,bootstrap,outcome};
+ const result={evidenceMode:admission.evidenceMode??'synthetic-control',...(orchestrate?{completionLane:completionLane.snapshot}:{}),transportInputBytes,transportOutputBytes,transportOutputScope:'supervisor stdout callback bytes; excludes post-close final-submission CLI frame',timing,supervisorStartSHA256,configSHA256,admissionSHA256,checkRuntimeSHA256,checkRuntimePreflightSHA256,groupObservation,remainingGroup,status:failure?'incomplete':'submitted',cleanup:failure?'uncertain':'closed',cleanupScope:'cooperative sidecar close and worker process group; not hostile-process containment',reason:failure,exitCode,exitSignal,bytesIn,bytesOut,bytesErr,coordinatorInputBytes,coordinatorOutputBytes,coordinatorControls,coordinatorActionReceiptBytes,actionReceipts:actionTracker?.snapshot,bootstrap,outcome};
  exclusive(resultPath,result);return result;
 }
 if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url)) {
- try {if(process.argv.length!==3)throw new Error('usage: cli.mjs /absolute/cell-config.json');const c=readConfig(process.argv[2]);const result=await supervise(c);if(result.status==='submitted'){const {snapshotSubmission}=await import('./coordinator.mjs');const submission=await snapshotSubmission({cellDir:c.cellDir});await writeStream(process.stdout,JSON.stringify({kind:'final-submission',submission})+'\n');}else process.exitCode=1;}catch(e){try{await writeStream(process.stderr,JSON.stringify({kind:'supervisor-error',reason:String(e)})+'\n');}catch{}process.exitCode=1;}
+ try {if(process.argv.length!==3)throw new Error('usage: cli.mjs /absolute/cell-config.json');const c=readConfig(process.argv[2]);const result=await supervise(c);if(result.status==='submitted'){const {snapshotSubmission}=await import('./coordinator.mjs');const submission=await snapshotSubmission({cellDir:c.cellDir});const terminalFrame=encodeFinalSubmissionFrame(submission,result);await writeStream(process.stdout,terminalFrame);}else process.exitCode=1;}catch(e){try{await writeStream(process.stderr,JSON.stringify({kind:'supervisor-error',reason:String(e)})+'\n');}catch{}process.exitCode=1;}
 }

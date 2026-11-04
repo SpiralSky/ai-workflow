@@ -1,4 +1,4 @@
-import type { LLMClient, LLMCompletion } from "@aiw/telemetry";
+import type { NumericLLMClient, NumericLLMCompletion } from "@aiw/telemetry";
 import { LLMError, classifyAPIError } from "./errors.ts";
 
 /** Only public SIWC endpoints are supported. OAuth credentials never follow redirects. */
@@ -47,9 +47,9 @@ export async function listChatGPTModels(opts: ChatGPTClientOptions, signal?: Abo
  * No SDK retries, paid fallback, arbitrary base URL, or unsupported preview fields.
  * `responses_output` on the assistant message must be retained by callers as history.
  */
-export function createChatGPTClient(opts: ChatGPTClientOptions): LLMClient {
+export function createChatGPTClient(opts: ChatGPTClientOptions): NumericLLMClient {
   return {
-    async complete(req): Promise<LLMCompletion> {
+    async complete(req): Promise<NumericLLMCompletion> {
       const signal = req.signal instanceof AbortSignal ? req.signal : undefined;
       const abort = requestSignal(opts, signal);
       try {
@@ -185,7 +185,7 @@ async function readCompleted(stream: ReadableStream<Uint8Array>, signal: AbortSi
 }
 
 /** Keep raw output for replay and expose the chat facade expected by existing agents. */
-function mapCompletion(response: RecordValue): LLMCompletion {
+function mapCompletion(response: RecordValue): NumericLLMCompletion {
   if (!Array.isArray(response.output)) throw new LLMError("infra", "Malformed ChatGPT completion output");
   let content = "";
   const toolCalls: unknown[] = [];

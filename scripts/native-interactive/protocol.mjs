@@ -1,10 +1,12 @@
 import {createHash} from 'node:crypto';
 
 export const PROTOCOL_VERSION='native-interactive-action-receipt-v3';
-export const LIMITS = Object.freeze({assignmentMs:900000, actionMs:60000, rounds:12, hostCalls:60, lineBytes:98304, sourceBytes:32768, feedbackBytes:1048576});
+export const LIMITS = Object.freeze({assignmentMs:900000, actionMs:300000, rounds:12, hostCalls:60, lineBytes:98304, sourceBytes:32768, referenceReadBytes:65536, feedbackBytes:1048576});
+/** Independent local I/O and branch watchdogs; a wider action must never widen these. */
+export const LOCAL_WATCHDOGS = Object.freeze({publicBootstrapMs:60000, cleanupMs:60000, branchExecutionMs:60000});
 /** Host monotonic observation; durations are derived only within the observing process. */
 export const monotonicNow = () => Number(process.hrtime.bigint()) / 1e6;
-export const ARMS = Object.freeze(['direct','branch-expanded','branch-hotpath2']);
+export const ARMS = Object.freeze(['direct','branch-expanded','branch-hotpath2','orchestrate-off','orchestrate-on']);
 /** Hash machine-observed payloads; this is not native conversation or billing provenance. */
 export const digest = value => createHash('sha256').update(typeof value === 'string' || Buffer.isBuffer(value) ? value : JSON.stringify(value)).digest('hex');
 /** Validate one finite project action. No model/provider messages are accepted. */
@@ -20,6 +22,13 @@ export function parseAction(line, arm, expectedSequence) {
     return a;
   }
   if((arm==='branch-expanded'||arm==='branch-hotpath2') && a.kind==='branch' && keys==='code,kind,sequence' && typeof a.code==='string' && Buffer.byteLength(a.code)<=LIMITS.sourceBytes) return a;
+  if(arm==='orchestrate-off'||arm==='orchestrate-on') {
+    if(keys!=='args,kind,sequence'||!a.args||typeof a.args!=='object'||Array.isArray(a.args))throw Error('invalid planner action');
+    const args=a.args,fields=Object.keys(args);
+    if(a.kind==='do'&&fields.every(k=>['instruction','tools'].includes(k))&&typeof args.instruction==='string'&&args.instruction.trim()&&Buffer.byteLength(args.instruction)<=LIMITS.sourceBytes&&(args.tools===undefined||(Array.isArray(args.tools)&&args.tools.length<=LIMITS.hostCalls&&args.tools.every(t=>typeof t==='string'&&t.length<=256))))return a;
+    const ref=args.ref,validRef=typeof ref==='string'||(ref&&typeof ref==='object'&&!Array.isArray(ref)&&Object.keys(ref).sort().join(',')==='ref,version'&&typeof ref.ref==='string'&&typeof ref.version==='string');
+    if(a.kind==='resolve'&&fields.every(k=>['ref','grep','lines'].includes(k))&&validRef&&(args.grep===undefined||typeof args.grep==='string')&&(args.lines===undefined||(Array.isArray(args.lines)&&args.lines.length===2&&args.lines.every(Number.isFinite))))return a;
+  }
   throw new Error('invalid action');
 }
 /** Decode newline actions with a streaming byte ceiling, before JSON allocation. */
@@ -75,5 +84,5 @@ export class Ledger {
     catch(e) {this.fail('unrecordable result');throw e;}
     this.state=submitted?'submitted':'open';
   }
-  fail(reason) {this.state='failed';this.#events.push(capture({type:'failure',reason:String(reason)}));}
+  fail(reason) {if(this.state==='failed')return;this.state='failed';this.#events.push(capture({type:'failure',reason:String(reason)}));}
 }

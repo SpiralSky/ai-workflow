@@ -228,14 +228,15 @@ test("RWLock: FIFO and shared batching", async () => {
   assert.deepEqual(order, ["w", "r"]);
 });
 
-test("orchestrate: state is the task's store proxy; hot paths and executor=calls refuse; needs opts", async () => {
+test("orchestrate: state is the task's store proxy; hot paths opt in and executor=calls refuses; needs opts", async () => {
   const t = await setup(readOnly);
   await t.tool("do").handle({ instruction: "read", tools: ["readFile"] }, t.call());
   t.fw.state.note = { a: 1 };
   assert.deepEqual(t.fw.task!.store.getNamed("note").value, { a: 1 });
   assert.throws(() => buildFramework("orchestrate", t.registry, { host: t.host }), /opts\.orchestrate/);
   const o = { client: t.llm.client, model: "m", workspaceRoot: t.ws };
-  assert.throws(() => buildFramework("orchestrate", t.registry, { host: t.host, orchestrate: o, variant: { hotPaths: true } }), /hot paths not built yet/);
+  assert.doesNotThrow(() => buildFramework("orchestrate", t.registry, { host: t.host, orchestrate: o, variant: { hotPaths: true } }));
+  assert.throws(() => buildFramework("baseline", t.registry, { host: t.host, variant: { hotPaths: true } }), /hotPaths/);
   assert.throws(() => buildFramework("orchestrate", t.registry, { host: t.host, orchestrate: o, variant: { executor: "calls" } }), /not built yet/);
   assert.throws(() => buildFramework("baseline", t.registry, { host: t.host, variant: { toolSearch: true } }), /toolSearch/);
 });
@@ -319,4 +320,63 @@ test("parsed rerank variants toggle actual selection model calls", async () => {
     assert.equal(selections.length, rerank === "llm" ? 1 : 0);
     assert.equal(t.llm.requests.length, rerank === "llm" ? 2 : 1);
   }
+});
+
+test("hot paths add tools before lock and first executor request; handoff records effective provenance", async () => {
+  const { HotPathIndex } = await import("../src/orchestrate/hot-paths/index.ts");
+  const { doTool } = await import("../src/orchestrate/planner-tools.ts");
+  const t = await setup(() => "done");
+  const task = t.fw.task!;
+  const read = t.registry.byName.get("readFile")!;
+  const selection = { tools: [read], stages: { retrieved: [{ name: "readFile", score: 1 }], reranked: ["readFile"], final: ["readFile"] } };
+  const index = new HotPathIndex([{ id: "write-recovery", description: "recover", tools: ["writeFile"], outcome: "missing", code: "async (tools, state) => { return 1; }" }]);
+  const tool = doTool({ task, registry: t.registry, host: t.host, client: t.llm.client, model: "m", runtime,
+    reader: { readFile: async () => "contents" }, selector: { select: async () => selection }, hotPathIndex: index });
+  const lease = await task.acquire("shared");
+  const modes: string[] = [];
+  const acquire = task.acquire.bind(task);
+  task.acquire = async mode => { modes.push(mode); return acquire(mode); };
+  const pending = tool.handle({ instruction: "recover" }, t.call());
+  await until(() => modes.length > 0);
+  assert.deepEqual(modes, ["exclusive"]);
+  assert.equal(t.llm.requests.length, 0, "executor cannot begin while a reader holds its lock");
+  lease.release();
+  const result = await pending;
+  assert.equal(result.isError, false, result.text);
+  const prompt = String(t.llm.requests[0].messages[0].content);
+  assert.match(prompt, /write-recovery/);
+  assert.match(prompt, /writeFile\(/);
+  const event = t.events.find((e: any) => e.kind === "attach" && e.key === "orchestrate.handoff") as any;
+  const handoff = event.data ?? event;
+  assert.deepEqual(handoff.hotPaths, ["write-recovery"]);
+  assert.deepEqual(handoff.selection.shortlist, ["readFile", "writeFile"]);
+  assert.deepEqual(handoff.selection.stages.final, ["readFile", "writeFile"]);
+  assert.deepEqual(handoff.selection.stages.retrieved, selection.stages.retrieved);
+  assert.deepEqual(selection.stages.final, ["readFile"]);
+});
+
+test("hot-path ablation leaves default prompt unchanged and explicit overrides snippet-free", async () => {
+  for (const variant of [undefined, { hotPaths: true }]) {
+    const t = await setup(() => "done", { variant });
+    await t.tool("do").handle({ instruction: "run tests failure summary", tools: ["runTests"] }, t.call());
+    assert.doesNotMatch(String(t.llm.requests[0].messages[0].content), /Known-good patterns/);
+    const event = t.events.find((e: any) => e.kind === "attach" && e.key === "orchestrate.handoff") as any;
+    assert.deepEqual((event.data ?? event).hotPaths, []);
+  }
+  const t = await setup(() => "done");
+  await t.tool("do").handle({ instruction: "run tests failure summary" }, t.call());
+  assert.doesNotMatch(String(t.llm.requests[0].messages[0].content), /Known-good patterns/);
+});
+
+test("hot-path variant retrieves shipped patterns without extra model or host calls", async () => {
+  const t = await setup(() => "done", { variant: { hotPaths: true } });
+  const result = await t.tool("do").handle({ instruction: "Run a narrow named test and summarize the first failing assertion" }, t.call());
+  assert.equal(result.isError, false, result.text);
+  assert.equal(t.llm.requests.length, 1, "retrieval has no model turn");
+  assert.equal(t.host.calls.length, 0, "snippets are examples, not automatically executed");
+  const event = t.events.find((e: any) => e.kind === "attach" && e.key === "orchestrate.handoff") as any;
+  const handoff = event.data ?? event;
+  assert.ok(handoff.hotPaths.includes("test-failure-summary"));
+  assert.ok(handoff.hotPaths.length <= 2);
+  assert.match(String(t.llm.requests[0].messages[0].content), /Known-good patterns/);
 });

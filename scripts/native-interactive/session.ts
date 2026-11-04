@@ -1,3 +1,5 @@
+import {LIMITS,LOCAL_WATCHDOGS} from './protocol.mjs';
+import {NATIVE_COMPLETION_LIMITS} from './native-completion.mjs';
 import {inspectCheckRuntime,nativeCheckEnv} from './check-runtime.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -10,13 +12,32 @@ import type {Host} from '../../packages/core/src/host/types.ts';
 import {LocalHost} from '../../packages/server/src/local.ts';
 import {Sidecar} from '../../packages/tools/src/sidecar.ts';
 import {createReporter} from '../../packages/telemetry/src/reporter.ts';
+import {Client} from '@modelcontextprotocol/sdk/client/index.js';
+import {Server} from '@modelcontextprotocol/sdk/server/index.js';
+import {InMemoryTransport} from '@modelcontextprotocol/sdk/inMemory.js';
+import type {Request} from '@modelcontextprotocol/sdk/types.js';
+import {createHostLLMClient} from '../../packages/server/src/host-client.ts';
+import {installHostLLMBroker,type HostLLMAdmission} from '../../packages/runner/src/llm-broker.ts';
+import {createCurrentWorkspaceReader} from './current-workspace.ts';
+import {createNativeEventSink} from './native-events.mjs';
+import type {createNativeCompletionBridge} from './native-completion.mjs';
+
+export const NATIVE_MODEL_LABEL='native-harness-unreported';
+export interface NativeSessionOptions {
+ cellDir:string;
+ binding:{sourceSHA256:string;admissionSHA256:string;cellId:string;arm:string;limitsSHA256:string};
+ bridge:ReturnType<typeof createNativeCompletionBridge>;
+}
+
 
 export const CATALOG = ['readFile','writeFile','edit','grep','findFiles','listDir','multiEdit','findDefinition','findReferences','check','runTests'] as const;
 export interface SessionOptions {
-  arm:'direct'|'branch-expanded'|'branch-hotpath2'; publicTask?:string; root:string; allowedWritePaths:string[]; venv:string; env:NodeJS.ProcessEnv;
+  arm:'direct'|'branch-expanded'|'branch-hotpath2'|'orchestrate-off'|'orchestrate-on'; publicTask?:string; root:string; allowedWritePaths:string[]; venv:string; env:NodeJS.ProcessEnv;
   onHostAttempt:(name:string,args:unknown)=>void;
   onHostResult?:(event:unknown)=>void;
   timeoutMs?:number;
+  native?:NativeSessionOptions;
+  onFatal?:(error:Error)=>void;
 }
 /** Relative canonical POSIX path. This policy intentionally rejects aliases rather than normalizing them. */
 function relative(value:unknown, directory=false):string {
@@ -25,14 +46,25 @@ function relative(value:unknown, directory=false):string {
  if(!value || value.split('/').some(x=>!x || x==='.' || x==='..'))throw new Error('unsafe path');
  return value;
 }
-/** Real finite direct/branch session. No LLM transport, listener or automatic actor dispatch exists. */
+/** Finite checked-host session; native orchestrate uses only the explicitly injected bounded bridge. */
 export async function createNativeSession(opts:SessionOptions) {
- if(opts.arm!=='direct' && opts.arm!=='branch-expanded'&&opts.arm!=='branch-hotpath2')throw new Error('unavailable arm');
+ const orchestrate=opts.arm==='orchestrate-off'||opts.arm==='orchestrate-on';
+ if(opts.arm!=='direct' && opts.arm!=='branch-expanded'&&opts.arm!=='branch-hotpath2'&&!orchestrate)throw new Error('unavailable arm');
+ if(orchestrate!==Boolean(opts.native))throw new Error('explicit native orchestrate bridge required');
+ if(opts.native&&opts.native.binding.arm!==opts.arm)throw new Error('native session arm mismatch');
+ const actionMs=opts.timeoutMs??LIMITS.actionMs;
+ if(!Number.isSafeInteger(actionMs)||actionMs<1||actionMs>LIMITS.actionMs)throw new Error('invalid or widening session timeout');
+ const branchMs=Math.min(actionMs,LOCAL_WATCHDOGS.branchExecutionMs);
  const root=path.resolve(opts.root);
  if(fs.realpathSync(root)!==root || !fs.lstatSync(root).isDirectory())throw new Error('noncanonical root');
  const allowed=new Set(opts.allowedWritePaths.map(p=>relative(p)));
  const original=inventory(root);let failure:string|undefined;let closed=false;let busy=false;
- const fail=(e:unknown)=>{failure??=e instanceof Error?e.message:String(e);return new Error(failure);};
+ let admission:HostLLMAdmission|undefined;
+ const fail=(e:unknown)=>{
+  if(failure===undefined){failure=e instanceof Error?e.message:String(e);admission?.close();try{opts.onFatal?.(new Error(failure));}catch{/* The original failure remains authoritative. */}}
+  return new Error(failure);
+ };
+ const checkFatal=()=>{if(opts.native?.bridge.failed)throw fail(opts.native.bridge.fatalReason??'native completion failed');if(failure)throw fail(failure);};
  const checkTree=()=>{
   try {assertPermittedDelta(original,inventory(root),[...allowed]);
   }catch(e){throw fail(e);}
@@ -48,7 +80,12 @@ export async function createNativeSession(opts:SessionOptions) {
  const sidecar=new Sidecar({root,env:{...opts.env}});
  const local=new LocalHost('L',{root,sidecar});
  let closing:Promise<void>|undefined;
- const closeResources=()=>closing??=(async()=>{try{await sidecar.close();}finally{await local.close();}})();
+ let brokerClient:Client|undefined,brokerServer:Server<Request>|undefined;
+ let eventSink:ReturnType<typeof createNativeEventSink>|undefined;
+ const closeResources=()=>closing??=(async()=>{
+  admission?.close();
+  try{await brokerClient?.close();}finally{try{await brokerServer?.close();}finally{try{await sidecar.close();}finally{await local.close();}}}
+ })();
  try {
  const raw=await local.tools();
  const declarations=CATALOG.map(name=>{const d=raw.find(x=>x.name===name);if(!d)throw new Error(`missing real tool ${name}`);return d;});
@@ -77,21 +114,73 @@ export async function createNativeSession(opts:SessionOptions) {
   }catch(e){throw fail(e);}
  }},{session:()=>({sessionId:'native-fixture'})});
  const registry=buildRegistry(await checked.tools(),{warn:()=>{}});
- const framework=buildFramework(opts.arm==='direct'?'baseline':'branch-only',registry,{host:checked,timeoutMs:opts.timeoutMs??60000,memoryMb:128});
+ if(opts.native)eventSink=createNativeEventSink({cellDir:opts.native.cellDir,binding:opts.native.binding,onFatal:fail,completionEvidence:()=>opts.native!.bridge.verifyComplete()});
+ const reporter=createReporter({writer:'r',sink:eventSink??{write(){}}});
+ const readers=createCurrentWorkspaceReader({root,original,allowedWritePaths:[...allowed],onFatal:fail,onRead:record=>reporter.attach('native.workspace-read',record)});
+ let hostClient;
+ if(opts.native){
+  brokerClient=new Client({name:'native-orchestrate-host',version:'1'},{capabilities:{experimental:{'aiw/llm/complete':{}}}});
+  brokerServer=new Server<Request>({name:'native-orchestrate-session',version:'1'});
+  admission=installHostLLMBroker(brokerClient,{secondaryClient:opts.native.bridge.client,secondaryModel:NATIVE_MODEL_LABEL,nativeMode:true});
+  const [clientTransport,serverTransport]=InMemoryTransport.createLinkedPair();
+  await Promise.all([brokerClient.connect(clientTransport),brokerServer.connect(serverTransport)]);
+  const server=brokerServer;
+  const transportClient=createHostLLMClient(()=>server,{timeoutMs:Math.min(actionMs,NATIVE_COMPLETION_LIMITS.requestMs),nativeMode:{model:NATIVE_MODEL_LABEL}});
+  // Integrity faults outside the adapter must survive the engine's normal error result.
+  hostClient={async complete(request:Parameters<typeof transportClient.complete>[0]){
+   try{return await transportClient.complete(request);}catch(error){throw fail(error);}
+  }};
+ }
+ const framework=buildFramework(orchestrate?'orchestrate':opts.arm==='direct'?'baseline':'branch-only',registry,{
+  host:checked,timeoutMs:branchMs,memoryMb:128,
+  ...(hostClient?{variant:{hotPaths:opts.arm==='orchestrate-on'},orchestrate:{client:hostClient,model:NATIVE_MODEL_LABEL,rerankModel:NATIVE_MODEL_LABEL,workspaceRoot:root,...readers}}:{}),
+ });
  const examples=opts.arm==='branch-hotpath2'?await selectHotpathExamples(opts.publicTask??'',registry.decls):undefined;
- const reporter=createReporter({writer:'r',sink:{write(){}}});
- return {
-  packet:{task:opts.publicTask??'',allowedWritePaths:[...opts.allowedWritePaths],...(examples?{hotpathExamples:examples}:{}),instructions:framework.instructions,tools:framework.tools.map(t=>({name:t.name,description:t.description,inputSchema:t.inputSchema})),fingerprint:framework.fingerprint},
-  get failed(){return failure!==undefined;},
-  async dispatch(action:{kind:string;calls?:{name:string;args:Record<string,unknown>}[];code?:string},signal?:AbortSignal){
-   if(failure||closed||busy)throw fail(failure??'session unavailable');busy=true;
-   try {checkTree();if(signal?.aborted)throw fail('aborted');const requests=opts.arm==='direct'&&action.kind==='tools'?action.calls:(opts.arm==='branch-expanded'||opts.arm==='branch-hotpath2')&&action.kind==='branch'?[{name:'branch',args:{code:action.code}}]:undefined;
-    if(!requests?.length)throw fail('invalid session action');
-    const results=[];for(const req of requests){if(signal?.aborted)throw fail('aborted');const tool=framework.tools.find(t=>t.name===req.name);if(!tool)throw fail('unavailable tool');const result=await tool.handle(req.args,{reporter,signal});if(failure)throw fail(failure);if(closed||signal?.aborted)throw fail('closed or aborted');checkTree();results.push(result);}
-    return results;
-   }finally{busy=false;}
-  },
-  close(){closed=true;if(busy)fail('closed during action');return closeResources();}
+ if(opts.native){checkTree();opts.native.bridge.open();admission!.open();}
+ /** Independent receipts and durable role coverage must both agree before accepting a result. */
+ const verifyNativeEvidence=()=>{
+  checkFatal();
+  if(!opts.native||!eventSink)throw Error('not a native orchestrate session');
+  try{return {completion:opts.native.bridge.verifyComplete(),event:eventSink.verifyComplete()};}catch(error){throw fail(error);}
  };
- }catch(error){try{await closeResources();}catch(cleanup){throw new AggregateError([error,cleanup],'session initialization and cleanup failed');}throw error;}
+ let finalClose:Promise<void>|undefined;
+ return {
+  packet:{task:opts.publicTask??'',allowedWritePaths:[...opts.allowedWritePaths],...(examples?{hotpathExamples:examples}:{}),instructions:framework.instructions,tools:framework.tools.map(t=>({name:t.name,description:t.description,inputSchema:t.inputSchema})),fingerprint:framework.fingerprint,...(opts.native?{nativeSource:opts.native.binding.sourceSHA256,hotPaths:opts.arm==='orchestrate-on',usageStatus:'unavailable'}:{})},
+  get failed(){return failure!==undefined||Boolean(opts.native?.bridge.failed);},
+  get fatalReason(){return failure??opts.native?.bridge.fatalReason;},
+  fail,
+  verifyNativeEvidence,
+  async dispatch(action:{kind:string;sequence?:number;args?:Record<string,unknown>;calls?:{name:string;args:Record<string,unknown>}[];code?:string},signal?:AbortSignal){
+   checkFatal();if(closed||busy)throw fail('session unavailable');busy=true;
+   try {
+    checkTree();if(signal?.aborted)throw fail('aborted');
+    const requests=opts.arm==='direct'&&action.kind==='tools'?action.calls:
+     (opts.arm==='branch-expanded'||opts.arm==='branch-hotpath2')&&action.kind==='branch'?[{name:'branch',args:{code:action.code}}]:
+     orchestrate&&(action.kind==='do'||action.kind==='resolve')&&action.args?[{name:action.kind,args:action.args}]:undefined;
+    if(!requests?.length)throw fail('invalid session action');
+    if(opts.native){if(!Number.isSafeInteger(action.sequence)||action.sequence!<1)throw fail('native action sequence required');opts.native.bridge.beginAction(action.sequence!,actionMs);}
+    const results=[];
+    for(const req of requests){
+     if(signal?.aborted)throw fail('aborted');
+     const tool=framework.tools.find(t=>t.name===req.name);if(!tool)throw fail('unavailable tool');
+     const result=await tool.handle(req.args,{reporter,signal});
+     checkFatal();if(closed||signal?.aborted)throw fail('closed or aborted');checkTree();results.push(result);
+    }
+    opts.native?.bridge.endAction();return results;
+   }catch(error){if(opts.native)throw fail(error);throw error;}
+   finally{busy=false;}
+  },
+  close(){
+   if(finalClose)return finalClose;
+   closed=true;if(busy)fail('closed during action');
+   finalClose=(async()=>{
+    try {
+     if(opts.native){checkFatal();opts.native.bridge.close();eventSink!.close();verifyNativeEvidence();}
+    }catch(error){fail(error);}
+    finally{try{await closeResources();}catch(error){throw fail(error);}}
+    if(opts.native)checkFatal();
+   })();return finalClose;
+  }
+ };
+ }catch(error){fail(error);try{opts.native?.bridge.close();}catch{/* Preserve original setup failure. */}try{await closeResources();}catch(cleanup){throw new AggregateError([error,cleanup],'session initialization and cleanup failed');}throw error;}
 }

@@ -1,3 +1,4 @@
+import { rejectNativeFormat } from "@aiw/telemetry";
 import { isDecisionsModel } from "@aiw/llm";
 import { validateClassifierPolicy } from "@aiw/core";
 /**
@@ -210,6 +211,7 @@ export function resolveConfig(
 ): RunConfig {
   const concurrency = flags.concurrency ?? DEFAULT_CONCURRENCY;
   if (!Number.isSafeInteger(concurrency) || concurrency < 1) throw new Error("concurrency must be a positive integer");
+  rejectNativeFormat(flags);
   const provider = flags.provider ?? "openrouter";
   const usageMode = flags.usageMode ?? "monetary";
   if (provider !== "openrouter" && provider !== "chatgpt" && provider !== "deepseek") throw new Error("Unknown provider");

@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import {pathToFileURL} from 'node:url';
-import {digest, LIMITS, monotonicNow} from './protocol.mjs';
+import {digest, LOCAL_WATCHDOGS, monotonicNow} from './protocol.mjs';
 import {HANDOFF_LIMITS, exactKeys, parsePublicHandoff, validateHandoffBindings} from './handoff.mjs';
 
 const CLOCK = Object.freeze({now:monotonicNow, setTimeout, clearTimeout});
@@ -110,7 +110,7 @@ export async function runPublicBootstrap({capabilityPath, expectedCapabilitySHA2
   const started = clock.now(); let lastObserved = started;
   if (!Number.isFinite(started) || started < 0) throw Error('invalid bootstrap clock');
   const now = () => { const value = clock.now(); if (!Number.isFinite(value) || value < lastObserved) throw Error('invalid bootstrap clock'); lastObserved = value; return value; };
-  const deadline = started + LIMITS.actionMs;
+  const deadline = started + LOCAL_WATCHDOGS.publicBootstrapMs;
   if (typeof capabilityPath !== 'string' || !path.isAbsolute(capabilityPath) || path.resolve(capabilityPath) !== capabilityPath || path.basename(capabilityPath) !== 'public-bootstrap.json' || !/^[a-f0-9]{64}$/.test(expectedCapabilitySHA256) || typeof emit !== 'function') throw Error('fixed capability path and expected digest required');
   const cellDir = path.dirname(capabilityPath);
   canonicalDirectory(cellDir);

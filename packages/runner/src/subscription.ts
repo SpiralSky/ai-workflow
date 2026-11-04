@@ -1,4 +1,4 @@
-import type { LLMClient } from "@aiw/telemetry";
+import { assertNumericCompletion, type LLMClient } from "@aiw/telemetry";
 import { LLMError } from "@aiw/llm";
 
 /** Explicit admission limits for shared ChatGPT plan usage, not dollar budgets. */
@@ -68,6 +68,7 @@ export function boundSubscriptionClient(client: LLMClient, limits: SubscriptionL
           usage.calls++;
           try {
             const result = await client.complete({ ...request, signal });
+            assertNumericCompletion(result);
             const { input, output, cachedRead, cacheWrite } = result.usage;
             for (const value of [input, output]) {
               if (!Number.isSafeInteger(value) || value < 0) throw new Error("subscription usage unavailable");
