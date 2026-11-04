@@ -154,9 +154,9 @@
       "after": {
         "path": "packages/llm/src/chatgpt-auth.ts",
         "mode": "100644",
-        "sha256": "f1850389aacbd8995b609d60955b5bc17db9fdf4e6a55b454c2f38473e6e8560"
+        "sha256": "c8f7a785eb8ff0fb674b93f1a4b1b537c16bf8c60f80eefc1c64fedcb20ab0c5"
       },
-      "rationale": "OpenAI sign-in, bounded host-brokered workflow usage and security regressions; fail-fast cancellation where shared with runner/core/server."
+      "rationale": "Preserve validated rotating refresh credentials across caller cancellation; fetch verification keys before token dispatch."
     },
     {
       "path": "packages/llm/src/chatgpt-client.ts",
@@ -1103,6 +1103,16 @@
         "sha256": "dcca9457442667f3a607010152bdc4d61e71920681acc482a7b9822668b7b9af"
       },
       "rationale": "Fix independently reviewed graceful CLI/sidecar child lifecycle gap; no auth behavior change."
+    },
+    {
+      "path": "packages/llm/test/chatgpt-refresh.test.ts",
+      "before": null,
+      "after": {
+        "path": "packages/llm/test/chatgpt-refresh.test.ts",
+        "mode": "100644",
+        "sha256": "3e2cf76556b71b9f56074a049434e3cf09757403535c2c8baf4b18d6ff7a2774"
+      },
+      "rationale": "Offline regressions for refresh cancellation, verification failures, and cross-process rotation serialization."
     }
   ],
   "packaging_followup": {

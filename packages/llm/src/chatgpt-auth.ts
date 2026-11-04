@@ -113,10 +113,10 @@ export function createChatGPTAuth(options: ChatGPTAuthOptions = {}) {
     }
     return value;
   }
-  async function identity(token: string, clientId: string, nonce?: string, signal?: AbortSignal): Promise<{subject: string; email?: string}> {
-    const keys = await json(JWKS, { signal }) as JSONWebKeySet;
+  async function identity(token: string, clientId: string, nonce?: string, signal?: AbortSignal, preparedKeys?: ReturnType<typeof createLocalJWKSet>): Promise<{subject: string; email?: string}> {
+    const keys = preparedKeys ?? createLocalJWKSet(await json(JWKS, { signal }) as JSONWebKeySet);
     try {
-      const { payload } = await jwtVerify(token, createLocalJWKSet(keys), { issuer: ISSUER, audience: clientId, algorithms: ['RS256'], currentDate: new Date(now()), requiredClaims: ['exp', 'iat', 'sub'] });
+      const { payload } = await jwtVerify(token, keys, { issuer: ISSUER, audience: clientId, algorithms: ['RS256'], currentDate: new Date(now()), requiredClaims: ['exp', 'iat', 'sub'] });
       if (nonce !== undefined && (typeof payload.nonce !== 'string' || !safeEqual(payload.nonce, nonce))) fail('ID token nonce mismatch');
       if (Array.isArray(payload.aud) && payload.aud.length > 1 && payload.azp !== clientId) fail('ID token authorized party mismatch');
       if (payload.azp !== undefined && payload.azp !== clientId) fail('ID token authorized party mismatch');
@@ -192,15 +192,26 @@ export function createChatGPTAuth(options: ChatGPTAuthOptions = {}) {
     /** Refreshes under a cross-process lock; caller must keep the returned secret out of telemetry. */
     async getAccessToken(id: string, signal?: AbortSignal): Promise<string> {
       path(id);
-      return locked(id, async () => {
+      const accessToken = await locked(id, async () => {
         const record = await read(id); assertScopes(record.scopes);
         if (!record.accessToken || !record.refreshToken) fail('account signed out');
         if ((record.expiresAt ?? 0) > now() + 60_000) return record.accessToken;
-        const response = await exchange({ grant_type: 'refresh_token', client_id: record.clientId, refresh_token: record.refreshToken }, signal);
+        // Finish cancellable network prerequisites before consuming a rotating refresh token.
+        const keys = createLocalJWKSet(await json(JWKS, { signal }) as JSONWebKeySet);
+        signal?.throwIfAborted();
+        // Once dispatched, refresh is a bounded credential transaction, not an inference request.
+        // The token transport retains its own 30-second timeout. Caller cancellation must not
+        // discard an accepted replacement or release the account lock before its durable write.
+        const response = await exchange({ grant_type: 'refresh_token', client_id: record.clientId, refresh_token: record.refreshToken });
         const updated = { ...record, ...tokens(response, record) };
-        if (response.id_token) { const verified = await identity(response.id_token, record.clientId, undefined, signal); if (verified.subject !== record.subject) fail('refreshed identity changed'); }
-        signal?.throwIfAborted(); await writeFile(path(id), updated, signal); return required(updated.accessToken);
+        if (response.id_token) { const verified = await identity(response.id_token, record.clientId, undefined, undefined, keys); if (verified.subject !== record.subject) fail('refreshed identity changed'); }
+        await writeFile(path(id), updated);
+        // A cancelled caller never receives credentials for new inference, but the next caller
+        // can use the validated replacement instead of retrying the consumed refresh token.
+        signal?.throwIfAborted(); return required(updated.accessToken);
       }, signal);
+      signal?.throwIfAborted();
+      return accessToken;
     },
     /** Attempts remote revocation and clears local tokens; false means remote revocation unconfirmed. */
     async signOut(id: string): Promise<boolean> {

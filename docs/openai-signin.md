@@ -20,6 +20,8 @@ Choose the stable account ID printed by the CLI and a model **slug** returned by
 
 Credentials belong only to this app under `~/.config/ai-workflow/chatgpt/` with directory mode0700/file mode0600. Do not copy them into a repository, container image, Actions secret, log or support message. Refresh is serialized across processes. An abandoned lock fails closed and requires inspection before removal. Linux/macOS browser launch is supported; Windows is explicitly not implemented. Live sign-in has not been validated in this development sandbox, which cannot bind sockets.
 
+Cancelling a workflow before refresh dispatch prevents that refresh. Once a rotating refresh request is dispatched, it has its own 30-second transport timeout and finishes validation and protected storage before cancellation is returned. This preserves the replacement credential without starting inference for the cancelled request. Verification-key retrieval happens before refresh dispatch. A failed token response, invalid identity/signature, or key rotation between preflight and exchange still fails closed; a consumed token whose replacement cannot be validated or saved can require deliberate sign-in again.
+
 ## Explicitly bounded subscription run
 
 ```sh
