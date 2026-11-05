@@ -1,15 +1,18 @@
 # Work status
 
-Updated: 2026-11-05 15:08 UTC
-Previous checkpoint: 2026-11-04 05:16 UTC
+Updated: 2026-11-05 15:48 UTC
+Previous checkpoint: 2026-11-05 15:08 UTC
 
-- State: Work resumed. Clock-guard diagnosis and baseline planning are in progress.
-- Screening: Actor screening has not resumed. A verified resolution of the clock-guard failure is still required.
-- Cause: Unknown. One isolated clock check passed, but no fix is verified. Failed-preflight evidence is preserved.
+- State: Baseline pair preparation is underway. No actor runs have started.
+- Clock hardening: Reviewed and published on a separate branch at the checkpoint below.
+- Preflight: One no-model actual-tool preflight passed, with cooperative cleanup confirmed.
+- Clock limits: The original historical failure remains unexplained. This single pass does not establish reliability.
 - Completed: Independent pull-request reviews and fixes. The reviewed sign-in refresh fix passed 571 local tests and was published separately; recovery checkpoints are verified.
 - Published: The Specplane migration integrity fix passed 412 configured tests and was published on a separate branch. Its remote commit and tree are verified.
 - Validation limits: Live sign-in and remote CI remain untested.
 - Final outcome: Pending. The paired orchestration comparison remains unmeasured.
+
+[Clock hardening checkpoint](https://github.com/SpiralSky/ai-workflow/commit/308d593556cec8eb456da44d4bf8382ff0bb9c93)
 
 [Reviewed sign-in fix checkpoint](https://github.com/SpiralSky/ai-workflow/commit/3b8f5c39b23b550a4e4ac92fd9f9880ad077541f)
 
