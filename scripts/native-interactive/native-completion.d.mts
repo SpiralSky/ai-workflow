@@ -15,6 +15,7 @@ export function nativeFileEvidence(file:string,max?:number):NativeEvidenceFile;
 export function verifyNativeCompletionEvidence(options:{cellDir:string;binding:NativeBinding;requireComplete?:boolean}):NativeCompletionEvidence;
 export function createNativeCompletionBridge(options:{cellDir:string;binding:NativeBinding;issueCapability:(reservation:any)=>Promise<string>;emitRequest:(raw:Buffer)=>Promise<void>|void;onFatal:(error:Error)=>void;checkActive:()=>void;limits?:Partial<Record<keyof typeof NATIVE_COMPLETION_LIMITS,number>>}):{client:LLMClient;readonly failed:boolean;readonly fatalReason:string|null;open():void;close():NativeCompletionEvidence;beginAction(sequence:number,remainingMs:number):void;endAction():void;accept(raw:Buffer):NativeCompletionReceipt;summary():Record<string,unknown>;verifyComplete():NativeCompletionEvidence};
 
+export class NativeClockSamplingError extends Error {constructor(uptimeMs:number,samplingSkewMs:number);}
 export function nativeSharedClock():{bootId:string;uptimeMs:number;wallMs:number;wallUpperMs:number;samplingSkewMs:number};
 export function verifyNativeCompletionLifetime(options:{cellDir:string;sequence:number}):unknown;
 export function assertNativeCompletionActive(options:{cellDir:string;sequence:number}):number;

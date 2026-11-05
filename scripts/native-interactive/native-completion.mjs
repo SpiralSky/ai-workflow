@@ -65,12 +65,25 @@ export function verifyNativeCompletionEvidence({cellDir,binding,requireComplete=
 /** Verify the capture helper's durable raw-byte receipt without accepting actor-selected paths. */
 function verifyCaptureFiles(cellDir,sequence,raw){verifyCompletionTransport({cellDir,sequence,through:'reader-observe',raw});verifyNativeCompletionBootstrap({cellDir,sequence});const p=nativeCompletionPaths(cellDir,sequence);const receiptRaw=readBounded(p['capture-receipt'],1024),expectedOutput=Buffer.concat([Buffer.from('{"kind":"native-completion-capture-ready","version":"native-completion-capture-stdin-v1"}\n'),receiptRaw]);const exit=parseNativeCompletionFrame(readBounded(p['capture-exit'],2048));const expectedExit={version:'native-completion-capture-exit-v1',sequence,exitCode:0,signal:null,inputSHA256:digest(raw),outputBytes:expectedOutput.length,outputSHA256:digest(expectedOutput),receiptSHA256:digest(receiptRaw)};if(JSON.stringify(exit)!==JSON.stringify(expectedExit))throw Error('native capture normal exit evidence');if(fs.existsSync(p['capture-failure']))throw Error('native failed capture');const receipt=parseNativeCompletionFrame(readBounded(p['capture-receipt'],1024));const attempt=parseNativeCompletionFrame(readBounded(p['capture-attempt'],1024));if(receipt.version!=='native-completion-capture-receipt-v1'||receipt.sequence!==sequence||receipt.inputBytes!==raw.length||receipt.inputSHA256!==digest(raw)||attempt.version!=='native-completion-capture-attempt-v1'||attempt.sequence!==sequence||!readBounded(p['capture-input'],98304).equals(raw))throw Error('native capture evidence');}
 
+/** Format only numeric primitives; never coerce clock-source text or caller objects into diagnostics. */
+function clockDiagnosticNumber(value){return typeof value==='number'?String(value).slice(0,32):'not-number';}
+/** Bounded failure-only sample values. This adds no reads and does not change clock acceptance. */
+export class NativeClockSamplingError extends Error {
+ constructor(uptimeMs,samplingSkewMs){super('native helper clock sampling skew; uptimeMs='+clockDiagnosticNumber(uptimeMs)+'; samplingSkewMs='+clockDiagnosticNumber(samplingSkewMs)+'; limitMs='+NATIVE_COMPLETION_CLOCK_POLICY.samplingSkewMs);}
+}
+
 /** Frozen dual-bound contract for scripted same-boot children only, not arbitrary native tool domains.
  * Namespace identity was unavailable (ENOENT) in retained preflight; it is not retried or inferred.
  * Wall sampling is bracketed; independent owner/supervisor monotonic deadlines remain authoritative.
  */
 export function nativeSharedClock(){
- if(process.platform!=='linux')throw Error('native helper shared clock unsupported');const wallMs=Date.now(),bootId=fs.readFileSync('/proc/sys/kernel/random/boot_id','utf8').trim(),text=fs.readFileSync('/proc/uptime','utf8').trim(),wallUpperMs=Date.now();if(!/^[a-f0-9-]{36}$/.test(bootId)||!/^\d+\.\d+ \d+\.\d+$/.test(text))throw Error('native helper shared clock invalid');const uptimeMs=Number(text.split(' ')[0])*1000,samplingSkewMs=wallUpperMs-wallMs;if(!Number.isFinite(uptimeMs)||uptimeMs<0||samplingSkewMs<0||samplingSkewMs>NATIVE_COMPLETION_CLOCK_POLICY.samplingSkewMs)throw Error('native helper clock sampling skew');return {bootId,uptimeMs,wallMs,wallUpperMs,samplingSkewMs};
+ if(process.platform!=='linux')throw Error('native helper shared clock unsupported');
+ const wallMs=Date.now(),bootId=fs.readFileSync('/proc/sys/kernel/random/boot_id','utf8').trim(),text=fs.readFileSync('/proc/uptime','utf8').trim(),wallUpperMs=Date.now();
+ if(!/^[a-f0-9-]{36}$/.test(bootId)||!/^\d+\.\d+ \d+\.\d+$/.test(text))throw Error('native helper shared clock invalid');
+ const uptimeMs=Number(text.split(' ')[0])*1000,samplingSkewMs=wallUpperMs-wallMs;
+ // NaN comparisons are false, so ordered bounds alone cannot fail closed.
+ if(![uptimeMs,wallMs,wallUpperMs,samplingSkewMs].every(Number.isFinite)||uptimeMs<0||samplingSkewMs<0||samplingSkewMs>NATIVE_COMPLETION_CLOCK_POLICY.samplingSkewMs)throw new NativeClockSamplingError(uptimeMs,samplingSkewMs);
+ return {bootId,uptimeMs,wallMs,wallUpperMs,samplingSkewMs};
 }
 /** Validate immutable lifetime receipt retrospectively; no active clock/namespace reads occur here. */
 export function verifyNativeCompletionLifetime({cellDir,sequence}){
@@ -78,7 +91,18 @@ export function verifyNativeCompletionLifetime({cellDir,sequence}){
 }
 /** Check a sampled pair against both original budgets, rejecting backwards motion and clock drift. */
 export function nativeRemainingLifetime(lease,clock){
- if(clock.bootId!==lease.bootId)throw Error('native helper clock domain drift');const wallElapsed=clock.wallUpperMs-lease.issuedWallMs,uptimeElapsed=clock.uptimeMs-lease.issuedUptimeMs;if(wallElapsed<0||uptimeElapsed<0)throw Error('native helper clock backwards');if(Math.abs(wallElapsed-uptimeElapsed)>NATIVE_COMPLETION_CLOCK_POLICY.maxElapsedDriftMs)throw Error('native helper clock elapsed drift');const remainingMs=Math.min(lease.expiresUptimeMs-clock.uptimeMs,lease.expiresWallMs-clock.wallUpperMs);if(remainingMs>lease.remainingMs)throw Error('native helper lifetime expanded');if(remainingMs<=0)throw Error('native original completion deadline');return remainingMs;
+ if(clock.bootId!==lease.bootId)throw Error('native helper clock domain drift');
+ if(![clock.wallUpperMs,clock.uptimeMs,lease.issuedWallMs,lease.issuedUptimeMs,lease.expiresWallMs,lease.expiresUptimeMs,lease.remainingMs].every(Number.isFinite))throw Error('native helper clock invalid');
+ const wallElapsed=clock.wallUpperMs-lease.issuedWallMs,uptimeElapsed=clock.uptimeMs-lease.issuedUptimeMs;
+ if(![wallElapsed,uptimeElapsed].every(Number.isFinite))throw Error('native helper clock invalid');
+ if(wallElapsed<0||uptimeElapsed<0)throw Error('native helper clock backwards');
+ if(Math.abs(wallElapsed-uptimeElapsed)>NATIVE_COMPLETION_CLOCK_POLICY.maxElapsedDriftMs)throw Error('native helper clock elapsed drift');
+ const uptimeRemainingMs=lease.expiresUptimeMs-clock.uptimeMs,wallRemainingMs=lease.expiresWallMs-clock.wallUpperMs;
+ if(![uptimeRemainingMs,wallRemainingMs].every(Number.isFinite))throw Error('native helper clock invalid');
+ const remainingMs=Math.min(uptimeRemainingMs,wallRemainingMs);
+ if(remainingMs>lease.remainingMs)throw Error('native helper lifetime expanded');
+ if(remainingMs<=0)throw Error('native original completion deadline');
+ return remainingMs;
 }
 /** Active helper guard; unlike historical readers it never accepts a terminal/revoked request. */
 export function assertNativeCompletionActive({cellDir,sequence}){
