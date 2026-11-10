@@ -20,7 +20,7 @@ const terminal=raw=>({output:raw.toString('utf8'),wall_time_seconds:0,exit_code:
 const live=(raw,session=101)=>({output:raw.toString('utf8'),wall_time_seconds:0,session_id:session});
 
 /** A real bridge with public synthetic content. Every fixture and failed byte remains on disk. */
-async function fixture(t,{requestMs=300000,wrongAdmittedPrefix=false}={}){
+async function fixture(t,{requestMs=300000,wrongAdmittedPrefix=false,responseContent}={}){
  const cellDir=fs.mkdtempSync(path.join(ROOT,'fixed-transport-'));
  let binding=createFixedTransportTestBinding({cellDir,arm:'orchestrate-off',cellId:'synthetic',limitsSHA256:'c'.repeat(64)});
  if(wrongAdmittedPrefix){
@@ -39,7 +39,7 @@ async function fixture(t,{requestMs=300000,wrongAdmittedPrefix=false}={}){
  const outcome=bridge.client.complete({...REQUEST,signal:abort.signal}).then(value=>({ok:true,value}),error=>({ok:false,error}));
  const requestRaw=await emitted,request=parseNativeCompletionFrame(requestRaw);
  const {request:_payload,...bound}=request;
- const response=encodeNative({...bound,version:'native-completion-response-v1',message:{role:'assistant',content:`literal € 漢字 $(touch ${cellDir}/must-not-exist) \`false\`; " \\ \n`}});
+ const response=encodeNative({...bound,version:'native-completion-response-v1',message:{role:'assistant',content:responseContent??`literal € 漢字 $(touch ${cellDir}/must-not-exist) \`false\`; " \\ \n`}});
  const f={cellDir,binding,abort,bridge,outcome,faults,requestRaw,request,response,sequence:1};
  fs.writeFileSync(path.join(cellDir,'CONTROL-SCOPE.txt'),'Public no-model control. Original bootstrap/capture subprocess close observations are real. Objects representing native exec/write results are synthetic test data, not actual native tool observations. No token, billing, isolation, model consumption or complete log claim. Fixtures are retained.\n');
  t.after(async()=>{abort.abort();await outcome;});
@@ -48,7 +48,8 @@ async function fixture(t,{requestMs=300000,wrongAdmittedPrefix=false}={}){
 /** Observer input is delayed until READY acknowledgement, just as the fixed native flow requires. */
 async function observe(f,stage,payload,{inputMode='normal',signal,transform}={}){
  const input=new PassThrough(),outputs=[];
- const data=encodeNative(transform?transform({...payload,observerInitial:live(TRANSPORT_READY)}):{...payload,observerInitial:live(TRANSPORT_READY)});
+ const observerInitial=live(TRANSPORT_READY),observation={...payload,observerInitial,observerReadinessObservations:[...Array(f.readinessPolls??0).fill({...observerInitial,output:''}),observerInitial],...(stage==='capture-observe'?{captureReadinessObservations:[...Array(f.readinessPolls??0).fill({...payload.initial,output:''}),payload.initial]}:{})};
+ const data=encodeNative(transform?transform(observation):observation);
  const result=observeCompletionTransport({cellDir:f.cellDir,sequence:1,stage,input,signal,emit:async raw=>{
   outputs.push(Buffer.from(raw));
   if(raw.equals(TRANSPORT_READY)){
@@ -360,4 +361,44 @@ test('fixed transport: consistently bound but wrong admitted prefix hash fails b
  await assert.rejects(bootstrapCompletionTransport({cellDir:f.cellDir,sequence:1,emit:async raw=>{emitted+=raw.length;return ack(raw);}}),/source|prefix|admission|binding/i);
  assert.equal(emitted,0);assert.equal(fs.existsSync(completionTransportPaths(f.cellDir,1)['bootstrap-child']),false);
  assert.ok(fs.existsSync(completionTransportPaths(f.cellDir,1).failure));
+});
+
+for(const variant of ['missing','empty','oversized','wrong-session','nonempty-prefix','changed-final'])test('fixed transport: readiness trace rejects '+variant,async t=>{
+ const f=await fixture(t);await bootstrap(f);
+ await assert.rejects(observe(f,'bootstrap-observe',{result:terminal(f.bootstrapOutput)},{transform:o=>{const initial=o.observerInitial;
+ if(variant==='missing')delete o.observerReadinessObservations;
+ if(variant==='empty')o.observerReadinessObservations=[];
+ if(variant==='oversized')o.observerReadinessObservations=[...Array(10).fill({...initial,output:''}),initial];
+ if(variant==='wrong-session')o.observerReadinessObservations=[{...initial,output:'',session_id:999},initial];
+ if(variant==='nonempty-prefix')o.observerReadinessObservations=[{...initial,output:'partial'},initial];
+ if(variant==='changed-final')o.observerReadinessObservations=[{...initial,wall_time_seconds:1}];
+ return o;}}));
+ assert.ok(fs.existsSync(completionTransportPaths(f.cellDir,1).failure));
+});
+test('fixed transport: retained readiness polls are counted in terminal accounting',async t=>{
+ const f=await fixture(t);await readerObserved(f);f.bridge.accept(f.response);assert.equal((await f.outcome).ok,true);
+ await observe(f,'relay-outcome',{result:live(Buffer.from('feedback\n'),SUPERVISOR_SESSION)},{transform:o=>({...o,observerReadinessObservations:[{...o.observerInitial,output:''},{...o.observerInitial,output:''},o.observerInitial]})});
+ const a=JSON.parse(fs.readFileSync(completionTransportPaths(f.cellDir,1).accounting));
+ assert.equal(a.additionalReadinessPolls,2);assert.equal(a.observedNativeResultObjects.relay,4);
+ verifyCompletionTransport({cellDir:f.cellDir,sequence:1});
+});
+
+test('fixed transport: all 45 possible additional readiness polls remain counted',async t=>{
+ const f=await fixture(t);f.readinessPolls=9;await readerObserved(f);f.bridge.accept(f.response);assert.equal((await f.outcome).ok,true);
+ await observe(f,'relay-outcome',{result:live(Buffer.from('feedback\n'),SUPERVISOR_SESSION)});
+ const a=JSON.parse(fs.readFileSync(completionTransportPaths(f.cellDir,1).accounting));assert.equal(a.additionalReadinessPolls,45);assert.deepEqual(a.observedNativeResultObjects,{bootstrap:11,capture:21,reader:11,relay:11});verifyCompletionTransport({cellDir:f.cellDir,sequence:1});
+});
+
+test('fixed transport: accounting accepts valid observation envelope above frame byte limit',async t=>{
+ const f=await fixture(t);await readerObserved(f);f.bridge.accept(f.response);assert.equal((await f.outcome).ok,true);
+ const result={...live(Buffer.from('feedback\n'),SUPERVISOR_SESSION),chunk_id:'x'.repeat(100000)};
+ await observe(f,'relay-outcome',{result});
+ const p=completionTransportPaths(f.cellDir,1),bytes=fs.statSync(p['relay-observation']).size;assert.ok(bytes>98304);assert.ok(bytes<FIXED_COMPLETION_TRANSPORT_LIMITS.observationBytes);
+ const a=JSON.parse(fs.readFileSync(p.accounting));assert.equal(a.additionalReadinessPolls,0);verifyCompletionTransport({cellDir:f.cellDir,sequence:1});
+});
+
+test('fixed transport: large valid response survives escaped capture envelope accounting',async t=>{
+ const f=await fixture(t,{responseContent:'\\'.repeat(30000)});await readerObserved(f);
+ const p=completionTransportPaths(f.cellDir,1),bytes=fs.statSync(p['capture-observation']).size;assert.ok(f.response.length<98304);assert.ok(bytes>98304);assert.ok(bytes<FIXED_COMPLETION_TRANSPORT_LIMITS.observationBytes);
+ f.bridge.accept(f.response);assert.equal((await f.outcome).ok,true);await observe(f,'relay-outcome',{result:live(Buffer.from('feedback\n'),SUPERVISOR_SESSION)});verifyCompletionTransport({cellDir:f.cellDir,sequence:1});
 });

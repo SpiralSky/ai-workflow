@@ -22,7 +22,7 @@ async function observe(f,sequence,stage,payload){
  const input=new PassThrough(),output=[];
  const observerInitial=result(TRANSPORT_READY,{session_id:770002});
  await observeCompletionTransport({cellDir:f.cellDir,sequence,stage,input,emit:async raw=>{
-  output.push(Buffer.from(raw));if(raw.equals(TRANSPORT_READY))setImmediate(()=>input.end(encodeNative({...payload,observerInitial})));
+  output.push(Buffer.from(raw));if(raw.equals(TRANSPORT_READY))setImmediate(()=>input.end(encodeNative({...payload,observerInitial,observerReadinessObservations:[observerInitial],...(stage==='capture-observe'?{captureReadinessObservations:[payload.initial]}:{})})));
   return ack(raw);
  }});
  assert.deepEqual(Buffer.concat(output),Buffer.concat([TRANSPORT_READY,TRANSPORT_VERDICT]));
