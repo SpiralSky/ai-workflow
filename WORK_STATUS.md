@@ -1,13 +1,15 @@
 # Work status
 
 Updated: 2026-11-10
-Previous checkpoint: 2026-11-05 16:15 UTC
+Previous checkpoint: 2026-11-10, commit 748185c
 
 - Evaluation: One limited baseline attempt reached its existing action deadline. It produced no grade or valid paired comparison. No task-quality improvement or measured cost saving is established.
-- Readiness remediation: The reviewed candidate passed 91 focused tests and a no-model full-runner control with three accepted completions and clean exit. These are infrastructure checks, not a successful real baseline or proof of reliability.
+- Readiness remediation: The reviewed readiness fix is published. It passed 91 focused tests. The fixed no-model full-runner preflight passed with three accepted completions and clean exit. No real actor ran in that control; it does not establish a successful real baseline, valid comparison, or reliability under real-worker conditions.
+- Cleanup verification: All four local copies covered by the cleanup request were already absent after the workspace reset. No deletion was performed.
+- Screening admission: A fresh screening run remains blocked pending a safe way to keep new output canaries private during solving. No fresh screening result is claimed.
+- Audit design: The composite audit design is a synthetic prototype with 56 passing tests. Actor validation remains outstanding.
 - Failure handling: An additional supervisor fix passed 22 synthetic tests and was privately checkpointed. Real-worker validation remains outstanding.
 - Review support: Reviewer guides were delivered. Focused mocked checks at the reviewed pull-request heads passed: 11 for PR #1, 37 for PR #2, 7 for PR #3, and 28 for PR #4. Sparse-checkout and Node 24 limitations apply; these checks do not replace full target-runtime validation.
-- Pending: Cleanup and readiness-fix publication were authorized and are being verified separately. Completion is not claimed in this checkpoint.
 - Final outcome: Pending. Earlier dated records remain historical evidence, not approval or current validation. This update changes only the status file on the existing status branch; it does not approve or merge development work.
 
 ## Previously published checkpoints
