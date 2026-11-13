@@ -28,7 +28,7 @@
 
 ```
 aiw eval    --problems <ids|all|small|large|dev|smoke> --mode <baseline|branch-only|orchestrate|compare|variant,...>
-            --tools S|L  --reps 1  --model deepseek/deepseek-v4-flash  [--secondary-model <model>]  [--temperature 0]
+            --tools S|L  --reps 1  --model deepseek-flash  [--secondary-model <model>]  [--temperature 0]
             --budget 0.50  [--full]  --concurrency 2  [--branch-context trace|annotated|full]
             [--secondary-cap 4]  [--until-reps N --combine-with <report>]
 aiw report  <run-dir>... --name <report-name>          # combine (§8)

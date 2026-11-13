@@ -144,7 +144,7 @@ export interface EvalFlags {
  */
 export function validateModel(model: string): void {
   if (/^anthropic\//i.test(model)) {
-    throw new Error(`Model "${model}" is not allowed; use deepseek/deepseek-v4-flash (runner §3)`);
+    throw new Error(`Model "${model}" is not allowed; use deepseek-flash (runner §3)`);
   }
 }
 

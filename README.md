@@ -99,7 +99,7 @@ Specs in [docs/specifications/](docs/specifications/features/README.md) are the 
 2. **Build to the architecture specs**, in dependency order ([system-overview §2](docs/specifications/architecture/system-overview.md)):
    telemetry → LLM client → core (branch runtime, tool registry and hosts, orchestrate engine) → tools (tier S, then L) →
    framework server → report + runner + problems → viewer → Claude Code plugin.
-3. **Clean comparison**: `compare` (baseline, branch-only, orchestrate) on the new runner with `deepseek/deepseek-v4-flash`.
+3. **Clean comparison**: `compare` (baseline, branch-only, orchestrate) on the new runner with `deepseek-flash` (DeepSeek API, direct).
    The results above come from the old framework and are superseded.
    A new orchestrate idea (one extra mode) waits until this comparison is done.
 4. **Catalog-size scaling experiment**: `orchestrate` vs. `branch-only[toolSearch]` at 50, 200 and 1000 tools

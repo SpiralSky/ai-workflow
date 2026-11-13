@@ -82,7 +82,7 @@ means adding one usage normaliser; adding a model means adding its price-table e
 
 | Role | Model | Access | Use |
 |------|-------|--------|-----|
-| Main and secondary (measured runs) | `deepseek-v4-flash` | DeepSeek API, direct | dev, pilot and full runs |
+| Main and secondary (measured runs) | `deepseek-flash` (DeepSeek V4.1 Flash; `deepseek-v4-flash` is a retired alias) | DeepSeek API, direct | dev, pilot and full runs |
 | Selection classifier (orchestrate §7.2) | `jev-1.14` | TypeSafe Decisions API, direct | all runs |
 | Development only | ChatGPT plan model | ChatGPT sign-in (plan usage) | prompt and framework development; never combined or reported |
 

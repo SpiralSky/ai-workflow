@@ -18,7 +18,7 @@ things easy to get wrong; the spec wins.
 - No backward compatibility with old run formats; delete stale runs rather than adapting to them.
 
 ## Running experiments
-**Models** (framework-runner §4.1): measured runs use `deepseek-v4-flash` via the DeepSeek API
+**Models** (framework-runner §4.1): measured runs use `deepseek-flash` (DeepSeek V4.1 Flash) via the DeepSeek API
 directly; the orchestrate selection classifier is TypeSafe `jev-1.14`, also direct. ChatGPT plan
 sign-in is for development only, never for combined or reported runs. Never use Claude/Anthropic
 models for experiments.

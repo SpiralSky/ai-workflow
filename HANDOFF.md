@@ -19,7 +19,7 @@
 
 **Open:**
 - Push the branch, close draft PRs #1–#4, and delete the old remote `dot/*` and `status/*` branches. These were blocked by the permission check and need the user.
-- The DeepSeek model id in code is `deepseek-flash`, but the specs say `deepseek-v4-flash`. Check which id DeepSeek's API uses and align them.
+- DONE 2026-11-13: DeepSeek's API id is `deepseek-flash` (V4.1 Flash); `deepseek-v4-flash` is a retired alias. Specs and docs aligned to the code. Still open: the CLI defaults to `--provider openrouter --model deepseek/deepseek-v4-flash` and `--classifier-provider openrouter-decisions`, but §4.1 lists only direct DeepSeek and TypeSafe.
 - §6.5 says a run refuses to start if any model has no price. ChatGPT has no price-table entry, so plan runs start anyway, with cost `null`, bounded only by plan limits. Either add an API-equivalent entry or amend §6.5.
 - The meter doesn't serialise calls, so parallel secondaries can overshoot the budget by the in-flight responses.
 - Next design work: hierarchical budgets, where teams or roles negotiate against a main budgeter.
