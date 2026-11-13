@@ -12,3 +12,5 @@ export function configureNativeCompletionTerminal(options?:{inputTTY?:boolean;ou
 export function verifyDeliveredNativeCompletion(options:{cellDir:string;sequence:number;raw:Buffer}):unknown;
 
 export function verifyCapturedNativeCompletionFiles(options:{cellDir:string;sequence:number;raw:Buffer}):unknown;
+
+export function nativeCompletionCaptureDiagnostic(error:unknown,stage?:string):Readonly<{version:string;stage:string;category:string;reason:string;code:string|null}>;

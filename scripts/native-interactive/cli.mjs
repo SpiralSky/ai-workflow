@@ -43,6 +43,19 @@ function groupMembers(group){
   try{const text=fs.readFileSync(`/proc/${pid}/stat`,'utf8');if(text.length>8192)return {members,complete:false};const end=text.lastIndexOf(')'),begin=text.indexOf('('),fields=text.slice(end+2).trim().split(/\s+/);if(begin<0||end<=begin||fields.length<20||!/^\d+$/.test(fields[2])||!/^\d+$/.test(fields[19])||!/^[A-Za-z]$/.test(fields[0]))return {members,complete:false};if(Number(fields[2])===group)members.push({pid:Number(pid),comm:text.slice(text.indexOf('(')+1,end),state:fields[0],startTime:fields[19]});}catch(e){if(!['ENOENT','ESRCH'].includes(e.code))return {members,complete:false};}
  }return {members,complete:true};
 }
+/** Observe worker exit from spawn onward. After failure, allow only a fixed close grace.
+ * A missing exit is uncertainty, never evidence of termination. Late events cannot
+ * revise the settled observation; an error listener remains to absorb late errors.
+ */
+export function createWorkerExitWait(child,{setTimer=setTimeout,clearTimer=clearTimeout,onExit=()=>{},onError=()=>{}}={}) {
+ let settled=false,frozen=false,settledValue,timer,resolveWait;
+ const promise=new Promise(resolve=>{resolveWait=resolve;});
+ const settle=value=>{if(settled)return;settled=true;settledValue=Object.freeze(value);clearTimer(timer);resolveWait(settledValue);};
+ child.on('error',error=>{if(frozen||(settled&&!settledValue.exitObserved))return;onError(error);settle({status:'spawn-error',exitObserved:false});});
+ child.once('exit',(code,signal)=>{if(settled)return;onExit(code,signal);settle({status:'exit-observed',exitObserved:true,code,signal});});
+ return {promise,freeze(){frozen=true;},fail(){if(settled||timer!==undefined)return;timer=setTimer(()=>settle({status:'exit-unobserved-after-failure',exitObserved:false}),1000);}};
+}
+
 /** Preserve the exact bounded first JSON line before any delivery, including split UTF-8. */
 export function createReadyFrameForwarder({persist,emit,onReady}){
  let buffered=Buffer.alloc(0),complete=false,failed=false;
@@ -79,7 +92,7 @@ export async function supervise(config,{input=process.stdin,stdout:rawStdout=s=>
  const c=validateConfig(config);
  const orchestrate=c.arm==='orchestrate-off'||c.arm==='orchestrate-on';
  let transportInputBytes=0,transportOutputBytes=0,externalQueue=Promise.resolve();
- const stdout=data=>{transportOutputBytes+=Buffer.byteLength(data);if(transportOutputBytes>COMPLETION_TRANSPORT_LIMITS.outputBytes-(orchestrate?COMPLETION_TRANSPORT_LIMITS.terminalReserveBytes:0))throw Error('overall external output overflow; terminal reserve');const pending=externalQueue.then(()=>rawStdout(data));externalQueue=pending.catch(()=>{});return pending;};if(process.platform!=='linux')throw new Error('cleanup assurance unsupported on this platform');
+ const stdout=data=>{if(failure||!acceptingObservations)throw Error('supervisor output after failure or terminalization');transportOutputBytes+=Buffer.byteLength(data);if(transportOutputBytes>COMPLETION_TRANSPORT_LIMITS.outputBytes-(orchestrate?COMPLETION_TRANSPORT_LIMITS.terminalReserveBytes:0))throw Error('overall external output overflow; terminal reserve');const pending=externalQueue.then(()=>{if(failure||!acceptingObservations)throw Error('supervisor output after failure or terminalization');return rawStdout(data);});externalQueue=pending.catch(()=>{});return pending;};if(process.platform!=='linux')throw new Error('cleanup assurance unsupported on this platform');
  const configBytes=readBounded(path.join(c.cellDir,'config.json'),16384),admissionBytes=readBounded(path.join(c.cellDir,'admission.json'));
  if(JSON.stringify(c)!==JSON.stringify(JSON.parse(configBytes.toString('utf8')))||JSON.stringify(JSON.parse(admissionBytes.toString('utf8')).config)!==JSON.stringify(c))throw new Error('config/admission mismatch');
  const admission=JSON.parse(admissionBytes.toString('utf8')),receiptMode=admission.evidenceMode==='native-assignment'||orchestrate;
@@ -121,8 +134,10 @@ export async function supervise(config,{input=process.stdin,stdout:rawStdout=s=>
  const child=spawn(process.execPath,['--import',path.join(REPO,'node_modules/tsx/dist/loader.mjs'),path.join(HERE,'worker.ts'),configPath],{cwd:REPO,env,detached:true,stdio:orchestrate?['pipe','pipe','pipe','pipe']:['pipe','pipe','pipe']});
  let outputQueue=Promise.resolve(),errorQueue=Promise.resolve(),completionQueue=Promise.resolve();
  const closed=new Promise(resolve=>child.once('close',()=>{observe('worker-close');resolve();}));
- const kill=()=>{if(child.pid)try{process.kill(-child.pid,'SIGKILL');}catch(e){if(e.code!=='ESRCH')failure??='group kill uncertain';}};
- const fail=reason=>{if(!acceptingObservations)return;if(!failure&&orchestrate){try{const external=externalFramer?.retained??Buffer.alloc(0),worker=completionFramer?.retained??Buffer.alloc(0);exclusiveBytes(path.join(c.cellDir,'native-lane-rejected-external.raw'),external);exclusiveBytes(path.join(c.cellDir,'native-lane-rejected-worker.raw'),worker);exclusive(path.join(c.cellDir,'native-lane-failure.json'),{version:'native-lane-failure-v1',reason:String(reason),externalBytesObserved:externalFramer?.total??0,workerBytesObserved:completionFramer?.total??0,externalPrefixSHA256:digest(external),workerPrefixSHA256:digest(worker),scope:'last bounded observed frame prefixes; oversized rejected chunks are counted, not silently accepted'});}catch{}}failure??=reason;input.pause?.();child.stdin.destroy();kill();};
+ const workerExit=createWorkerExitWait(child,{setTimer:clock.setTimeout,clearTimer:clock.clearTimeout,onError:e=>{failure??=`spawn failed: ${e.message}`;},onExit:(code,signal)=>{observe('worker-exit',{code,signal});exitCode=code;exitSignal=signal;}});
+ const killErrors=[];let killAttempts=0,failureInitiated=false;
+ const kill=()=>{if(killAttempts>=2||!child.pid)return;killAttempts++;try{process.kill(-child.pid,'SIGKILL');}catch(e){if(e.code!=='ESRCH'){killErrors.push({code:typeof e.code==='string'?e.code.slice(0,64):'unknown'});failure??='group kill uncertain';}}};
+ const fail=reason=>{if(!acceptingObservations||failureInitiated)return;failureInitiated=true;if(!failure&&orchestrate){try{const external=externalFramer?.retained??Buffer.alloc(0),worker=completionFramer?.retained??Buffer.alloc(0);exclusiveBytes(path.join(c.cellDir,'native-lane-rejected-external.raw'),external);exclusiveBytes(path.join(c.cellDir,'native-lane-rejected-worker.raw'),worker);exclusive(path.join(c.cellDir,'native-lane-failure.json'),{version:'native-lane-failure-v1',reason:String(reason),externalBytesObserved:externalFramer?.total??0,workerBytesObserved:completionFramer?.total??0,externalPrefixSHA256:digest(external),workerPrefixSHA256:digest(worker),scope:'last bounded observed frame prefixes; oversized rejected chunks are counted, not silently accepted'});}catch{}}failure??=reason;workerExit.fail();input.pause?.();child.stdin.destroy();kill();};
  const timer=clock.setTimeout(()=>{observe('assignment-timeout');fail('wall timeout; cleanup uncertain');},Math.max(0,deadline-clock.now()));
  const assertReceiptActive=()=>{if(failure||!acceptingObservations||clock.now()>=deadline)throw Error('action receipt unavailable or assignment expired');
   if(orchestrate){if(digest(readBounded(path.join(c.cellDir,'admission.json')))!==admissionSHA256||digest(readBounded(path.join(c.cellDir,'config.json'),16384))!==configSHA256)throw Error('completion source binding changed');
@@ -133,7 +148,7 @@ export async function supervise(config,{input=process.stdin,stdout:rawStdout=s=>
  if(orchestrate){
   completionLane=createSupervisorCompletionLane({cellDir:c.cellDir,binding:completionBinding(admission,admissionSHA256,path.basename(c.cellDir)),checkActive:assertReceiptActive,onFatal:fail,now:clock.now,
    emitWorker:raw=>writeStream(child.stdio[3],raw),emitExternal:stdout});
-  child.stdio[3].on('data',chunk=>{try{for(const raw of completionFramer.push(chunk))completionQueue=completionQueue.then(()=>completionLane.worker(raw)).catch(error=>fail(error.message));}catch(error){fail(error.message);}});
+  child.stdio[3].on('data',chunk=>{if(failure||!acceptingObservations)return;try{for(const raw of completionFramer.push(chunk))completionQueue=completionQueue.then(()=>completionLane.worker(raw)).catch(error=>fail(error.message));}catch(error){fail(error.message);}});
   child.stdio[3].on('end',()=>{try{completionFramer.eof();}catch(error){fail(error.message);}});
   child.stdio[3].on('error',()=>fail('completion IPC error; close agreement unavailable'));
  }
@@ -190,6 +205,7 @@ export async function supervise(config,{input=process.stdin,stdout:rawStdout=s=>
  };
  externalFramer=orchestrate?createCompletionFramer({totalBytes:COMPLETION_TRANSPORT_LIMITS.inputBytes}):undefined;
  const onInput=chunk=>{
+  if(failure||!acceptingObservations)return;
   transportInputBytes+=Buffer.byteLength(chunk);if(transportInputBytes>COMPLETION_TRANSPORT_LIMITS.inputBytes)return fail('overall external input overflow');
   if(!orchestrate)return onInputFrame(chunk);
   if(inputPhase==='submitted')return fail('input after submitted frame; cleanup uncertain');
@@ -207,9 +223,10 @@ export async function supervise(config,{input=process.stdin,stdout:rawStdout=s=>
  };
  const onEnd=()=>{inputEnded=true;try{externalFramer?.eof();}catch(error){fail(error.message);}if(inputPhase==='tools'||inputPhase==='submitted'){try{if(receiptMode)actionTracker.inputEOF();if(inputPhase==='tools')child.stdin.end();}catch(error){fail(`action EOF failed: ${error.message}; cleanup uncertain`);}}else if(inputPhase!=='control-pending')fail('EOF before coordinator acknowledgement; cleanup uncertain');};const onInputError=()=>fail('input error; cleanup uncertain');const onInputClose=()=>{if(!inputEnded&&inputPhase!=='submitted')fail('input disconnected; cleanup uncertain');};
  input.on('data',onInput);input.once('end',onEnd);input.once('error',onInputError);input.once('close',onInputClose);child.stdin.on('drain',()=>{if(inputPhase==='tools')input.resume?.();});child.stdin.on('error',()=>{if(receiptMode)fail('worker stdin error; effects uncertain');});
- child.stdout.on('data',chunk=>{bytesOut+=chunk.length;if(bytesOut>BOUNDS.outputBytes)return fail('output overflow; cleanup uncertain');child.stdout.pause();outputQueue=outputQueue.then(()=>forwardOutput(chunk)).catch(error=>fail(`output callback failed: ${error.message}; cleanup uncertain`)).finally(()=>child.stdout.resume());});
- child.stderr.on('data',chunk=>{bytesErr+=chunk.length;if(bytesErr>BOUNDS.stderrBytes)return fail('stderr overflow; cleanup uncertain');child.stderr.pause();errorQueue=errorQueue.then(()=>stderr(chunk)).catch(()=>fail('stderr callback failed; cleanup uncertain')).finally(()=>child.stderr.resume());});
- await new Promise(resolve=>{child.once('error',e=>{failure??=`spawn failed: ${e.message}`;resolve();});child.once('exit',(code,signal)=>{observe('worker-exit',{code,signal});exitCode=code;exitSignal=signal;resolve();});});
+ child.stdout.on('data',chunk=>{if(failure||!acceptingObservations)return;bytesOut+=chunk.length;if(bytesOut>BOUNDS.outputBytes)return fail('output overflow; cleanup uncertain');child.stdout.pause();outputQueue=outputQueue.then(()=>forwardOutput(chunk)).catch(error=>fail(`output callback failed: ${error.message}; cleanup uncertain`)).finally(()=>child.stdout.resume());});
+ child.stderr.on('data',chunk=>{if(failure||!acceptingObservations)return;bytesErr+=chunk.length;if(bytesErr>BOUNDS.stderrBytes)return fail('stderr overflow; cleanup uncertain');child.stderr.pause();errorQueue=errorQueue.then(()=>{if(failure||!acceptingObservations)throw Error('supervisor stderr after failure or terminalization');return stderr(chunk);}).catch(()=>fail('stderr callback failed; cleanup uncertain')).finally(()=>child.stderr.resume());});
+ const workerTermination=await workerExit.promise;
+ if(!workerTermination.exitObserved)failure??='worker exit unobserved; cleanup uncertain';
  let drainTimer;try{await Promise.race([closed.then(()=>Promise.all([outputQueue,errorQueue,controlPromise,completionQueue,externalQueue])),new Promise((_,reject)=>{drainTimer=clock.setTimeout(()=>reject(new Error('stdio drain uncertain')),Math.max(0,Math.min(2000,deadline-clock.now())));})]);}catch{failure??='stdio drain uncertain';}finally{clock.clearTimeout(drainTimer);}
  if(receiptMode&&!failure){try{actionTracker.feedbackEOF();actionTracker.assertComplete();if(orchestrate)completionLane.assertComplete();}catch(error){failure=`action receipts incomplete: ${error.message}`;}}
  input.off('data',onInput);input.off('end',onEnd);input.off('error',onInputError);input.off('close',onInputClose);input.pause?.();child.stdin.destroy();
@@ -223,15 +240,18 @@ export async function supervise(config,{input=process.stdin,stdout:rawStdout=s=>
  if(clock.now()>=deadline)failure??='wall timeout; cleanup uncertain';
  if(!groupAbsent)failure??='worker group persists; cleanup uncertain';
  child.stdout.destroy();child.stderr.destroy();if(orchestrate)child.stdio[3].destroy();
+ // An unobserved worker may still exist. Do not retain its event-loop handle or
+ // represent this as cleanup: the terminal result remains incomplete/uncertain.
+ if(!workerTermination.exitObserved)child.unref();
  let outcome;
  if(exitCode===0&&!exitSignal&&!failure){try{outcome=readSmallJson(path.join(c.cellDir,'worker-outcome.json'));if(outcome.status!=='submitted'||outcome.cleanupStatus!=='closed'||outcome.confirmedOutputBytes!==bytesOut)failure='worker incomplete or feedback not fully delivered';}catch(e){failure=`invalid worker outcome: ${e.message}`;}}
  else failure??='abnormal worker exit; cleanup uncertain';
  if(!failure){try{if(digest(readBounded(path.join(c.cellDir,'check-runtime.json'),16384))!==checkRuntimeSHA256||digest(readBounded(path.join(c.cellDir,'check-runtime-preflight.json'),16384))!==checkRuntimePreflightSHA256)throw Error('retained runtime changed');inspectCheckRuntime(c.venv,temp,checkRuntime,Math.min(30000,deadline-clock.now()));}catch(error){failure=`offline checker final validation failed: ${error.message}`;}}
- observe('supervisor-close');const ended=clock.now();acceptingObservations=false;
+ observe('supervisor-close');const ended=clock.now();acceptingObservations=false;workerExit.freeze();
  if(ended>=deadline)failure??='wall timeout; cleanup uncertain';
  if(!readyObserved)failure??='ready packet not delivered';
  const timing={scope:'supervisor preflight-to-close; includes offline checker validation, loader, ready, input idle, relay, actions and cleanup',startedMonotonicMs:started,endedMonotonicMs:ended,elapsedMs:ended-started,startedAtUTC,assignmentLimitMs:BOUNDS.wallMs,observations};
- const result={evidenceMode:admission.evidenceMode??'synthetic-control',...(orchestrate?{completionLane:completionLane.snapshot}:{}),transportInputBytes,transportOutputBytes,transportOutputScope:'supervisor stdout callback bytes; excludes post-close final-submission CLI frame',timing,supervisorStartSHA256,configSHA256,admissionSHA256,checkRuntimeSHA256,checkRuntimePreflightSHA256,groupObservation,remainingGroup,status:failure?'incomplete':'submitted',cleanup:failure?'uncertain':'closed',cleanupScope:'cooperative sidecar close and worker process group; not hostile-process containment',reason:failure,exitCode,exitSignal,bytesIn,bytesOut,bytesErr,coordinatorInputBytes,coordinatorOutputBytes,coordinatorControls,coordinatorActionReceiptBytes,actionReceipts:actionTracker?.snapshot,bootstrap,outcome};
+ const result={workerTermination,killAttempts,killErrors,evidenceMode:admission.evidenceMode??'synthetic-control',...(orchestrate?{completionLane:completionLane.snapshot}:{}),transportInputBytes,transportOutputBytes,transportOutputScope:'supervisor stdout callback bytes; excludes post-close final-submission CLI frame',timing,supervisorStartSHA256,configSHA256,admissionSHA256,checkRuntimeSHA256,checkRuntimePreflightSHA256,groupObservation,remainingGroup,status:failure?'incomplete':'submitted',cleanup:failure?'uncertain':'closed',cleanupScope:'cooperative sidecar close and worker process group; not hostile-process containment',reason:failure,exitCode,exitSignal,bytesIn,bytesOut,bytesErr,coordinatorInputBytes,coordinatorOutputBytes,coordinatorControls,coordinatorActionReceiptBytes,actionReceipts:actionTracker?.snapshot,bootstrap,outcome};
  exclusive(resultPath,result);return result;
 }
 if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url)) {

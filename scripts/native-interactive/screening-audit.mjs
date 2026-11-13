@@ -59,6 +59,35 @@ function validateRegistry(registry, secret) {
   }
 }
 
+/** Explicit two-part public commitment, never a synthetic private digest.
+ * Historical projection stays intact. Fresh private markers are never needed here.
+ * Provenance/Space custody still require independent receipts outside this data validator.
+ */
+function publicEntries(registry) {
+  if (registry?.version === 1) { validateRegistry(registry, false); return registry.entries; }
+  keys(registry, ['version', 'campaignId', 'historicalRegistry', 'newOutputRegistry']);
+  if (registry.version !== 2) throw Error('invalid composite version');
+  id(registry.campaignId);
+  const {historicalRegistry: historical, newOutputRegistry: fresh} = registry;
+  validateRegistry(historical, false); validateRegistry(fresh, false);
+  if (fresh.campaignId !== registry.campaignId || historical.campaignId === registry.campaignId) throw Error('fresh cohort identity required');
+  if (!historical.entries.some(e => e.role === 'grader')) throw Error('historical grader required');
+  const oldCells = new Set(historical.entries.filter(e => e.cellId !== null).map(e => e.cellId));
+  const cells = new Set();
+  for (const entry of fresh.entries) {
+    if (entry.role !== 'run-output' || oldCells.has(entry.cellId) || cells.has(entry.cellId)) throw Error('fresh unique output cell required');
+    if (entry.authorizedScopes.some(s => s.role !== 'coordinator' || !['grade','audit'].includes(s.phase) || s.cellId !== null)) throw Error('fresh outputs coordinator-only');
+    cells.add(entry.cellId);
+  }
+  const entries = [...historical.entries, ...fresh.entries]; list(entries, MAX_ENTRIES);
+  const ids = new Set(), markers = new Set();
+  for (const entry of entries) {
+    if (ids.has(entry.artifactId) || markers.has(entry.canarySHA256)) throw Error('composite duplicate artifact or marker');
+    ids.add(entry.artifactId); markers.add(entry.canarySHA256);
+  }
+  return entries;
+}
+
 /** Create private marker data only. This performs no I/O, execution, publication or insertion.
  * Store the returned object outside solve-time files; shared plugin access remains possible.
  * Each artifact supplies artifactId, role, cellId and explicit authorizedScopes.
@@ -81,7 +110,7 @@ export function publicCanaryRegistry(privateRegistry) {
 
 /** Exact public registry bytes to retain and hash in screeningControls.canaryRegistrySHA256. */
 export function canaryRegistryBytes(registry) {
-  validateRegistry(registry, false); return Buffer.from(canonical(registry) + '\n');
+  publicEntries(registry); return Buffer.from(canonical(registry) + '\n');
 }
 
 /** Private retained output envelope. Keep this away from actor-visible protocol frames.
@@ -121,8 +150,9 @@ export function auditScreeningEvidence({registry, expectedRegistrySHA256, campai
     if (!entry || typeof entry !== 'object' || !Number.isSafeInteger(entry.bytes) || entry.bytes < 0 || entry.bytes > MAX_BYTES) throw Error('invalid submission inventory entry');
     digest(entry.sha256);
   }
-  if (!registry.entries.some(entry => entry.role === 'grader')) throw Error('missing grader canary');
-  if (!registry.entries.some(entry => entry.role === 'run-output' && entry.cellId === cellId)) throw Error('missing cell output canary');
+  const registryEntries = publicEntries(registry);
+  if (!registryEntries.some(entry => entry.role === 'grader')) throw Error('missing grader canary');
+  if (!(registry.version === 2 ? registry.newOutputRegistry.entries : registryEntries).some(entry => entry.role === 'run-output' && entry.cellId === cellId)) throw Error('missing cell output canary');
   list(sources, MAX_SOURCES, false); list(requiredSourceIds, MAX_SOURCES); list(accessFindings, MAX_HITS, false);
   const required = new Set(); for (const value of requiredSourceIds) { id(value); if (required.has(value)) throw Error('duplicate required source'); required.add(value); }
   const inventorySources = new Map(files.map(([relative, entry]) => ['submission/' + relative, entry]));
@@ -133,7 +163,7 @@ export function auditScreeningEvidence({registry, expectedRegistrySHA256, campai
   }
   const missingRequiredKinds = REQUIRED_KINDS.filter(kind => !sources.some(source => source?.kind === kind));
   const allSources = [...sources, {id: 'submission-result', kind: 'submission-record', scope: {role: 'solver', phase: 'solve', cellId}, bytes: submissionResultBytes, expectedSHA256: expectedSubmissionSHA256, complete: true}];
-  const known = new Map(registry.entries.map(entry => [entry.canarySHA256, entry]));
+  const known = new Map(registryEntries.map(entry => [entry.canarySHA256, entry]));
   const observed = new Map(), manifests = [], hits = []; let bytesScanned = 0;
   for (const source of allSources) {
     keys(source, ['id', 'kind', 'scope', 'bytes', 'expectedSHA256', 'complete']); id(source.id); scope(source.scope);

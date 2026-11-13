@@ -4,14 +4,48 @@ import fs from 'node:fs';
 import {spawnSync} from 'node:child_process';
 import path from 'node:path';
 import {pathToFileURL} from 'node:url';
+import {types} from 'node:util';
 import {digest,monotonicNow} from './protocol.mjs';
-import {nativeCompletionPaths,parseNativeCompletionFrame,validateNativeCompletionResponse,writeNativeExclusive,assertNativeCompletionActive} from './native-completion.mjs';
+import {nativeCompletionPaths,parseNativeCompletionFrame,validateNativeCompletionResponse,writeNativeExclusive,assertNativeCompletionActive,NativeClockSamplingError} from './native-completion.mjs';
 import {readBounded} from './files.mjs';
 
 export const NATIVE_COMPLETION_CAPTURE_LIMITS=Object.freeze({inputBytes:98304,outputBytes:1024,timeoutMs:60000});
 export const NATIVE_COMPLETION_READY=Buffer.from('{"kind":"native-completion-capture-ready","version":"native-completion-capture-stdin-v1"}\n');
 const CLOCK=Object.freeze({now:monotonicNow,setTimeout,clearTimeout});
 const SCOPE='exact actor input bytes captured as data; not authorship, isolation, or action execution';
+
+const FAILURE_STAGES=new Set(['preflight','input-open','ready-output','ready-ack','input-read','response-validation','input-sync','input-verify','receipt-output','receipt-ack','receipt-persist','final-check']);
+const FAILURE_CODES=new Set(['EACCES','EPERM','ENOENT','EEXIST','ENOSPC','EDQUOT','EIO','EBADF','EMFILE','ENFILE','ELOOP','ENOTDIR','EISDIR','EROFS']);
+const FAILURE_REASONS=new Map([
+ ['native completion capture cancelled',['cancellation','cancelled']],
+ ['native completion capture deadline',['deadline','capture-deadline']],
+ ['native original completion deadline',['deadline','original-deadline']],
+ ['invalid native completion capture clock',['clock','capture-clock-invalid']],
+ ...['invalid','backwards','elapsed drift','domain drift'].map(reason=>['native helper clock '+reason,['clock','clock-'+reason.replaceAll(' ','-')]]),
+ ['native helper shared clock invalid',['clock','shared-clock-invalid']],
+ ['native helper shared clock unsupported',['clock','shared-clock-unsupported']],
+ ['native helper lifetime expanded',['clock','lifetime-expanded']],
+ ['native completion revoked/terminal',['lifecycle','revoked-or-terminal']],
+ ['native completion capture output acknowledgement mismatch',['acknowledgement','output-ack-mismatch']],
+ ['native completion capture output failed',['output','output-failed']],
+ ...['input limit','output limit','EOF before frame','input error','after frame','requires raw bytes','coalesced extra bytes','changed during capture'].map(reason=>['native completion capture '+reason,['capture',reason.toLowerCase().replaceAll(' ','-')]]),
+]);
+const CAPTURE_FAILURES=new WeakMap();
+
+/** Read only own data properties, never error getters, strings, stacks, paths, or causes. */
+function errorData(error,key){try{return Object.getOwnPropertyDescriptor(error,key)?.value;}catch{return undefined;}}
+/** Fixed-vocabulary, bounded failure-only metadata. No clock reads or raw error text. */
+export function nativeCompletionCaptureDiagnostic(error,stage){
+ if(stage===undefined){try{if(CAPTURE_FAILURES.has(error))return CAPTURE_FAILURES.get(error);}catch{}}
+ let category='unknown',reason='unclassified',code=null;
+ // Proxy inspection can run arbitrary traps even when only descriptors are requested.
+ if(types.isProxy(error))return Object.freeze({version:'native-completion-capture-diagnostic-v1',stage:FAILURE_STAGES.has(stage)?stage:'preflight',category,reason,code});
+ const message=errorData(error,'message'),errorCode=errorData(error,'code');
+ if(typeof message==='string'&&FAILURE_REASONS.has(message))[category,reason]=FAILURE_REASONS.get(message);
+ else if(typeof errorCode==='string'&&FAILURE_CODES.has(errorCode)){category='filesystem';reason='filesystem-error';code=errorCode;}
+ else{try{if(Object.getPrototypeOf(error)===NativeClockSamplingError.prototype){category='clock';reason='sampling-skew';}}catch{}}
+ return Object.freeze({version:'native-completion-capture-diagnostic-v1',stage:FAILURE_STAGES.has(stage)?stage:'preflight',category,reason,code});
+}
 
 /** Coordinator-selected fixed filenames only. No actor-provided path is accepted. */
 export function completionCapturePaths(cellDir,sequence){
@@ -63,6 +97,7 @@ export async function captureNativeCompletion({cellDir,sequence,input,emit,onRea
  let priorInputBytes=0,priorOutputBytes=0;for(let n=1;n<=32;n++){const paths=nativeCompletionPaths(cellDir,n);if(fs.existsSync(paths['bootstrap-output']))priorOutputBytes+=readBounded(paths['bootstrap-output'],98304).length;if(n===sequence)continue;if(fs.existsSync(paths['capture-input']))priorInputBytes+=readBounded(paths['capture-input'],98304).length;if(fs.existsSync(paths['capture-attempt']))priorOutputBytes+=NATIVE_COMPLETION_READY.length;if(fs.existsSync(paths['capture-receipt']))priorOutputBytes+=readBounded(paths['capture-receipt'],1024).length;}
  const started=clock.now(),deadline=started+Math.min(NATIVE_COMPLETION_CAPTURE_LIMITS.timeoutMs,assertNativeCompletionActive({cellDir,sequence}));
  if(!Number.isFinite(started)||started<0)throw Error('invalid native completion capture clock');
+ let stage='input-open';
  let last=started,timer,fd,bytes=0,receivedBytes=0,raw,settled=false,rejectWait,rejectOutput,receivedCleanup,streamFailure,outputBytes=0;
  const check=()=>{assertNativeCompletionActive({cellDir,sequence});if(streamFailure)throw streamFailure;const now=clock.now();if(!Number.isFinite(now)||now<last)throw Error('invalid native completion capture clock');last=now;if(signal?.aborted)throw Error('native completion capture cancelled');if(now>=deadline)throw Error('native completion capture deadline');};
  const failWait=error=>{streamFailure??=error;settled=true;rejectWait?.(error);rejectOutput?.(error);};
@@ -71,13 +106,14 @@ export async function captureNativeCompletion({cellDir,sequence,input,emit,onRea
  try{
   check();completionCapturePaths(cellDir,sequence);fd=fs.openSync(files.input,fs.constants.O_WRONLY|fs.constants.O_CREAT|fs.constants.O_EXCL|fs.constants.O_NOFOLLOW,0o600);
   const chunks=[];
-  const deliver=async(output,emitter)=>{
+  const deliver=async(output,emitter,phase)=>{
+   stage=phase+'-output';
    check();outputBytes+=output.length;if(outputBytes>NATIVE_COMPLETION_CAPTURE_LIMITS.outputBytes||priorOutputBytes+outputBytes>1048576)throw Error('native completion capture output limit');
    const acknowledgement=await new Promise((resolve,reject)=>{
     let done=false;
     const finish=(error,value)=>{if(done)return;done=true;error?reject(error):resolve(value);};
     rejectOutput=error=>finish(error);
-    Promise.resolve().then(()=>{check();return emitter(Buffer.from(output));}).then(value=>{try{check();finish(undefined,value);}catch(error){finish(error);}},()=>finish(Error('native completion capture output failed')));
+    Promise.resolve().then(()=>{check();return emitter(Buffer.from(output));}).then(value=>{try{stage=phase+'-ack';check();finish(undefined,value);}catch(error){finish(error);}},()=>finish(Error('native completion capture output failed')));
    });
    rejectOutput=undefined;check();
    if(acknowledgement?.bytes!==output.length||acknowledgement?.sha256!==digest(output))throw Error('native completion capture output acknowledgement mismatch');
@@ -101,18 +137,24 @@ export async function captureNativeCompletion({cellDir,sequence,input,emit,onRea
    signal?.addEventListener('abort',cancelled,{once:true});
   });
   received.catch(()=>{});
-  if(onReady)await deliver(NATIVE_COMPLETION_READY,onReady);
+  if(onReady)await deliver(NATIVE_COMPLETION_READY,onReady,'ready');
+  stage='input-read';
   raw=await received;
   check();if(streamFailure)throw streamFailure;
+  stage='response-validation';
   const request=parseNativeCompletionFrame(readBounded(nativeCompletionPaths(cellDir,sequence).request,98304));
   validateNativeCompletionResponse(parseNativeCompletionFrame(raw),request);
+  stage='input-sync';
   fs.fsyncSync(fd);fs.closeSync(fd);fd=undefined;check();
+  stage='input-verify';
   if(!readBounded(files.input,NATIVE_COMPLETION_CAPTURE_LIMITS.inputBytes).equals(raw))throw Error('native completion capture changed during capture');
   const receipt={version:'native-completion-capture-receipt-v1',sequence,inputBytes:raw.length,inputSHA256:digest(raw),scope:SCOPE};
-  await deliver(encode(receipt),emit);
-  exclusive(files.receipt,encode(receipt));check();
+  await deliver(encode(receipt),emit,'receipt');
+  stage='receipt-persist';exclusive(files.receipt,encode(receipt));
+  stage='final-check';check();
   return receipt;
- }catch(error){try{exclusive(files.failure,encode({version:'native-completion-capture-failure-v1',sequence,status:'incomplete',retainedBytes:bytes,receivedBytes}));}catch{}throw error;
+ }catch(error){const diagnostic=nativeCompletionCaptureDiagnostic(error,stage);try{CAPTURE_FAILURES.set(error,diagnostic);}catch{}
+  try{exclusive(files.failure,encode({version:'native-completion-capture-failure-v1',sequence,status:'incomplete',retainedBytes:bytes,receivedBytes,diagnostic}));}catch{}throw error;
  }finally{receivedCleanup?.();clock.clearTimeout(timer);signal?.removeEventListener('abort',cancelled);if(fd!==undefined)fs.closeSync(fd);}
 }
 
@@ -167,6 +209,6 @@ if(process.argv[1]&&pathToFileURL(path.resolve(process.argv[1])).href===import.m
    process.stdout.write(bytes,error=>{process.stdout.off('error',failed);error?reject(error):resolve({bytes:bytes.length,sha256:digest(bytes)});});
   });
   await captureNativeCompletion({cellDir:process.argv[2],sequence:Number(process.argv[3]),input:process.stdin,signal:abort.signal,onReady:emit,emit});
- }catch{process.exitCode=1;try{process.stderr.write('native completion capture incomplete; retain evidence and do not relay or retry\n');}catch{}}
+ }catch(error){process.exitCode=1;try{process.stderr.write(encode(nativeCompletionCaptureDiagnostic(error)));process.stderr.write('native completion capture incomplete; retain evidence and do not relay or retry\n');}catch{}}
  finally{if(rawTTY)process.stdin.setRawMode(false);process.stdin.pause();process.removeListener('SIGINT',stop);process.removeListener('SIGTERM',stop);}
 }
