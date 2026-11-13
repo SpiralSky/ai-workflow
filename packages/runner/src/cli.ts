@@ -9,7 +9,7 @@ import { collectStaticProvenance } from "./provenance.ts";
 import { parseArgs } from "node:util";
 import { join } from "node:path";
 import { existsSync } from "node:fs";
-import { resolveConfig, buildProvenance, expandModes, DEFAULT_CONCURRENCY } from "./config.ts";
+import { resolveConfig, buildProvenance, expandModes, DEFAULT_CONCURRENCY, DEFAULT_PROVIDER, defaultClassifierProvider } from "./config.ts";
 import { buildPlan } from "./plan.ts";
 import { createRunDir, generateRunId, writeRunJSON } from "./rundir.ts";
 import { runScheduler } from "./scheduler.ts";
@@ -18,6 +18,8 @@ import { buildProblems, checkProblems } from "./problems/index.ts";
 import { createTypeSafeDecisionsClient, createDeepSeekClient, createOpenAIClient, createChatGPTAuth, createChatGPTClient, listChatGPTModels } from "@aiw/llm";
 import { boundSubscriptionClient } from "./subscription.ts";
 import { authCommand } from "./auth-cli.ts";
+import { assertRunSelectionGate, loadSelectionReports, runSelectionCheck, tierLCatalogHash } from "./selection-check.ts";
+import type { SelectionClassifierSettings } from "./selection-check.ts";
 
 /** Repo root: find upward from this file. */
 function repoRoot(): string {
@@ -44,6 +46,9 @@ Usage:
 
   aiw report  <run-dir>... --name <report-name>
 
+  aiw selection check [--cases <path>] [--catalog 50,200,1000] [--rerank none|classifier] [--name <report-name>]
+                       [--classifier-provider openrouter-decisions|typesafe] [--classifier-model <model>] [--classifier-threshold <0.5..1>] [--budget 0.50]
+
   aiw problems build [<id>...]
   aiw problems check [<id>...]
 
@@ -60,7 +65,7 @@ async function evalCommand(argv: string[]): Promise<void> {
       tools: { type: "string" },
       reps: { type: "string", default: "1" },
       model: { type: "string" },
-      provider: { type: "string", default: "openai" },
+      provider: { type: "string", default: DEFAULT_PROVIDER },
       account: { type: "string" },
       "max-calls": { type: "string" },
       "max-tokens": { type: "string" },
@@ -148,6 +153,8 @@ async function evalCommand(argv: string[]): Promise<void> {
   );
 
   const plan = buildPlan(config, root);
+  assertRunSelectionGate({ kind: config.kind, frameworks: config.frameworks, catalogHash: tierLCatalogHash(root),
+    reports: loadSelectionReports(root), classifier: config.classifier });
   if (plan.projectedCostUsd !== undefined && plan.projectedCostUsd > config.budgetUsd) {
     process.stderr.write(
       `Projected cost $${plan.projectedCostUsd.toFixed(4)} exceeds budget $${config.budgetUsd}. Aborting.\n`,
@@ -236,6 +243,50 @@ async function reportCommand(argv: string[]): Promise<void> {
   if (positionals.length === 0) { process.stderr.write("At least one run directory required\n"); process.exit(1); }
   const root = repoRoot();
   await combineRuns(positionals, values.name, root);
+}
+
+/** Runs the local, network-free-by-default selection check command. */
+async function selectionCommand(argv: string[]): Promise<void> {
+  const { values } = parseArgs({ args: argv, options: {
+    cases: { type: "string" }, catalog: { type: "string", default: "50,200,1000" }, rerank: { type: "string", default: "none" }, name: { type: "string" },
+    "classifier-provider": { type: "string" }, "classifier-model": { type: "string" }, "classifier-threshold": { type: "string" },
+    budget: { type: "string", default: "0.50" },
+  }, allowPositionals: false });
+  const mode = values.rerank;
+  if (mode !== "none" && mode !== "classifier") throw new Error("--rerank must be none or classifier");
+  const catalogs = values.catalog!.split(",").map((value) => Number(value));
+  if (catalogs.some((value) => !Number.isInteger(value) || value < 1)) throw new Error("--catalog must be comma-separated positive integers");
+  const budgetUsd = Number(values.budget);
+  if (!Number.isFinite(budgetUsd) || budgetUsd <= 0) throw new Error("--budget must be a positive dollar amount");
+  const root = repoRoot();
+  let classifier: SelectionClassifierSettings | undefined;
+  if (mode === "classifier") {
+    const classifierProvider = (values["classifier-provider"] as "openrouter-decisions" | "typesafe" | undefined)
+      ?? defaultClassifierProvider(DEFAULT_PROVIDER);
+    const provider = classifierProvider === "openrouter-decisions" ? "openrouter" : "openai";
+    const resolved = resolveConfig({
+      provider,
+      problems: "smoke",
+      mode: "orchestrate[rerank=classifier]",
+      tools: "L",
+      reps: 1,
+      model: "gpt-6-luna",
+      temperature: 0,
+      budget: budgetUsd,
+      full: false,
+      branchContext: "trace",
+      secondaryCap: 4,
+      classifierProvider,
+      classifierModel: values["classifier-model"],
+      classifierThreshold: values["classifier-threshold"] === undefined ? undefined : Number(values["classifier-threshold"]),
+    }, [{ id: "selection-check", size: "smoke", set: "dev" }]);
+    const settings = resolved.classifier;
+    if (!settings) throw new Error("Classifier settings were not resolved");
+    classifier = { ...settings };
+  } else if (values["classifier-provider"] || values["classifier-model"] || values["classifier-threshold"] !== undefined) {
+    throw new Error("Classifier settings require --rerank classifier");
+  }
+  await runSelectionCheck({ root, casesPath: values.cases, catalogs, rerank: mode, name: values.name, classifier, budgetUsd });
 }
 
 async function problemsCommand(argv: string[]): Promise<void> {
@@ -357,6 +408,10 @@ async function main(): Promise<void> {
       break;
     case "report":
       await reportCommand(rest);
+      break;
+    case "selection":
+      if (rest[0] !== "check") { usage(); process.exit(1); }
+      await selectionCommand(rest.slice(1));
       break;
     case "problems":
       await problemsCommand(rest);

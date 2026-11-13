@@ -36,6 +36,13 @@ export function parseVariant(raw: string): string {
 
 /** The three modes that `compare` expands to. */
 export const COMPARE_MODES = ["baseline", "branch-only", "orchestrate"] as const;
+/** Default measured provider selected by `aiw eval`. */
+export const DEFAULT_PROVIDER = "openai" as const;
+
+/** Resolves the classifier-provider default used by eval for a selected main provider. */
+export function defaultClassifierProvider(provider: NonNullable<EvalFlags["provider"]>): "openrouter-decisions" | "typesafe" {
+  return provider === "openrouter" ? "openrouter-decisions" : "typesafe";
+}
 
 /**
  * Expands mode tokens into canonical framework variant strings.
@@ -233,7 +240,7 @@ export function resolveConfig(
 
   const classifierEnabled = frameworks.some(id => parseFrameworkVariant(id).variant.rerank === "classifier");
   // TypeSafe direct is the spec classifier (framework-runner §4.1); OpenRouter decisions only pair with the OpenRouter provider.
-  const classifierProvider = flags.classifierProvider ?? (provider === "openrouter" ? "openrouter-decisions" : "typesafe");
+  const classifierProvider = flags.classifierProvider ?? defaultClassifierProvider(provider);
   if (classifierEnabled) {
     if (classifierProvider === "typesafe") {
       if (provider !== "deepseek" && provider !== "openai") throw new Error("Direct TypeSafe requires a paid direct provider (OpenAI or DeepSeek); mixed plan/paid use is unsupported");
