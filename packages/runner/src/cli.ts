@@ -15,7 +15,7 @@ import { createRunDir, generateRunId, writeRunJSON } from "./rundir.ts";
 import { runScheduler } from "./scheduler.ts";
 import { combineRuns } from "./combine.ts";
 import { buildProblems, checkProblems } from "./problems/index.ts";
-import { createTypeSafeDecisionsClient, createDeepSeekClient, createChatGPTAuth, createChatGPTClient, listChatGPTModels } from "@aiw/llm";
+import { createTypeSafeDecisionsClient, createDeepSeekClient, createOpenAIClient, createChatGPTAuth, createChatGPTClient, listChatGPTModels } from "@aiw/llm";
 import { boundSubscriptionClient } from "./subscription.ts";
 import { authCommand } from "./auth-cli.ts";
 
@@ -33,12 +33,12 @@ Usage:
 
   aiw eval    --problems <ids|all|small|large|dev|smoke>
               --mode <baseline|branch-only|orchestrate|compare|variant,...>
-              --tools S|L  [--reps 1]  [--model deepseek/deepseek-v4-flash]
+              --tools S|L  [--reps 1]  [--model gpt-6-luna]
               [--secondary-model <model>]  [--temperature 0]
               [--budget 0.50 (1.00 with --full)]  [--full]  [--concurrency 1]
               [--branch-context trace|annotated|full]
               [--secondary-cap 4] [--classifier-provider openrouter-decisions|typesafe] [--classifier-model <decision-model>] [--classifier-threshold <0.5..1>]
-              [--provider openrouter|chatgpt|deepseek]
+              [--provider openai|openrouter|chatgpt|deepseek]  (default openai)
               [--account <saved-id>] [--max-calls N --max-tokens N --max-duration-ms N]  (ChatGPT plan runs)
               [--until-reps N]  [--combine-with <report>]
 
@@ -60,7 +60,7 @@ async function evalCommand(argv: string[]): Promise<void> {
       tools: { type: "string" },
       reps: { type: "string", default: "1" },
       model: { type: "string" },
-      provider: { type: "string", default: "openrouter" },
+      provider: { type: "string", default: "openai" },
       account: { type: "string" },
       "max-calls": { type: "string" },
       "max-tokens": { type: "string" },
@@ -89,12 +89,14 @@ async function evalCommand(argv: string[]): Promise<void> {
 
   const useDeepSeek = values.provider === "deepseek";
   if (useDeepSeek && (!values.model || values.temperature !== undefined)) throw new Error("DeepSeek requires explicit --model deepseek-flash and no --temperature");
+  const useOpenAI = values.provider === "openai";
+  if (useOpenAI && values.temperature !== undefined) throw new Error("OpenAI gpt-6-luna runs do not accept --temperature");
   const useChatGPT = values.provider === "chatgpt";
   if (useChatGPT && (!values.model || !values.account)) throw new Error("ChatGPT runs require explicit --account and --model; run aiw auth signin separately");
   if (useChatGPT && values.temperature !== undefined) throw new Error("ChatGPT plan runs do not accept --temperature");
   if (!useChatGPT && (values["max-calls"] || values["max-tokens"] || values["max-duration-ms"])) throw new Error("--max-calls/--max-tokens/--max-duration-ms are ChatGPT plan limits");
   if (!useChatGPT && values.account) throw new Error("--account is only for ChatGPT plan usage");
-  const apiKey = useChatGPT ? "" : useDeepSeek ? process.env["DEEPSEEK_API_KEY"] ?? "" : process.env["OPENAI_API_KEY"] ?? process.env["OPENROUTER_API_KEY"] ?? "";
+  const apiKey = useChatGPT ? "" : useDeepSeek ? process.env["DEEPSEEK_API_KEY"] ?? "" : useOpenAI ? process.env["OPENAI_API_KEY"] ?? "" : process.env["OPENAI_API_KEY"] ?? process.env["OPENROUTER_API_KEY"] ?? "";
   const baseURL = useDeepSeek ? "https://api.deepseek.com" : useChatGPT ? "https://api.openai.com/v1" : process.env["OPENAI_BASE_URL"] ?? "https://openrouter.ai/api/v1";
 
   const root = repoRoot();
@@ -120,7 +122,7 @@ async function evalCommand(argv: string[]): Promise<void> {
 
   const config = resolveConfig(
     {
-      provider: values.provider as "openrouter" | "chatgpt" | "deepseek",
+      provider: values.provider as "openrouter" | "chatgpt" | "deepseek" | "openai",
       ...((values["max-calls"] || values["max-tokens"] || values["max-duration-ms"]) ? { subscriptionLimits: {
         maxCalls: Number(values["max-calls"]), maxTokens: Number(values["max-tokens"]), maxDurationMs: Number(values["max-duration-ms"]),
       } } : {}),
@@ -128,7 +130,7 @@ async function evalCommand(argv: string[]): Promise<void> {
       mode: values.mode!,
       tools: values.tools as "S" | "L",
       reps: parseInt(values.reps ?? "1", 10),
-      model: values.model ?? "deepseek/deepseek-v4-flash",
+      model: values.model ?? (useOpenAI ? "gpt-6-luna" : "deepseek/deepseek-v4-flash"),
       secondaryModel: values["secondary-model"],
       classifierProvider: values["classifier-provider"] as "openrouter-decisions" | "typesafe" | undefined,
       classifierModel: values["classifier-model"],
@@ -156,7 +158,7 @@ async function evalCommand(argv: string[]): Promise<void> {
   const provenance = collectStaticProvenance(root, config, {
     ...buildProvenance(root),
     inference: { provider: config.provider!, mainModel: config.models.main, secondaryModel: config.models.secondary,
-      temperature: useChatGPT || useDeepSeek ? null : config.temperature, ...(useChatGPT ? { stream: true as const, store: false as const } : {}) },
+      temperature: useChatGPT || useDeepSeek || useOpenAI ? null : config.temperature, ...(useChatGPT ? { stream: true as const, store: false as const } : {}) },
   });
 
   let subscription: ReturnType<typeof boundSubscriptionClient> | undefined;
@@ -172,7 +174,7 @@ async function evalCommand(argv: string[]): Promise<void> {
   }
 
   // Host-only direct clients; the scheduler meters them against the one run budget.
-  const llmClient = useDeepSeek ? createDeepSeekClient({ apiKey }) : undefined;
+  const llmClient = useDeepSeek ? createDeepSeekClient({ apiKey }) : useOpenAI ? createOpenAIClient({ apiKey }) : undefined;
   const classifierClient = config.classifier?.provider === "typesafe"
     ? createTypeSafeDecisionsClient({ apiKey: process.env["TYPESAFE_API_KEY"] ?? "", model: config.classifier.model }) : undefined;
 

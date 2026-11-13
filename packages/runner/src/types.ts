@@ -30,7 +30,7 @@ export interface RunConfig {
   /** Run budget in USD over every role's cost (API, price-table or API-equivalent). */
   budgetUsd: number;
   /** Both roles share this provider; omitted preserves the legacy OpenRouter default. */
-  provider?: "openrouter" | "chatgpt" | "deepseek";
+  provider?: "openrouter" | "chatgpt" | "deepseek" | "openai";
   /** ChatGPT plan runs only: call, token and time limits in addition to the budget. */
   subscriptionLimits?: import("./subscription.ts").SubscriptionLimits;
   concurrency: number;

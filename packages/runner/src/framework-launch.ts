@@ -16,7 +16,7 @@ export function frameworkLaunch(framework: string, config: RunConfig): {
   if (parsed.variant.rerank === "classifier") {
     const openrouter = classifier?.provider === "openrouter-decisions" && isDecisionsModel(classifier.model) &&
       (config.provider ?? "openrouter") === "openrouter";
-    const direct = classifier?.provider === "typesafe" && classifier.model === "jev-1.14.0" && config.provider === "deepseek";
+    const direct = classifier?.provider === "typesafe" && classifier.model === "jev-1.14.0" && (config.provider === "deepseek" || config.provider === "openai");
     if (!classifier || (!openrouter && !direct)) throw new Error("Unsupported classifier configuration");
     validateClassifierPolicy(classifier.threshold, classifier.policy);
   }

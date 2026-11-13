@@ -13,12 +13,15 @@ export interface ModelPrice {
 }
 
 /**
- * Price table keyed by the model id the provider client sends. Time-of-day rates are separate
- * entries; a model without an entry has no price, and nothing invents one.
+ * Price table keyed by the model id the provider client sends. Time-of-day rates and service tiers
+ * are separate entries (`model@tier` suffixed keys, e.g. `gpt-6-luna@flex`); a model without an entry has no price, and nothing invents one.
  */
 export const PRICE_TABLE: Readonly<Record<string, ModelPrice>> = {
   // DeepSeek V4.1 Flash (`deepseek-flash`), off-peak rates. The direct client only dispatches off-peak.
   "deepseek-flash": { uncachedInput: 0.15, cachedRead: 0.003, output: 0.6 },
+  // OpenAI gpt-6-luna (pricing page 2026-11-13): standard tier, and Flex tier under the `@flex` key.
+  "gpt-6-luna": { uncachedInput: 0.10, cachedRead: 0.01, output: 0.50 },
+  "gpt-6-luna@flex": { uncachedInput: 0.05, cachedRead: 0.005, output: 0.25 },
   // TypeSafe Decisions jev-1.14.0: input billed at one rate, output free.
   "jev-1.14.0": { uncachedInput: 0.042, cachedRead: 0.042, output: 0 },
 };

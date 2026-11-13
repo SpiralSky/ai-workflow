@@ -93,7 +93,7 @@ export async function runJobAttempt(opts: JobOptions): Promise<JobResult> {
   // Validate treatment before creating artifacts or starting any container.
   const launch = frameworkLaunch(job.framework, config);
   if (config.classifier?.provider === "openrouter-decisions" && launch.id.includes("rerank=classifier") && baseURL.replace(/\/$/, "") !== "https://openrouter.ai/api/v1") throw new Error("Classifier campaigns require the canonical OpenRouter chat provider; cross-endpoint credentials are refused");
-  if ((config.classifier?.provider === "typesafe") !== (opts.classifierClient !== undefined) || (opts.classifierClient && provider !== "deepseek")) throw new Error("Classifier runtime/provider mismatch");
+  if ((config.classifier?.provider === "typesafe") !== (opts.classifierClient !== undefined) || (opts.classifierClient && provider !== "deepseek" && provider !== "openai")) throw new Error("Classifier runtime/provider mismatch");
   const openRouterClassifier = () => {
     const c = createDecisionsClient({ apiKey, model: config.classifier!.model });
     return opts.meter ? opts.meter.classifier(c) : c;

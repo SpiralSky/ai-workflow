@@ -133,7 +133,7 @@ export interface EvalFlags {
   secondaryCap: number;
   untilReps?: number;
   combineWith?: string;
-  provider?: "openrouter" | "chatgpt" | "deepseek";
+  provider?: "openrouter" | "chatgpt" | "deepseek" | "openai";
   subscriptionLimits?: SubscriptionLimits;
 }
 
@@ -144,7 +144,7 @@ export interface EvalFlags {
  */
 export function validateModel(model: string): void {
   if (/^anthropic\//i.test(model)) {
-    throw new Error(`Model "${model}" is not allowed; use deepseek-flash (runner §3)`);
+    throw new Error(`Model "${model}" is not allowed; use gpt-6-luna (runner §3)`);
   }
 }
 
@@ -208,7 +208,7 @@ export function resolveConfig(
   const concurrency = flags.concurrency ?? DEFAULT_CONCURRENCY;
   if (!Number.isSafeInteger(concurrency) || concurrency < 1) throw new Error("concurrency must be a positive integer");
   const provider = flags.provider ?? "openrouter";
-  if (provider !== "openrouter" && provider !== "chatgpt" && provider !== "deepseek") throw new Error("Unknown provider");
+  if (provider !== "openrouter" && provider !== "chatgpt" && provider !== "deepseek" && provider !== "openai") throw new Error("Unknown provider");
   if (!Number.isFinite(flags.budget) || flags.budget <= 0) throw new Error("--budget must be a positive dollar amount");
   if (provider === "chatgpt") {
     if (!flags.subscriptionLimits) throw new Error("Subscription usage requires explicit call, token and duration limits");
@@ -221,6 +221,10 @@ export function resolveConfig(
     if (flags.model !== "deepseek-flash" || (flags.secondaryModel && flags.secondaryModel !== "deepseek-flash")) throw new Error("Select deepseek-flash; retired aliases are not supported");
     if (!PRICE_TABLE["deepseek-flash"]) throw new Error("deepseek-flash has no price-table entry; the run cost would be unknown");
   }
+  if (provider === "openai") {
+    if (flags.model !== "gpt-6-luna" || (flags.secondaryModel && flags.secondaryModel !== "gpt-6-luna")) throw new Error("Select gpt-6-luna for the OpenAI provider");
+    if (!PRICE_TABLE["gpt-6-luna"] || !PRICE_TABLE["gpt-6-luna@flex"]) throw new Error("gpt-6-luna has no price-table entry; the run cost would be unknown");
+  }
   validateModel(flags.model);
   if (flags.secondaryModel) validateModel(flags.secondaryModel);
 
@@ -231,7 +235,7 @@ export function resolveConfig(
   const classifierProvider = flags.classifierProvider ?? "openrouter-decisions";
   if (classifierEnabled) {
     if (classifierProvider === "typesafe") {
-      if (provider !== "deepseek") throw new Error("Direct TypeSafe requires the DeepSeek provider; mixed plan/paid use is unsupported");
+      if (provider !== "deepseek" && provider !== "openai") throw new Error("Direct TypeSafe requires a paid direct provider (OpenAI or DeepSeek); mixed plan/paid use is unsupported");
       if (flags.classifierModel !== "jev-1.14.0") throw new Error("Direct TypeSafe requires pinned jev-1.14.0");
       if (!PRICE_TABLE["jev-1.14.0"]) throw new Error("jev-1.14.0 has no price-table entry; the run cost would be unknown");
     } else if (classifierProvider === "openrouter-decisions") {

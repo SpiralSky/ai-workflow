@@ -21,5 +21,8 @@ test("priceUsage invents no price for unknown models or unpriceable counts", () 
 test("tableCost names its source and table version, or returns nothing", () => {
   assert.deepEqual(tableCost("jev-1.14.0", { input: 1e6, output: 0 }), { costUsd: 0.042, costSource: "price-table", priceTable: PRICE_TABLE_VERSION });
   assert.equal(tableCost("deepseek-flash", { input: 0, output: 1e6 }, "api-equivalent").costSource, "api-equivalent");
+  assert.equal(priceUsage("gpt-6-luna", { input: 10, output: 2, cachedRead: 4 }), (6 * 0.10 + 4 * 0.01 + 2 * 0.50) / 1e6);
+  assert.equal(priceUsage("gpt-6-luna@flex", { input: 10, output: 2, cachedRead: 4 }), (6 * 0.05 + 4 * 0.005 + 2 * 0.25) / 1e6);
+  assert.deepEqual(tableCost("gpt-6-luna@flex", { input: 1e6, output: 0 }), { costUsd: 0.05, costSource: "price-table", priceTable: PRICE_TABLE_VERSION });
   assert.deepEqual(tableCost("gpt-5", { input: 1, output: 1 }), {});
 });

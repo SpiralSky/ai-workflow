@@ -190,3 +190,16 @@ test("hotPaths is a distinct canonical opt-in, never part of compare", () => {
   assert.deepEqual(expandModes("compare"), ["baseline", "branch-only", "orchestrate"]);
   assert.throws(() => parseVariant("baseline[hotPaths]"));
 });
+
+test("openai provider: gpt-6-luna only, parallel allowed, direct TypeSafe allowed", () => {
+  const flags = { problems: "dev", mode: "baseline", tools: "S" as const, reps: 1, provider: "openai" as const,
+    model: "gpt-6-luna", temperature: 0, budget: 0.5, full: false, branchContext: "trace" as const, secondaryCap: 4 };
+  const config = resolveConfig(flags, sampleProblems);
+  assert.equal(config.provider, "openai"); assert.equal(config.models.main, "gpt-6-luna");
+  assert.equal(resolveConfig({ ...flags, concurrency: 3 }, sampleProblems).concurrency, 3);
+  assert.throws(() => resolveConfig({ ...flags, model: "deepseek-flash" }, sampleProblems), /gpt-6-luna/);
+  assert.throws(() => resolveConfig({ ...flags, secondaryModel: "gpt-5" }, sampleProblems), /gpt-6-luna/);
+  const orch = { ...flags, mode: "orchestrate[rerank=classifier]", classifierProvider: "typesafe" as const, classifierModel: "jev-1.14.0", classifierThreshold: 0.8 };
+  assert.equal(resolveConfig(orch, sampleProblems).classifier?.provider, "typesafe");
+  assert.throws(() => resolveConfig({ ...orch, provider: "chatgpt" as const }, sampleProblems));
+});

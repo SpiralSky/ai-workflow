@@ -40,6 +40,7 @@ export async function runScheduler(opts: SchedulerOptions, runJSON: RunJSON): Pr
   const provider = opts.config.provider ?? "openrouter";
   if (!Number.isFinite(opts.config.budgetUsd) || opts.config.budgetUsd <= 0) throw new Error("Runs require a positive finite dollar budget");
   if (provider === "deepseek" && (!opts.llmClient || opts.subscription || opts.config.concurrency !== 1)) throw new Error("DeepSeek requires the host client and serial execution");
+  if (provider === "openai" && (!opts.llmClient || opts.subscription)) throw new Error("OpenAI requires the host client");
   if (provider === "chatgpt" && (!opts.subscription || opts.llmClient || !opts.config.subscriptionLimits || opts.config.concurrency !== 1)) throw new Error("Plan runs require a bounded host client and serial execution");
   if (provider === "openrouter" && (opts.llmClient || opts.subscription)) throw new Error("OpenRouter runs take no host client");
   if ((opts.config.classifier?.provider === "typesafe") !== (opts.classifierClient !== undefined)) throw new Error("Classifier runtime/provider mismatch");
