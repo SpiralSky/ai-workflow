@@ -15,6 +15,8 @@ framework/prompt/.system.*.md
 
 # run outputs
 experiments/runs/
+experiments/runs-archive/
+experiments/reports/
 experiments/problems/**/.selfcheck.json
 experiments/problems/**/check.log
 experiments/problems/**/diff.patch

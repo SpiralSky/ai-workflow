@@ -1,6 +1,6 @@
 {
   "id": "07-async-race",
   "size": "small",
-  "turnLimit": 10,
+  "turnLimit": 20,
   "tags": ["bugfix", "concurrency"]
 }

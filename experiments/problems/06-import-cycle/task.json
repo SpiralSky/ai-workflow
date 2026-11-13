@@ -1,6 +1,7 @@
 {
   "id": "06-import-cycle",
   "size": "small",
+  "set": "dev",
   "turnLimit": 8,
   "tags": ["bugfix", "import-cycle"]
 }

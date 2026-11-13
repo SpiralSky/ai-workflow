@@ -155,7 +155,8 @@ A problem that fails the self-check cannot be selected for a run.
 | `08-api-mismatch` | Consumer/provider contract; which side to fix | 15 |
 | `09-cache-invalidation` | Multi-file data flow, invalidation semantics | 20 |
 
-Each must be brought up to §5 (in particular §5.2 and §5.5) and the §3 layout.
+Each must be brought up to §5 (in particular §5.2 and §5.5) and the §3 layout. Comments that named
+the bug (§5.8) were removed from the `08` and `09` workspaces on 2026-11-13.
 
 ### 8.2 Small problems — cut
 
@@ -182,7 +183,7 @@ half of the limit).
 ### 8.4 Size of a full run
 
 5 small + 5 large = 10 problems. A full comparison is 10 × 3 frameworks × 2 tiers = 60 jobs per
-repetition. Staged evaluation (framework-runner §6.6) should start with small problems at tier S,
+repetition. The catalog-size grid (orchestrate §10.2) is not part of this count. Staged evaluation (framework-runner §6.6) should start with small problems at tier S,
 then large at both tiers.
 
 ### 8.5 Dev set (temporary)
@@ -195,7 +196,7 @@ separate **dev set** (`set: "dev"`), and the reported set is never gated.
 |----|-------|
 | `01-chunk-off-by-one` | The smoke test (§8.2). |
 | `03-discount-mismatch` | Cut from the reported set as a near-duplicate of 08 (§8.2); fine for tuning. |
-| `06-import-cycle` | Must first be fixed to §5.2 (no hidden constraint). |
+| `06-import-cycle` | Fixed to §5.2 on 2026-11-13: a visible test now imports `format_price` from `services`, which the checks require. |
 | one large dev problem on `fulfil` | **Deferred** until `fulfil` exists; must not overlap with L1–L5 in what it tests. Until then large-problem behaviour is checked only by pilot runs (framework-runner §6.6). |
 
 Dev problems must meet §5 like any other problem, so that a failure points at the framework, not at

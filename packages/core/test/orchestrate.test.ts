@@ -291,6 +291,11 @@ test("catalog=N pads with the fixed distractor set, for any framework", async ()
   buildRegistry([...DECLS, ...distractorDecls(1000).map((d) => ({ name: d.name, description: d.description, inputSchema: d.parameters, meta: d.meta }))], { warn: (m) => big.push(m) });
   assert.deepEqual(big, []);
   assert.deepEqual(distractorDecls(200), distractorDecls(1000).slice(0, 200));
+  // about one distractor in five is a hard negative from a software-delivery domain, at any prefix length
+  for (const n of [5, 50, 150]) {
+    const hard = distractorDecls(n).filter((d) => /PullRequest|BuildCache|ContainerImage|DbMigration|EnvSecret|Deployment|ErrorReport|LicenceAudit|ServiceEndpoint|ReleaseNote/.test(d.name)).length;
+    assert.ok(hard >= Math.floor(n / 6) && hard <= Math.ceil(n / 4), `${hard} hard negatives in ${n}`);
+  }
   // orchestrate selects among the padded catalog and still answers
   const fw = buildFramework("orchestrate", t.registry, { host: t.host, runtime, variant: { catalog: 200 }, orchestrate: { client: t.llm.client, model: "m", workspaceRoot: t.ws, rerank: "none" } });
   const r = await fw.tools[0]!.handle({ instruction: "read the contents of a file" }, t.call());

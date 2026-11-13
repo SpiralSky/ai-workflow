@@ -38147,7 +38147,19 @@ function declarations(decls, opts = {}) {
 
 // packages/core/src/registry/distractors.ts
 var d = (noun, one, many, who, fields) => ({ noun, one, many, who, fields: fields.split(" ") });
-var DOMAINS = [
+var NEIGHBOUR_DOMAINS = [
+  d("PullRequest", "pull request", "pull requests", "code reviewer", "sourceBranch targetBranch reviewers changedFiles mergeStatus commitCount"),
+  d("BuildCache", "build cache", "build caches", "build engineer", "cacheKey sizeMb restoreStage evictionPolicy lastHit toolchainVersion"),
+  d("ContainerImage", "container image", "container images", "platform engineer", "imageTag baseImage registryUrl layerCount buildArgs exposedPorts"),
+  d("DbMigration", "database migration", "database migrations", "database administrator", "schemaVersion tableName rollbackScript appliedAt columnChanges lockTimeout"),
+  d("EnvSecret", "environment secret", "environment secrets", "security engineer", "secretName targetEnvironment rotationDate ownerTeam maskedValue accessScope"),
+  d("Deployment", "deployment", "deployments", "release manager", "releaseVersion targetCluster replicaCount healthCheckUrl rollbackVersion deployWindow"),
+  d("ErrorReport", "error report", "error reports", "on-call engineer", "stackTrace exceptionType affectedRelease occurrenceCount firstSeen sourceFile"),
+  d("LicenceAudit", "licence audit", "licence audits", "compliance engineer", "packageName licenceType complianceStatus auditDate flaggedDependency reviewerTeam"),
+  d("ServiceEndpoint", "service endpoint", "service endpoints", "service owner", "routePath httpMethod requestSchema rateLimit authScope responseCode"),
+  d("ReleaseNote", "release note", "release notes", "maintainer", "releaseVersion changeSummary breakingChanges authorTeam linkedCommit publishDate")
+];
+var BUSINESS_DOMAINS = [
   d("Invoice", "invoice", "invoices", "accountant", "dueDate lineItems taxRate customerName currency paymentTerms"),
   d("CalendarEvent", "calendar event", "calendar events", "organiser", "startTime endTime attendees reminderMinutes recurrence timeZone"),
   d("SupportTicket", "support ticket", "support tickets", "support agent", "priority requesterEmail queue escalationLevel firstResponseDue channel"),
@@ -38201,6 +38213,7 @@ var DOMAINS = [
   d("SecurityBadge", "security badge", "security badges", "security officer", "holderName accessLevel doorGroups visitorHost issuedAt lostReportedAt"),
   d("Warranty", "warranty", "warranties", "after-sales agent", "serialNumber purchaseDate coverageMonths defectReport proofOfPurchase transferable")
 ];
+var DOMAINS = BUSINESS_DOMAINS.flatMap((dom, i) => i % 4 === 3 && NEIGHBOUR_DOMAINS[(i - 3) / 4] ? [dom, NEIGHBOUR_DOMAINS[(i - 3) / 4]] : [dom]);
 var VERBS = [
   ["list", "read", (x) => ({ desc: `Lists ${x.many}, optionally filtered by ${x.a} or ${x.b}.`, when: `Use to browse ${x.many} before choosing one, for example everything sharing a ${x.a}.`, not: ["get", `you already know which ${x.one} you need`] })],
   ["get", "read", (x) => ({ desc: `Fetches the full record of one ${x.one}, including its ${x.a}, ${x.b} and ${x.c}.`, when: `Use when you have the id of a ${x.one} and need its current details.`, not: ["list", `you want several ${x.many} at once`] })],

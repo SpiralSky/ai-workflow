@@ -1,9 +1,9 @@
 diff --git a/models.py b/models.py
-index 9462fa7..44bb7f1 100644
+index ca766fb..44bb7f1 100644
 --- a/models.py
 +++ b/models.py
 @@ -1,9 +1,8 @@
--from services import format_price  # circular: services also imports from models
+-from services import format_price
 -
  class Product:
      def __init__(self, name: str, price: float):

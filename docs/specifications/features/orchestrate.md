@@ -386,17 +386,48 @@ model-driven tool search does not.
 - **Baseline `branch-only[toolSearch]`:** one session with the branch tool, the stable prompt and
   a `findTools` meta-tool, but no other tools up front. Tools that `findTools` finds join its `Tools`
   map and stay there for the rest of the session. `findTools` uses the same retrieval stage (§7.1)
-  as orchestrate, without rerank, so the comparison isolates *who selects* (framework vs. executing model).
+  as orchestrate, without rerank.
+- **Arms.** Three per N, so each comparison changes one thing:
+  1. `branch-only[toolSearch,catalog=N]` — the executing model selects, retrieval only.
+  2. `orchestrate[rerank=none,catalog=N]` — the framework selects, retrieval only. Arm 2 against
+     arm 1 isolates *who selects* (framework vs. executing model).
+  3. `orchestrate[catalog=N]` — the framework selects with the default rerank (§7.2). Arm 3 against
+     arm 2 shows what the rerank adds.
 - **Catalog padding:** the variant key `catalog=N` pads the real catalog with distractor tools up
   to N tools. Distractors are plausible but unneeded for the problem set, and they still obey §6.1 (no
-  near-duplicates of real tools). They are generated once and fixed, so runs stay comparable.
-- **Grid:** `orchestrate[catalog=N]` vs. `branch-only[toolSearch,catalog=N]` for N = 50, 200, 1000,
-  on the same problems.
+  near-duplicates of real tools). About one in five is a **hard negative**: a tool from a
+  software-delivery domain (pull requests, build caches, deployments, database migrations, …) whose
+  wording overlaps with coding intents. The rest are unrelated business tools. Without hard
+  negatives, flat recall would only show that retrieval can tell code from invoices. They are
+  generated once and fixed, so runs stay comparable.
+- **Grid:** the three arms for N = 50, 200, 1000, on the same problems, at tier L.
+- **Size and budget.** The grid is separate from the framework comparison (problems §8.4) and has
+  its own runs and budgets (framework-runner §6.5). It is staged: N = 200 first, on the small
+  reported problems; N = 50 and N = 1000 follow only if that run is valid and its cost projection
+  fits the budget.
 - **Report per N:** pass rate, cost per successful job, selection recall (first pass), escalation
   turns, tool-definition tokens (cached/uncached), and output tokens spent on searching.
 
-The claim holds if orchestrate's selection recall and cost per successful job stay roughly flat in N,
-and tool search's cost grows faster at a similar pass rate.
+The claim holds if orchestrate's selection recall and cost (paired on problems both arms passed,
+framework-runner §6.2) stay roughly flat in N, and tool search's cost grows faster at a similar
+pass rate. Recall is also reported on hard negatives alone: how often a hard negative was
+shortlisted.
+
+### 10.3 Offline selection check
+
+Selection can be checked without running a job, so it is checked before any paid orchestrate run.
+
+- **Cases:** a fixed file of intents, each with the tools that are sufficient for it
+  (`expected`) and, optionally, tools that must not be shortlisted. Intents are written in the
+  planner's style and cover every tier-L tool group; they are not taken from the reported problems.
+- **Run:** each case goes through selection (§7.1–7.3) against the tier-L catalog, at
+  `catalog=N` for the §10.2 values of N, once with `rerank=none` and once with the default judge.
+- **Report:** recall (all `expected` tools shortlisted), shortlist size, hard negatives shortlisted,
+  and the judge's cost per case.
+- **Gate:** an orchestrate run on the reported set does not start until this check has been run for
+  the current catalog and judge. A recall below 90% at any N is fixed in tool metadata or the judge
+  first, since every miss becomes an escalation turn and the §2.1 claim then fails for a reason
+  that has nothing to do with the design.
 
 ---
 

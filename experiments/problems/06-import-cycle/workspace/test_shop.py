@@ -15,5 +15,9 @@ class TestShop(unittest.TestCase):
         self.assertIn("Widget", result)
         self.assertIn("9.99", result)
 
+    def test_format_price(self):
+        from services import format_price
+        self.assertEqual(format_price(2.5), "$2.50")
+
 if __name__ == "__main__":
     unittest.main()

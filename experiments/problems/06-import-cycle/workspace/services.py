@@ -1,4 +1,4 @@
-from models import Product  # circular: models also imports from services
+from models import Product
 
 def format_price(amount: float) -> str:
     return f"${amount:.2f}"

@@ -1,4 +1,4 @@
-from services import format_price  # circular: services also imports from models
+from services import format_price
 
 class Product:
     def __init__(self, name: str, price: float):

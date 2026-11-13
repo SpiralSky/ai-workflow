@@ -1,15 +1,17 @@
+diff --git a/client.py b/client.py
+index ec77350..848f4eb 100644
 --- a/client.py
 +++ b/client.py
-@@ -2,10 +2,10 @@
+@@ -1,10 +1,10 @@
  from server import compute_stats, normalize
-
+ 
  def summarize(data: list[float]) -> str:
--    stats = compute_stats(data, variance=True)   # BUG: wrong kwarg name
-+    stats = compute_stats(data, include_variance=True)   # BUG: wrong kwarg name
+-    stats = compute_stats(data, variance=True)
++    stats = compute_stats(data, include_variance=True)
      mean = stats["mean"]
      var = stats.get("variance", "n/a")
      return f"mean={mean}, variance={var}"
-
+ 
  def preprocess(data: list[float]) -> list[float]:
--    return normalize(data, norm="zscore")         # BUG: wrong kwarg name
-+    return normalize(data, method="zscore")         # BUG: wrong kwarg name
+-    return normalize(data, norm="zscore")
++    return normalize(data, method="zscore")

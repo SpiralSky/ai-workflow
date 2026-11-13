@@ -1,13 +1,12 @@
 diff --git a/service.py b/service.py
-index 1f90aa6..e03cf91 100644
+index 9211cc1..4f27077 100644
 --- a/service.py
 +++ b/service.py
-@@ -30,7 +30,7 @@ class ProductService:
+@@ -30,6 +30,7 @@ class ProductService:
          if self._store.get(product_id) is None:
              raise KeyError(f"product {product_id!r} not found")
          self._store.set(product_id, data)
--        # BUG: cache is not invalidated here; subsequent get() returns stale data.
 +        self._cache.invalidate(product_id)
          return data
-
+ 
      def delete(self, product_id: str):

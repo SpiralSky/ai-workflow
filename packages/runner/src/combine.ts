@@ -36,12 +36,33 @@ export interface FrameworkStats {
   pass: number;
   passRate: number;
   wilson95: [number, number];
+  /** Mean cost of the passing jobs only. Biased towards frameworks that fail expensive problems; not the headline. */
   costPerSuccessUsd: number | null;
+  /** Cost of every job (passed or failed) divided by the number of passes: what one success costs to obtain. */
+  costPerPassUsd: number | null;
   meanCostUsd: number | null;
+  /** Mean coefficient of variation of job cost across repetitions of one problem; null with fewer than 2 jobs per problem. */
+  costSpread: number | null;
   turns: { main: number; secondary: number };
   toolCalls: { topLevel: number; leaf: number };
   failures: Record<string, number>;
-  gate: "ok" | { flagged: string[] };
+  /** Failure gate (framework-runner §6.6): dev reports only. */
+  gate: "ok" | "not-applicable" | { insufficient: number } | { flagged: string[] };
+}
+
+/** Cost comparison of two frameworks on the problems both passed (framework-runner §6.2). */
+export interface PairedCost {
+  /** Problems where both frameworks have at least one passing job with a known cost. */
+  problems: number;
+  meanA: number | null;
+  meanB: number | null;
+  /** meanB / meanA over those problems. */
+  ratio: number | null;
+  aCheaper: number;
+  bCheaper: number;
+  /** Two-sided exact sign test over the problems (ties dropped). */
+  pValue: number;
+  verdict: "a-cheaper" | "b-cheaper" | "inconclusive";
 }
 
 /** Paired comparison between two frameworks. */
@@ -50,7 +71,9 @@ export interface PairedComparison {
   b: string;
   mdd: number;
   verdict: "better" | "worse" | "inconclusive";
-  problems: Array<{ problem: string; passA: number; passB: number; costA: number | null; costB: number | null }>;
+  cost: PairedCost;
+  problems: Array<{ problem: string; jobsA: number; jobsB: number; passA: number; passB: number; costA: number | null; costB: number | null;
+    passCostA: number | null; passCostB: number | null }>;
 }
 
 /**
@@ -81,6 +104,47 @@ export function mdd(passA: number, passB: number, n: number): number {
   if (n === 0) return 1;
   const pPool = (passA + passB) / (2 * n);
   return 1.96 * Math.sqrt((2 * pPool * (1 - pPool)) / n);
+}
+
+/**
+ * Two-sided exact sign test: the probability of a split at least this uneven if either side were equally likely.
+ * @param a - count favouring one side
+ * @param b - count favouring the other side (ties are left out by the caller)
+ * @returns p-value in (0, 1]; 1 when there are no observations
+ */
+export function signTest(a: number, b: number): number {
+  const n = a + b;
+  if (n === 0) return 1;
+  const k = Math.min(a, b);
+  let tail = 0;
+  let c = 1; // C(n, i)
+  for (let i = 0; i <= k; i++) {
+    tail += c;
+    c = (c * (n - i)) / (i + 1);
+  }
+  return Math.min(1, (2 * tail) / 2 ** n);
+}
+
+/** Minimum jobs per framework before the failure gate gives a verdict (one failure must not decide it). */
+export const GATE_MIN_JOBS = 10;
+/** Failure-gate pass-rate threshold (framework-runner §6.6). */
+export const GATE_THRESHOLD = 0.9;
+
+/** Mean cost of the passing jobs, or null if there are none or a cost is unknown. */
+function meanPassCost(jobs: JobJSON[]): number | null {
+  const passed = jobs.filter((j) => j.outcome === "pass");
+  const total = sumJobCosts(passed);
+  return passed.length > 0 && total !== null ? total / passed.length : null;
+}
+
+/** Groups jobs by problem id. */
+function byProblem(jobs: JobJSON[]): Map<string, JobJSON[]> {
+  const out = new Map<string, JobJSON[]>();
+  for (const job of jobs) {
+    if (!out.has(job.problem)) out.set(job.problem, []);
+    out.get(job.problem)!.push(job);
+  }
+  return out;
 }
 
 /**
@@ -188,8 +252,9 @@ function sumJobCosts(jobs: JobJSON[]): number | null {
 /**
  * Aggregates job records for one framework into FrameworkStats.
  * @param jobs - all jobs for this framework
+ * @param gated - whether the failure gate applies (every combined run is a dev run)
  */
-function aggregateFramework(jobs: JobJSON[]): FrameworkStats {
+function aggregateFramework(jobs: JobJSON[], gated: boolean): FrameworkStats {
   const n = jobs.length;
   const passCount = jobs.filter((j) => j.outcome === "pass").length;
   const passRate = n > 0 ? passCount / n : 0;
@@ -200,6 +265,25 @@ function aggregateFramework(jobs: JobJSON[]): FrameworkStats {
   const successCost = sumJobCosts(successJobs);
   const costPerSuccessUsd = successJobs.length > 0 && successCost !== null ? successCost / successJobs.length : null;
   const meanCostUsd = n > 0 && totalCost !== null ? totalCost / n : null;
+  const costPerPassUsd = passCount > 0 && totalCost !== null ? totalCost / passCount : null;
+
+  // Run-to-run spread: coefficient of variation of job cost within each problem that has repetitions.
+  const cvs: number[] = [];
+  for (const group of byProblem(jobs).values()) {
+    const total = sumJobCosts(group);
+    if (group.length < 2 || total === null || total === 0) continue;
+    const mean = total / group.length;
+    const variance = group.reduce((sum, j) => sum + (j.costUsdAllAttempts! - mean) ** 2, 0) / (group.length - 1);
+    cvs.push(Math.sqrt(variance) / mean);
+  }
+  const costSpread = cvs.length ? cvs.reduce((a, b) => a + b, 0) / cvs.length : null;
+
+  let gate: FrameworkStats["gate"] = "not-applicable";
+  if (gated) {
+    if (n < GATE_MIN_JOBS) gate = { insufficient: n };
+    else if (passRate < GATE_THRESHOLD) gate = { flagged: [...new Set(jobs.filter((j) => j.outcome === "fail").map((j) => j.problem))].sort() };
+    else gate = "ok";
+  }
 
   const failures: Record<string, number> = {};
   for (const job of jobs.filter((j) => j.outcome === "fail")) {
@@ -213,11 +297,13 @@ function aggregateFramework(jobs: JobJSON[]): FrameworkStats {
     passRate,
     wilson95,
     costPerSuccessUsd,
+    costPerPassUsd,
     meanCostUsd,
+    costSpread,
     turns: { main: 0, secondary: 0 }, // rollup data not yet implemented
     toolCalls: { topLevel: 0, leaf: 0 },
     failures,
-    gate: "ok",
+    gate,
   };
 }
 
@@ -247,30 +333,46 @@ function computePaired(frameworkJobs: Map<string, JobJSON[]>): PairedComparison[
       }
 
       // Per-problem breakdown
-      const problemsA = new Map<string, JobJSON[]>();
-      const problemsB = new Map<string, JobJSON[]>();
-      for (const jb of jobsA) {
-        if (!problemsA.has(jb.problem)) problemsA.set(jb.problem, []);
-        problemsA.get(jb.problem)!.push(jb);
-      }
-      for (const jb of jobsB) {
-        if (!problemsB.has(jb.problem)) problemsB.set(jb.problem, []);
-        problemsB.get(jb.problem)!.push(jb);
-      }
+      const problemsA = byProblem(jobsA);
+      const problemsB = byProblem(jobsB);
       const allProblems = new Set([...problemsA.keys(), ...problemsB.keys()]);
       const problemStats = [...allProblems].map((problem) => {
         const pA = problemsA.get(problem) ?? [];
         const pB = problemsB.get(problem) ?? [];
         return {
           problem,
+          jobsA: pA.length,
+          jobsB: pB.length,
           passA: pA.filter((jb) => jb.outcome === "pass").length,
           passB: pB.filter((jb) => jb.outcome === "pass").length,
           costA: sumJobCosts(pA),
           costB: sumJobCosts(pB),
+          passCostA: meanPassCost(pA),
+          passCostB: meanPassCost(pB),
         };
       });
 
-      pairs.push({ a, b, mdd: mddVal, verdict, problems: problemStats });
+      // Cost is compared only on problems both frameworks passed, so failing the expensive
+      // problems cannot make a framework look cheaper (framework-runner §6.2).
+      const both = problemStats.filter((p) => p.passCostA !== null && p.passCostB !== null);
+      const mean = (xs: number[]) => (xs.length ? xs.reduce((x, y) => x + y, 0) / xs.length : null);
+      const meanA = mean(both.map((p) => p.passCostA!));
+      const meanB = mean(both.map((p) => p.passCostB!));
+      const aCheaper = both.filter((p) => p.passCostA! < p.passCostB!).length;
+      const bCheaper = both.filter((p) => p.passCostB! < p.passCostA!).length;
+      const pValue = signTest(aCheaper, bCheaper);
+      const cost: PairedCost = {
+        problems: both.length,
+        meanA,
+        meanB,
+        ratio: meanA !== null && meanB !== null && meanA > 0 ? meanB / meanA : null,
+        aCheaper,
+        bCheaper,
+        pValue,
+        verdict: pValue < 0.05 ? (aCheaper > bCheaper ? "a-cheaper" : "b-cheaper") : "inconclusive",
+      };
+
+      pairs.push({ a, b, mdd: mddVal, verdict, cost, problems: problemStats });
     }
   }
 
@@ -286,19 +388,38 @@ function generateMarkdown(report: CombinedReport): string {
   lines.push(`Runs: ${report.runs.join(", ")}`, "");
   lines.push(report.provenanceStatus === "runtime-observed" ? "Provenance: runtime observed (local metadata, not cryptographic attestation)." : "Provenance: legacy/unattested — not a verified baseline.", "");
   lines.push("## Frameworks", "");
-  lines.push("| Framework | Jobs | Pass | Pass Rate | 95% CI | Mean Cost |");
-  lines.push("|-----------|------|------|-----------|--------|-----------|");
+  const usd = (v: number | null) => (v === null ? "unknown" : "$" + v.toFixed(4));
+  const gateText = (g: FrameworkStats["gate"]) =>
+    typeof g === "string" ? g : "insufficient" in g ? `too few jobs (${g.insufficient} < ${GATE_MIN_JOBS})` : `flagged: ${g.flagged.join(", ")}`;
+  lines.push("| Framework | Jobs | Pass | Pass Rate | 95% CI | Mean Cost | Cost per Pass | Cost Spread | Gate |");
+  lines.push("|-----------|------|------|-----------|--------|-----------|---------------|-------------|------|");
   for (const [fw, stats] of Object.entries(report.frameworks)) {
     const ci = `[${stats.wilson95[0].toFixed(2)}, ${stats.wilson95[1].toFixed(2)}]`;
     lines.push(
-      `| ${fw} | ${stats.jobs} | ${stats.pass} | ${(stats.passRate * 100).toFixed(1)}% | ${ci} | ${stats.meanCostUsd === null ? "unknown" : "$" + stats.meanCostUsd.toFixed(4)} |`,
+      `| ${fw} | ${stats.jobs} | ${stats.pass} | ${(stats.passRate * 100).toFixed(1)}% | ${ci} | ${usd(stats.meanCostUsd)} | ${usd(stats.costPerPassUsd)} | ${stats.costSpread === null ? "n/a" : (stats.costSpread * 100).toFixed(0) + "%"} | ${gateText(stats.gate)} |`,
     );
   }
   lines.push("");
+  const reasons = ["checks", "turn-limit", "timeout", "patch-failed", "context-limit"] as const;
+  lines.push("## Failures", "");
+  lines.push(`| Framework | ${reasons.join(" | ")} |`);
+  lines.push(`|---|${reasons.map(() => "---").join("|")}|`);
+  for (const [fw, stats] of Object.entries(report.frameworks)) {
+    lines.push(`| ${fw} | ${reasons.map((reason) => stats.failures[reason] ?? 0).join(" | ")} |`);
+  }
+  lines.push("");
+  for (const p of report.paired) {
+    const a = report.frameworks[p.a]?.failures["turn-limit"] ?? 0;
+    const b = report.frameworks[p.b]?.failures["turn-limit"] ?? 0;
+    if (a !== b) lines.push(`Warning: ${p.a} and ${p.b} have different turn-limit failure counts (${a} vs ${b}); the pass-rate difference may come from the turn limit.`);
+  }
+  if (report.paired.some((p) => (report.frameworks[p.a]?.failures["turn-limit"] ?? 0) !== (report.frameworks[p.b]?.failures["turn-limit"] ?? 0))) lines.push("");
   if (report.paired.length > 0) {
     lines.push("## Paired Comparisons", "");
     for (const p of report.paired) {
-      lines.push(`**${p.a} vs ${p.b}**: ${p.verdict} (MDD ${(p.mdd * 100).toFixed(1)}%)`);
+      lines.push(`**${p.a} vs ${p.b}**: pass rate ${p.verdict} (MDD ${(p.mdd * 100).toFixed(1)}%); ` +
+        `cost on ${p.cost.problems} problems both passed: ${usd(p.cost.meanA)} vs ${usd(p.cost.meanB)}, ` +
+        `${p.cost.aCheaper}/${p.cost.bCheaper} cheaper, sign test p=${p.cost.pValue.toFixed(3)}: ${p.cost.verdict}`, "");
     }
     lines.push("");
   }
@@ -342,9 +463,11 @@ export async function combineRuns(runDirs: string[], name: string, repoRoot: str
     }
   }
 
+  // The failure gate is for dev runs only; the reported set is never gated (problems §8.5).
+  const gated = runJSONs.every((r) => r.config.kind === "dev");
   const frameworks: CombinedReport["frameworks"] = {};
   for (const [fw, jobs] of frameworkJobs) {
-    frameworks[fw] = aggregateFramework(jobs);
+    frameworks[fw] = aggregateFramework(jobs, gated);
   }
 
   const report: CombinedReport = {

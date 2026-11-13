@@ -30,7 +30,6 @@ class ProductService:
         if self._store.get(product_id) is None:
             raise KeyError(f"product {product_id!r} not found")
         self._store.set(product_id, data)
-        # BUG: cache is not invalidated here; subsequent get() returns stale data.
         return data
 
     def delete(self, product_id: str):

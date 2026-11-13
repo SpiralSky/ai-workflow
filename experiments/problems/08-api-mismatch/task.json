@@ -1,6 +1,6 @@
 {
   "id": "08-api-mismatch",
   "size": "small",
-  "turnLimit": 8,
+  "turnLimit": 15,
   "tags": ["bugfix"]
 }

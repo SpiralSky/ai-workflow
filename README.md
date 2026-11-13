@@ -113,12 +113,18 @@ Specs in [docs/specifications/](docs/specifications/features/README.md) are the 
 
 | Path | What |
 |---|---|
-| `framework/` | MCP server, sandbox runner, helpers, prompts, tests. See [framework/README.md](framework/README.md). |
-| `experiments/` | Eval harness (`run.ts`) + 9 Python problems (`problems/0N-*/`). Outputs in `experiments/runs/<ts>/` (gitignored). |
-| `experiments/viewer/` | Self-contained HTML dashboard. Build with `cd framework && npm run view`, then open `experiments/viewer/index.html`. |
-| `dev/issues/` | Open design and implementation issues. |
-| `dev/jobs/` | Specs for framework dev tasks. |
-| `docs/` | Design documents. |
+| `packages/core/` | Branch sandbox runtime, tool registry and hosts, and orchestrate engine. |
+| `packages/llm/` | LLM provider clients, authentication, usage tracking, and pricing. |
+| `packages/runner/` | Experiment CLI, run planning, execution, and combined results. |
+| `packages/server/` | Framework MCP server with local and MCP client tool hosts. |
+| `packages/telemetry/` | Event schemas, trace sinks, blobs, transcripts, and reports. |
+| `packages/tools/` | Shell, file, code navigation, refactoring, checking, and testing tools. |
+| `packages/viewer/` | React experiment results viewer and run indexer. |
+| `experiments/problems/` | Nine Python experiment problems with workspaces, checks, and reference solutions. |
+| `experiments/runs/` | Experiment run outputs (git-ignored). |
+| `docs/specifications/` | Feature and architecture specifications. |
+| `docs/ideas/` | Exploratory design ideas. |
+| `framework/` | leftover files of the old Claude Code plugin (branch command + report hook), pending the plugin rebuild |
 
 ## Running
 

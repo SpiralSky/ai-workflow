@@ -1,6 +1,6 @@
 {
   "id": "02-inventory-feature",
   "size": "small",
-  "turnLimit": 12,
+  "turnLimit": 15,
   "tags": ["feature"]
 }

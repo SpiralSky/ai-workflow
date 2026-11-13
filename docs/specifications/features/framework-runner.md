@@ -121,6 +121,14 @@ Held constant across frameworks within a run:
 - **Secondary turn cap**: at most 4 secondary turns per `do` call (at most 4 executor turns; one is the normal case; configurable, orchestrate §8.2).
   Their cost is always included in the job's total (§4.5).
 - Base system prompt, excluding framework-specific sections.
+- **Opt-in variants off.** The three-way comparison runs each framework in its default form. An
+  opt-in variant (e.g. `orchestrate[hotPaths]`) is its own arm, compared against its framework's
+  default, never mixed into it.
+
+A turn limit must not decide the comparison. Branch packs several tool calls into one turn, so a
+tight limit fails baseline first. Each problem's limit is therefore at least twice the main-loop
+turns of a baseline reference run (problems §8.3), and the report lists `turn-limit` failures per
+framework so a difference caused by the limit is visible.
 
 Recorded, **not** controlled:
 
@@ -301,13 +309,27 @@ problems/<id>/
 Per framework, over all jobs in the evaluation (§6.6):
 
 - **Pass rate**, with a 95% Wilson interval.
-- **Cost per successful job** — the headline number for the cost claim.
+- **Paired cost on problems both frameworks passed** — the headline number for the cost claim.
+  For each pair of frameworks, each problem that both passed at least once contributes its mean
+  cost per passing job; the report gives both means, their ratio and how many problems each
+  framework was cheaper on. Comparing only shared passes keeps a framework from looking cheaper
+  because it failed the expensive problems.
+- **Cost per pass** — the cost of all of a framework's jobs, failed ones included, divided by its
+  number of passes: what one success costs to obtain. The mean cost of passing jobs alone is
+  reported too, but is not a headline, for the reason above.
+- **Cost spread** — the coefficient of variation of job cost across repetitions of the same
+  problem, per framework, whenever a problem has two or more jobs (§6.6 variance pilot).
 - **Paired per-problem comparison** (e.g. branch vs. baseline on the same problem), so a few hard
   problems do not dominate the aggregate.
+- **Latency is informational.** Flex requests are queued by the provider, so wall-clock and model
+  latency say nothing about a framework. Speed is compared by main and secondary turns and by
+  tokens.
 - **Claim rule (stated before the full run).** With one repetition the full run can detect only
   large differences. The report computes the minimum detectable difference for the run's size,
   and a difference is claimed only if the paired comparison exceeds it; smaller differences are
-  reported as inconclusive, never as wins.
+  reported as inconclusive, never as wins. A **cost** difference is claimed only if a two-sided
+  exact sign test over the problems both frameworks passed gives p < 0.05 (so at least six
+  problems, all in the same direction); otherwise it is reported as inconclusive.
 
 ### 6.3 Action log
 
@@ -374,12 +396,18 @@ the expensive full run happens once.
 - **Dev runs** use the dev set (problems §8.5) to tune the frameworks.
 - **Failure gate (temporary, dev set only).** After each dev run, the combined report checks every
   framework's pass rate against a threshold (default 90%). Below it, the report flags the framework
-  and the failing problems. Every failure is audited and labelled `setup` (bug in the problem,
+  and the failing problems. The gate gives a verdict only once a framework has at least 10 dev
+  jobs (the dev set is small, so this takes repetitions); with fewer, one failure would decide it,
+  and the report says `insufficient` instead. Every failure is audited and labelled `setup` (bug in the problem,
   runner or tools) or `framework` (weakness to tune). Remove the gate together with the dev set.
 - **Setup gate (permanent).** Before any run on the reported set: the smoke test and every
   problem's reference solution pass, and no audited failure is still labelled `setup`.
 - **Pilot runs** use part of the reported set (e.g. small problems at tier S) to check the setup
   and to measure cost per job. Their results are never tuned against.
+- **Variance pilot.** The first pilot repeats two small problems 3–5 times per framework, to
+  measure the run-to-run cost spread (§6.2) before the single full run. If the spread within a
+  problem is as large as the difference between frameworks, the full run cannot support a cost
+  claim at one repetition, and repetitions are added (within the budget) or the claim is dropped.
 - **Full run.** The whole reported set, with a $1 budget. The runner refuses to start it unless the
   setup and failure gates pass, the cost projection from pilot runs fits the budget, and no full run
   exists yet for the same provenance (§7.1).

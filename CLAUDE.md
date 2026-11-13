@@ -38,7 +38,7 @@ API-equivalent for plan usage), with the price-table version.
 - Use plain `//` comments for implementation notes inside function bodies.
 
 ## Commit practices
-- Run `npm test` (repo root, `packages/*`) before committing package changes; `cd framework && npm test` for the old `framework/` until it is removed.
+- Run `npm test` and `npm run typecheck` (repo root) before committing package changes.
 - One logical change per commit.
 - Message format: `fix(issue-NN): ...` for issue work; `feat:`, `docs:`, `refactor:` otherwise.
 - Never commit experiment run outputs (`experiments/runs/`).

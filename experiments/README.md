@@ -1,43 +1,28 @@
-# Loop Framework Testbed
+# Experiments
 
-Five small problems for designing and refining a loop-based AI development framework.
-For each one, write down in `STEPS.md` what you *intend* the AI to do at every iteration.
-Then run your framework on it and compare.
+Problems, the job image and run outputs for the framework comparison. The specs are the source of
+truth: [problems](../docs/specifications/features/problems.md) for the problem set and
+[framework-runner](../docs/specifications/features/framework-runner.md) for metrics, grading,
+budget and staged evaluation.
 
-| # | Problem | What it tests |
-|---|---------|---------------|
-| 01 | chunk-off-by-one | Basic loop: reproduce → fix → verify → stop |
-| 02 | inventory-feature | Implementing new behavior + writing its own tests |
-| 03 | discount-mismatch | Bug spanning 2 files; *which* side to fix is a judgement call |
-| 04 | vague-rate-limit | Underspecified request: should the loop ask before acting? |
-| 05 | report-refactor | Refactor with a "no behavior change" guard; knowing when to stop |
-| 06 | import-cycle | Circular import; requires structural reasoning to break correctly |
-| 07 | async-race | Race condition in async code; must reason about execution order |
-| 08 | api-mismatch | Consumer/provider contract mismatch; which side owns the fix? |
-| 09 | cache-invalidation | Stale cache bug; requires understanding invalidation semantics |
+| Path | Contents |
+|------|----------|
+| `problems/<id>/` | One problem: `task.md` (the prompt), `task.json` (size, set, turn limit, tags), `Dockerfile`, `workspace/` (starting files), `checks/` (hidden tests + `check.sh`, never present during a job), `reference/` (reference solution). |
+| `docker/aiw-base/` | Base image for job containers. |
+| `runs/` | Run outputs (git-ignored). |
+| `runs-archive/` | Archived old-format runs (git-ignored). |
 
-Each folder has:
-- `PROBLEM.md` — the task exactly as you'd give it to the AI (the prompt), plus hidden notes for you
-- code + `test_*.py` — run with `python3 -m unittest` inside the folder
-- `hidden/test_hidden.py` — acceptance test the AI never sees; `experiments/run.ts` copies it in after the run (must FAIL on the unmodified code — check with `npm run eval -- --selfcheck` from framework/)
-- `STEPS.md` — blank template for your intended loop trace
+## Commands
 
-Reset a problem after a manual run: `git checkout -- experiments/problems/<id>` (the eval harness works on temp copies and never modifies these).
+Run from the repo root (`npx aiw --help` lists every option):
 
-## Running experiments
-
-From `framework/`:
 ```bash
-npm run eval -- --problem all --mode compare --n 3 --model sonnet
+npx aiw problems build            # build problem images
+npx aiw problems check            # self-check: checks fail before, pass with the reference solution
+npx aiw eval --problems dev --mode compare --tools S
+npx aiw report <run-dir>... --name <report-name>
+npx aiw view                      # results viewer
 ```
 
-Modes: **baseline** (control, direct tools), **branch-only** (branch MCP only), **orchestrate** (delegate → BM25 → sub-LLM).
-**compare** = branch-only + orchestrate (default). **both** = baseline + branch-only. **all** = all three.
-
-Use `--backend openai` to swap the main model to an OpenAI-compatible endpoint while keeping all modes intact:
-```bash
-OPENAI_BASE_URL=https://openrouter.ai/api/v1 OPENAI_API_KEY=<key> \
-  npm run eval -- --problem all --mode compare --n 3 --backend openai --model qwen/qwen-2.5-72b-instruct
-```
-
-Results viewer: `npm run view`, then open `experiments/viewer/index.html`.
+Modes: `baseline`, `branch-only`, `orchestrate`; `compare` runs all three. Measured runs use
+`gpt-6-luna` on OpenAI Flex with a per-run `--budget` (framework-runner §4.1, §6.5).

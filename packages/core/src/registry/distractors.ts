@@ -11,8 +11,32 @@ interface Domain {
 
 const d = (noun: string, one: string, many: string, who: string, fields: string): Domain => ({ noun, one, many, who, fields: fields.split(" ") });
 
-/** The fixed domains; each has its own vocabulary so tools of different domains share few terms. */
-const DOMAINS: Domain[] = [
+/**
+ * Hard negatives (orchestrate §10.2): software-delivery domains whose vocabulary overlaps with coding tasks
+ * (branch, build, test, file, import, release) although no problem needs them and
+ * none duplicates a real tool (orchestrate §6.1). Every fifth distractor comes from here.
+ */
+const NEIGHBOUR_DOMAINS: Domain[] = [
+  d("PullRequest", "pull request", "pull requests", "code reviewer", "sourceBranch targetBranch reviewers changedFiles mergeStatus commitCount"),
+  d("BuildCache", "build cache", "build caches", "build engineer", "cacheKey sizeMb restoreStage evictionPolicy lastHit toolchainVersion"),
+  d("ContainerImage", "container image", "container images", "platform engineer", "imageTag baseImage registryUrl layerCount buildArgs exposedPorts"),
+  d("DbMigration", "database migration", "database migrations", "database administrator", "schemaVersion tableName rollbackScript appliedAt columnChanges lockTimeout"),
+  d("EnvSecret", "environment secret", "environment secrets", "security engineer", "secretName targetEnvironment rotationDate ownerTeam maskedValue accessScope"),
+  d("Deployment", "deployment", "deployments", "release manager", "releaseVersion targetCluster replicaCount healthCheckUrl rollbackVersion deployWindow"),
+  d("ErrorReport", "error report", "error reports", "on-call engineer", "stackTrace exceptionType affectedRelease occurrenceCount firstSeen sourceFile"),
+  d("LicenceAudit", "licence audit", "licence audits", "compliance engineer", "packageName licenceType complianceStatus auditDate flaggedDependency reviewerTeam"),
+  d("ServiceEndpoint", "service endpoint", "service endpoints", "service owner", "routePath httpMethod requestSchema rateLimit authScope responseCode"),
+  d("ReleaseNote", "release note", "release notes", "maintainer", "releaseVersion changeSummary breakingChanges authorTeam linkedCommit publishDate"),
+];
+
+/** Returns whether a generated catalog name belongs to one of the software-delivery hard-negative domains. */
+export function isHardNegativeToolName(name: string): boolean {
+  const domainNames = NEIGHBOUR_DOMAINS.map((domain) => domain.noun);
+  return domainNames.some((domain) => new RegExp(`^(?:${VERBS.map(([verb]) => verb).join("|")})${domain}(?:[2-9][0-9]*)?X*$`).test(name));
+}
+
+/** Unrelated business domains; each has its own vocabulary so tools of different domains share few terms. */
+const BUSINESS_DOMAINS: Domain[] = [
   d("Invoice", "invoice", "invoices", "accountant", "dueDate lineItems taxRate customerName currency paymentTerms"),
   d("CalendarEvent", "calendar event", "calendar events", "organiser", "startTime endTime attendees reminderMinutes recurrence timeZone"),
   d("SupportTicket", "support ticket", "support tickets", "support agent", "priority requesterEmail queue escalationLevel firstResponseDue channel"),
@@ -67,6 +91,9 @@ const DOMAINS: Domain[] = [
   d("Warranty", "warranty", "warranties", "after-sales agent", "serialNumber purchaseDate coverageMonths defectReport proofOfPurchase transferable"),
 ];
 
+/** The fixed domain order: four business domains, then one neighbour domain, so any prefix is about one-fifth hard negatives. */
+const DOMAINS: Domain[] = BUSINESS_DOMAINS.flatMap((dom, i) => (i % 4 === 3 && NEIGHBOUR_DOMAINS[(i - 3) / 4] ? [dom, NEIGHBOUR_DOMAINS[(i - 3) / 4]!] : [dom]));
+
 /** Per-tool text: `desc` is the description, `when` the situation to call it, `not` an optional redirect to a sibling verb. */
 type Wording = { desc: string; when: string; not?: [sibling: string, reason: string] };
 
@@ -117,7 +144,8 @@ const grammar = (s: string) => s.replace(/\ba(?= [aeiou])/g, "an");
 const cap = (s: string) => s[0]!.toUpperCase() + s.slice(1);
 
 /**
- * The fixed distractor set (orchestrate §10.2): plausible business tools no coding problem needs.
+ * The fixed distractor set (orchestrate §10.2): plausible tools no coding problem needs. About one in five is a
+ * hard negative from a software-delivery domain; the rest are unrelated business tools.
  * Generation is deterministic: index i -> domain i mod D and verb floor(i / D); which of the domain's
  * fields a tool mentions depends only on its verb round. So the first N are identical in every
  * run (no randomness) and a larger N extends a smaller one. Each domain has its own vocabulary, so tools of

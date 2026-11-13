@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { wilsonCI95, mdd } from "../src/combine.ts";
+import { wilsonCI95, mdd, signTest } from "../src/combine.ts";
 
 // --- wilsonCI95 ---
 
@@ -272,4 +272,82 @@ test("direct TypeSafe classifier provider isolates reports", async t => {
     b.config.classifier = changed;
     const { root, dirs } = fixtureDirs(t, [a, b]); await assert.rejects(combineRuns(dirs, "mixed-classifier", root), /provider|limits/);
   }
+});
+
+// --- paired cost, cost per pass, spread and the failure gate ---
+
+test("signTest: exact two-sided p-values", () => {
+  assert.equal(signTest(0, 0), 1);
+  assert.equal(signTest(3, 3), 1);
+  assert.equal(signTest(5, 0), 0.0625);
+  assert.equal(signTest(6, 0), 0.03125);
+  assert.ok(Math.abs(signTest(9, 1) - 22 / 1024) < 1e-12);
+});
+
+/** Writes one fixture job per entry: [problem, framework, outcome, cost]. */
+function writeJobs(dir: string, jobs: Array<[string, string, "pass" | "fail", number]>): void {
+  jobs.forEach(([problem, framework, outcome, cost], i) => {
+    const jobDir = join(dir, `job-${i}`); mkdirSync(jobDir);
+    writeFileSync(join(jobDir, "job.json"), JSON.stringify({ format: 1, problem, framework, rep: i,
+      outcome, reason: outcome === "pass" ? null : "checks", attempts: [{ n: 0, final: true }], costUsdAllAttempts: cost, durationMs: 1 }));
+  });
+}
+
+test("cost is compared only on problems both frameworks passed, and failures count in cost per pass", async (t) => {
+  const { root, dirs } = fixtureDirs(t, [fixtureRun("a")]);
+  // b fails the expensive problem p3, so its mean cost over passes looks cheap although it is dearer on every shared problem.
+  writeJobs(dirs[0]!, [
+    ["p1", "a", "pass", 1], ["p2", "a", "pass", 1], ["p3", "a", "pass", 10],
+    ["p1", "b", "pass", 2], ["p2", "b", "pass", 2], ["p3", "b", "fail", 4],
+  ]);
+  await combineRuns(dirs, "paired", root);
+  const report = JSON.parse(readFileSync(join(root, "experiments/reports/paired/report.json"), "utf8"));
+  assert.equal(report.frameworks.a.costPerSuccessUsd, 4);
+  assert.equal(report.frameworks.b.costPerSuccessUsd, 2);
+  assert.equal(report.frameworks.b.costPerPassUsd, 4, "the failed job's cost is charged to the passes");
+  const cost = report.paired[0].cost;
+  assert.deepEqual([cost.problems, cost.meanA, cost.meanB, cost.ratio, cost.aCheaper, cost.bCheaper], [2, 1, 2, 2, 2, 0]);
+  assert.equal(cost.verdict, "inconclusive", "two problems cannot support a cost claim");
+  assert.equal(report.frameworks.a.costSpread, null, "no repetitions, no spread");
+});
+
+test("report markdown lists failure reasons and flags unequal turn-limit failures", async (t) => {
+  const { root, dirs } = fixtureDirs(t, [fixtureRun("turn-limits")]);
+  writeJobs(dirs[0]!, [["p1", "alpha", "fail", 1], ["p2", "alpha", "fail", 1], ["p3", "alpha", "fail", 1], ["p4", "alpha", "fail", 1], ["p5", "alpha", "fail", 1], ["p1", "beta", "fail", 1]]);
+  const { readFileSync } = await import("node:fs");
+  const { join } = await import("node:path");
+  const { writeFileSync } = await import("node:fs");
+  for (const [index, reason] of ["checks", "turn-limit", "timeout", "patch-failed", "context-limit"] .entries()) {
+    const file = join(dirs[0]!, `job-${index}`, "job.json");
+    const job = JSON.parse(readFileSync(file, "utf8")); job.reason = reason; writeFileSync(file, JSON.stringify(job));
+  }
+  await combineRuns(dirs, "failures-visible", root);
+  const markdown = readFileSync(join(root, "experiments/reports/failures-visible/report.md"), "utf8");
+  assert.match(markdown, /## Failures/);
+  assert.match(markdown, /\| alpha \| 1 \| 1 \| 1 \| 1 \| 1 \|/);
+  assert.match(markdown, /Warning: alpha and beta have different turn-limit failure counts.*may come from the turn limit/);
+});
+
+test("cost spread needs repetitions; the gate needs enough dev jobs", async (t) => {
+  const { root, dirs } = fixtureDirs(t, [fixtureRun("a")]);
+  writeJobs(dirs[0]!, [["p1", "a", "pass", 1], ["p1", "a", "pass", 3], ["p1", "a", "fail", 2]]);
+  await combineRuns(dirs, "few", root);
+  const few = JSON.parse(readFileSync(join(root, "experiments/reports/few/report.json"), "utf8"));
+  assert.equal(few.frameworks.a.costSpread, 0.5);
+  assert.deepEqual(few.frameworks.a.gate, { insufficient: 3 });
+
+  const many = fixtureDirs(t, [fixtureRun("b")]);
+  writeJobs(many.dirs[0]!, [...Array.from({ length: 8 }, (): [string, string, "pass", number] => ["p1", "a", "pass", 1]),
+    ["p2", "a", "fail", 1], ["p2", "a", "fail", 1],
+    ...Array.from({ length: 10 }, (): [string, string, "pass", number] => ["p1", "b", "pass", 1])]);
+  await combineRuns(many.dirs, "gate", many.root);
+  const gate = JSON.parse(readFileSync(join(many.root, "experiments/reports/gate/report.json"), "utf8"));
+  assert.deepEqual(gate.frameworks.a.gate, { flagged: ["p2"] });
+  assert.equal(gate.frameworks.b.gate, "ok");
+
+  const pilot = fixtureRun("c"); pilot.config.kind = "pilot";
+  const reported = fixtureDirs(t, [pilot]);
+  writeJobs(reported.dirs[0]!, [["p1", "a", "fail", 1]]);
+  await combineRuns(reported.dirs, "pilot", reported.root);
+  assert.equal(JSON.parse(readFileSync(join(reported.root, "experiments/reports/pilot/report.json"), "utf8")).frameworks.a.gate, "not-applicable");
 });

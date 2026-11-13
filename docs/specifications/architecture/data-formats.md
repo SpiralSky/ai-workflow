@@ -106,16 +106,19 @@ the viewer shows them from `events.jsonl` alone, marked incomplete (viewer §9).
   "frameworks": {
     "<framework-id>": {
       "jobs": 15, "pass": 14, "passRate": 0.933, "wilson95": [0.70, 0.99],
-      "costPerSuccessUsd": 0.0041, "meanCostUsd": 0.0038,
+      "costPerSuccessUsd": 0.0041, "costPerPassUsd": 0.0044, "meanCostUsd": 0.0038, "costSpread": 0.12,
       "turns": { "main": 6.1, "secondary": 0 }, "toolCalls": { "topLevel": 5.2, "leaf": 11.4 },
-      "failures": { "checks": 1 }, "gate": "ok" | { "flagged": ["<problem>", "..."] }
+      "failures": { "checks": 1 }, "gate": "ok" | "not-applicable" | { "insufficient": 6 } | { "flagged": ["<problem>", "..."] }
     }
   },
   "audits": { "<run-id>/<job-id>": { "label": "setup" | "framework", "note": "..." } },
   "paired": [ { "a": "branch-only", "b": "baseline",
                 "mdd": 0.25, "verdict": "better" | "worse" | "inconclusive",
-                "problems": [ { "problem": "07-async-race", "passA": 3, "passB": 2,
-                                "costA": 0.011, "costB": 0.019 } ] } ],
+                "cost": { "problems": 8, "meanA": 0.0031, "meanB": 0.0052, "ratio": 1.68,
+                          "aCheaper": 7, "bCheaper": 1, "pValue": 0.070,
+                          "verdict": "a-cheaper" | "b-cheaper" | "inconclusive" },
+                "problems": [ { "problem": "07-async-race", "jobsA": 3, "jobsB": 3, "passA": 3, "passB": 2,
+                                "costA": 0.011, "costB": 0.019, "passCostA": 0.0037, "passCostB": 0.0071 } ] } ],
   "orchestrate": { /* orchestrate §10.1 metrics when present */ },
   "tools": { "<framework-id>": { "<tier>": {
       "schemaTokens": 5800, "callsPerTool": { "readFile": 41 }, "neverCalled": ["…"],
@@ -128,6 +131,15 @@ the viewer shows them from `events.jsonl` alone, marked incomplete (viewer §9).
 `mdd` = smallest pass-rate difference detectable at 95% for the pair's job count; `verdict` is
 `better`/`worse` (for `a`) only if the pooled paired pass-rate difference exceeds `mdd`, else
 `inconclusive`.
+
+Cost fields (framework-runner §6.2): `costPerPassUsd` = cost of all jobs ÷ passes; `costSpread` =
+mean coefficient of variation of job cost across repetitions of a problem (`null` without
+repetitions); `passCostA`/`passCostB` = mean cost per passing job on that problem. `paired[].cost`
+covers only problems both frameworks passed: `ratio` = `meanB` ÷ `meanA`, `pValue` is a two-sided
+exact sign test, and `verdict` is a claim only when `pValue` < 0.05.
+
+`gate` (framework-runner §6.6): `not-applicable` unless every combined run is a dev run;
+`insufficient` (with the job count) below 10 jobs; otherwise `ok` or the flagged problems.
 
 `tools` metrics (tools §8), computed by `@aiw/report`:
 

@@ -9,7 +9,8 @@
     "build": "npm run build:indexer && vite build",
     "dev": "vite",
     "preview": "vite preview",
-    "test": "node --import tsx --test test/*.test.ts"
+    "test": "node --import tsx --test test/*.test.ts",
+    "typecheck": "tsc -p tsconfig.json"
   },
   "dependencies": {
     "react": "^18.3.1",
