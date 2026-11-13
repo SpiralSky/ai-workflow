@@ -9,6 +9,10 @@ export const UsageSchema = z.object({
 });
 export type Usage = z.infer<typeof UsageSchema>;
 
+/** Where a turn's dollar cost came from (framework-runner §4.1). */
+export const CostSourceSchema = z.enum(["api", "price-table", "api-equivalent"]);
+export type CostSource = z.infer<typeof CostSourceSchema>;
+
 export const RoleSchema = z.enum(["main", "secondary", "selection"]);
 export type Role = z.infer<typeof RoleSchema>;
 
@@ -38,9 +42,9 @@ export const EventSchema = z.discriminatedUnion("kind", [
     providerSystemFingerprint: z.string().optional(),
     role: RoleSchema,
     usage: UsageSchema.optional(),
-    classifierEstimate: z.object({ basis: z.string(), estimatedUsd: z.number().finite().nonnegative(), inputTokens: z.number().int().nonnegative(), outputTokens: z.number().int().nonnegative() }).optional(),
-    deepseekEstimate: z.object({ basis: z.string(), estimatedUsd: z.number().nonnegative(), cacheHitTokens: z.number().int().nonnegative(), cacheMissTokens: z.number().int().nonnegative(), outputTokens: z.number().int().nonnegative() }).optional(),
     costUsd: z.number().optional(),
+    costSource: CostSourceSchema.optional(),
+    priceTable: z.string().optional(), // Price-table version, only for price-table costs.
     cacheHit: z.boolean().optional(),
     latencyMs: z.number(),
   }),

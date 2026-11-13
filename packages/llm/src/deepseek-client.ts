@@ -1,8 +1,9 @@
 import type { LLMClient, LLMCompletion } from "@aiw/telemetry";
 import { LLMError, classifyAPIError } from "./errors.ts";
+import { tableCost } from "./prices.ts";
 
-/** Official tariff snapshot, not a measured bill or a guarantee of future pricing. */
-export const DEEPSEEK_PRICE_BASIS = "deepseek-flash:2026-11-01:off-peak";
+/** The only model id the direct client sends; also its price-table key. */
+export const DEEPSEEK_MODEL = "deepseek-flash";
 export const DEEPSEEK_ENDPOINT = "https://api.deepseek.com/chat/completions";
 const MARGIN_MS = 5 * 60_000;
 
@@ -27,17 +28,13 @@ export function deepSeekOffPeakRemaining(now: number): number {
   return 0;
 }
 
-export interface DeepSeekEstimate {
-  basis: typeof DEEPSEEK_PRICE_BASIS;
-  estimatedUsd: number;
-  cacheHitTokens: number;
-  cacheMissTokens: number;
-  outputTokens: number;
-}
-export interface DeepSeekCompletion extends LLMCompletion { deepseekEstimate: DeepSeekEstimate }
-
-/** Validate complete provider token accounting. Absent/inconsistent tokens are not zero. */
-export function deepSeekUsage(body: any): Pick<DeepSeekCompletion, "usage" | "cacheHit" | "deepseekEstimate"> {
+/**
+ * Validates complete provider token accounting and prices it from the off-peak price table.
+ * Absent or inconsistent tokens are not zero.
+ * @param body - DeepSeek chat-completions response body
+ * @throws LLMError (infra) when usage is missing or inconsistent
+ */
+export function deepSeekUsage(body: any): Pick<LLMCompletion, "usage" | "cacheHit" | "costUsd" | "costSource" | "priceTable"> {
   const u = body?.usage;
   const values = [u?.prompt_tokens, u?.completion_tokens, u?.prompt_cache_hit_tokens, u?.prompt_cache_miss_tokens];
   if (values.some(v => !Number.isSafeInteger(v) || v < 0) ||
@@ -46,13 +43,8 @@ export function deepSeekUsage(body: any): Pick<DeepSeekCompletion, "usage" | "ca
       (u.total_tokens !== undefined && u.total_tokens !== u.prompt_tokens + u.completion_tokens)) {
     throw new LLMError("infra", "DeepSeek usage missing or inconsistent");
   }
-  return {
-    usage: { input: u.prompt_tokens, output: u.completion_tokens, cachedRead: u.prompt_cache_hit_tokens },
-    cacheHit: u.prompt_cache_hit_tokens > 0,
-    deepseekEstimate: { basis: DEEPSEEK_PRICE_BASIS,
-      estimatedUsd: (u.prompt_cache_hit_tokens * 0.003 + u.prompt_cache_miss_tokens * 0.15 + u.completion_tokens * 0.60) / 1e6,
-      cacheHitTokens: u.prompt_cache_hit_tokens, cacheMissTokens: u.prompt_cache_miss_tokens, outputTokens: u.completion_tokens },
-  };
+  const usage = { input: u.prompt_tokens, output: u.completion_tokens, cachedRead: u.prompt_cache_hit_tokens };
+  return { usage, cacheHit: u.prompt_cache_hit_tokens > 0, ...tableCost(DEEPSEEK_MODEL, usage) };
 }
 
 /** Direct host-only client. No endpoint override, redirect, retry, paid fallback or peak dispatch.
@@ -62,8 +54,8 @@ export function createDeepSeekClient(opts: { apiKey: string; fetch?: typeof fetc
   if (!opts.apiKey || /[\r\n]/.test(opts.apiKey)) throw new Error("DeepSeek API key required");
   const timeoutMs = opts.timeoutMs ?? 300_000;
   if (!Number.isSafeInteger(timeoutMs) || timeoutMs <= 0 || timeoutMs > 2_147_483_647) throw new Error("Invalid DeepSeek timeout");
-  return { async complete(req): Promise<DeepSeekCompletion> {
-    if (req.model !== "deepseek-flash") throw new LLMError("other", "Unsupported direct DeepSeek model; select deepseek-flash");
+  return { async complete(req): Promise<LLMCompletion> {
+    if (req.model !== DEEPSEEK_MODEL) throw new LLMError("other", "Unsupported direct DeepSeek model; select deepseek-flash");
     const caller = req.signal instanceof AbortSignal ? req.signal : undefined;
     if (caller?.aborted) throw new LLMError("infra", "DeepSeek request cancelled");
     const remaining = deepSeekOffPeakRemaining((opts.now ?? Date.now)());

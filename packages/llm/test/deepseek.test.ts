@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { createDeepSeekClient, deepSeekOffPeakRemaining, deepSeekUsage, DEEPSEEK_ENDPOINT } from "../src/deepseek-client.ts";
+import { PRICE_TABLE_VERSION } from "../src/prices.ts";
 const good = () => ({ model: "deepseek-flash", choices: [{ finish_reason: "stop", message: { role: "assistant", content: "ok", reasoning_content: "opaque provider history" } }], usage: { prompt_tokens: 10, completion_tokens: 2, prompt_cache_hit_tokens: 4, prompt_cache_miss_tokens: 6, total_tokens: 12 } });
 const request = { model: "deepseek-flash", system: "system", tools: [], messages: [] };
 const sunday = () => Date.parse("2026-11-01T12:00:00Z");
@@ -9,7 +10,7 @@ test("offpeak conservative UTC boundaries including weekend and margin", () => {
   for (const time of ["2026-11-02T04:05:00Z", "2026-11-02T10:05:00Z", "2026-11-01T02:00:00Z", "2026-11-06T20:00:00Z"]) assert.ok(deepSeekOffPeakRemaining(Date.parse(time)) > 0, time);
   assert.equal(deepSeekOffPeakRemaining(NaN), 0);
 });
-test("fixed origin, no redirect, no cost fabrication, intact thinking and cache", async () => {
+test("fixed origin, no redirect, price-table cost, intact thinking and cache", async () => {
   let body: any;
   const client = createDeepSeekClient({ apiKey: "synthetic-key", now: sunday, fetch: (async (url, opts) => {
     assert.equal(url, DEEPSEEK_ENDPOINT); assert.equal(opts?.redirect, "error");
@@ -17,7 +18,8 @@ test("fixed origin, no redirect, no cost fabrication, intact thinking and cache"
   }) as typeof fetch });
   const result = await client.complete({ ...request, tools: [{}], messages: [{ role: "assistant", content: "", reasoning_content: "prior", tool_calls: [] }], temperature: 0, baseURL: "https://wrong.invalid" });
   assert.equal(body.messages[1].reasoning_content, "prior"); assert.equal(body.temperature, undefined); assert.equal(body.baseURL, undefined);
-  assert.deepEqual(result.usage, { input: 10, output: 2, cachedRead: 4 }); assert.equal(result.costUsd, undefined);
+  assert.deepEqual(result.usage, { input: 10, output: 2, cachedRead: 4 });
+  assert.equal(result.costUsd, (6 * 0.15 + 4 * 0.003 + 2 * 0.6) / 1e6); assert.equal(result.costSource, "price-table"); assert.equal(result.priceTable, PRICE_TABLE_VERSION);
 });
 test("no dispatch for peak, incomplete history, aliases or cancelled calls", async () => {
   let calls = 0; const fetcher = (async () => { calls++; return Response.json(good()); }) as typeof fetch;

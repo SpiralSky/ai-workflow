@@ -17,8 +17,6 @@ import { combineRuns } from "./combine.ts";
 import { buildProblems, checkProblems } from "./problems/index.ts";
 import { createTypeSafeDecisionsClient, createDeepSeekClient, createChatGPTAuth, createChatGPTClient, listChatGPTModels } from "@aiw/llm";
 import { boundSubscriptionClient } from "./subscription.ts";
-import { boundClassifierEstimatedClient } from "./classifier-estimated.ts";
-import { boundEstimatedClient } from "./estimated.ts";
 import { authCommand } from "./auth-cli.ts";
 
 /** Repo root: find upward from this file. */
@@ -37,11 +35,11 @@ Usage:
               --mode <baseline|branch-only|orchestrate|compare|variant,...>
               --tools S|L  [--reps 1]  [--model deepseek/deepseek-v4-flash]
               [--secondary-model <model>]  [--temperature 0]
-              [--budget 0.50]  [--full]  [--concurrency 1]
+              [--budget 0.50 (1.00 with --full)]  [--full]  [--concurrency 1]
               [--branch-context trace|annotated|full]
               [--secondary-cap 4] [--classifier-provider openrouter-decisions|typesafe] [--classifier-model <decision-model>] [--classifier-threshold <0.5..1>]
-              [--provider openrouter|chatgpt|deepseek] [--usage-mode monetary|subscription|estimated]
-              [--estimate-limit-usd N] [--account <saved-id>] [--max-calls N --max-tokens N --max-duration-ms N]
+              [--provider openrouter|chatgpt|deepseek]
+              [--account <saved-id>] [--max-calls N --max-tokens N --max-duration-ms N]  (ChatGPT plan runs)
               [--until-reps N]  [--combine-with <report>]
 
   aiw report  <run-dir>... --name <report-name>
@@ -63,18 +61,12 @@ async function evalCommand(argv: string[]): Promise<void> {
       reps: { type: "string", default: "1" },
       model: { type: "string" },
       provider: { type: "string", default: "openrouter" },
-      "usage-mode": { type: "string", default: "monetary" },
-      "estimate-limit-usd": { type: "string" },
       account: { type: "string" },
       "max-calls": { type: "string" },
       "max-tokens": { type: "string" },
       "max-duration-ms": { type: "string" },
       "secondary-model": { type: "string" },
       "classifier-provider": { type: "string" },
-      "classifier-max-calls": { type: "string" },
-      "classifier-max-tokens": { type: "string" },
-      "classifier-max-duration-ms": { type: "string" },
-      "classifier-estimate-limit-usd": { type: "string" },
       "classifier-model": { type: "string" },
       "classifier-threshold": { type: "string" },
       temperature: { type: "string" },
@@ -96,11 +88,11 @@ async function evalCommand(argv: string[]): Promise<void> {
   }
 
   const useDeepSeek = values.provider === "deepseek";
-  if (useDeepSeek && (!values.model || values.budget !== undefined || values.temperature !== undefined)) throw new Error("DeepSeek requires explicit --model deepseek-flash and estimate limits, not --budget or --temperature");
-  if (!useDeepSeek && values["estimate-limit-usd"] !== undefined) throw new Error("Estimate limit requires DeepSeek");
+  if (useDeepSeek && (!values.model || values.temperature !== undefined)) throw new Error("DeepSeek requires explicit --model deepseek-flash and no --temperature");
   const useChatGPT = values.provider === "chatgpt";
   if (useChatGPT && (!values.model || !values.account)) throw new Error("ChatGPT runs require explicit --account and --model; run aiw auth signin separately");
-  if (useChatGPT && (values.budget !== undefined || values.temperature !== undefined)) throw new Error("ChatGPT plan runs do not accept --budget or --temperature; use explicit subscription limits");
+  if (useChatGPT && values.temperature !== undefined) throw new Error("ChatGPT plan runs do not accept --temperature");
+  if (!useChatGPT && (values["max-calls"] || values["max-tokens"] || values["max-duration-ms"])) throw new Error("--max-calls/--max-tokens/--max-duration-ms are ChatGPT plan limits");
   if (!useChatGPT && values.account) throw new Error("--account is only for ChatGPT plan usage");
   const apiKey = useChatGPT ? "" : useDeepSeek ? process.env["DEEPSEEK_API_KEY"] ?? "" : process.env["OPENAI_API_KEY"] ?? process.env["OPENROUTER_API_KEY"] ?? "";
   const baseURL = useDeepSeek ? "https://api.deepseek.com" : useChatGPT ? "https://api.openai.com/v1" : process.env["OPENAI_BASE_URL"] ?? "https://openrouter.ai/api/v1";
@@ -129,9 +121,7 @@ async function evalCommand(argv: string[]): Promise<void> {
   const config = resolveConfig(
     {
       provider: values.provider as "openrouter" | "chatgpt" | "deepseek",
-      usageMode: values["usage-mode"] as "monetary" | "subscription" | "estimated",
-      ...(useDeepSeek ? { estimatedLimits: { maxCalls: Number(values["max-calls"]), maxTokens: Number(values["max-tokens"]), maxDurationMs: Number(values["max-duration-ms"]), estimateLimitUsd: Number(values["estimate-limit-usd"]) } } : {}),
-      ...((!useDeepSeek && (values["max-calls"] || values["max-tokens"] || values["max-duration-ms"])) ? { subscriptionLimits: {
+      ...((values["max-calls"] || values["max-tokens"] || values["max-duration-ms"]) ? { subscriptionLimits: {
         maxCalls: Number(values["max-calls"]), maxTokens: Number(values["max-tokens"]), maxDurationMs: Number(values["max-duration-ms"]),
       } } : {}),
       problems: values.problems!,
@@ -141,14 +131,10 @@ async function evalCommand(argv: string[]): Promise<void> {
       model: values.model ?? "deepseek/deepseek-v4-flash",
       secondaryModel: values["secondary-model"],
       classifierProvider: values["classifier-provider"] as "openrouter-decisions" | "typesafe" | undefined,
-      ...(["classifier-max-calls", "classifier-max-tokens", "classifier-max-duration-ms", "classifier-estimate-limit-usd"].some(k => values[k as keyof typeof values] !== undefined) ? { classifierLimits: {
-        maxCalls: Number(values["classifier-max-calls"]), maxTokens: Number(values["classifier-max-tokens"]),
-        maxDurationMs: Number(values["classifier-max-duration-ms"]), estimateLimitUsd: Number(values["classifier-estimate-limit-usd"]),
-      } } : {}),
       classifierModel: values["classifier-model"],
       classifierThreshold: values["classifier-threshold"] !== undefined ? Number(values["classifier-threshold"]) : undefined,
       temperature: parseFloat(values.temperature ?? "0"),
-      budget: parseFloat(values.budget ?? "0.50"),
+      budget: Number(values.budget ?? (values.full ? "1.00" : "0.50")),
       full: values.full ?? false,
       concurrency: Number(values.concurrency ?? DEFAULT_CONCURRENCY),
       branchContext: (values["branch-context"] ?? "trace") as "trace" | "annotated" | "full",
@@ -160,7 +146,7 @@ async function evalCommand(argv: string[]): Promise<void> {
   );
 
   const plan = buildPlan(config, root);
-  if (config.budgetUsd !== null && plan.projectedCostUsd !== undefined && plan.projectedCostUsd > config.budgetUsd) {
+  if (plan.projectedCostUsd !== undefined && plan.projectedCostUsd > config.budgetUsd) {
     process.stderr.write(
       `Projected cost $${plan.projectedCostUsd.toFixed(4)} exceeds budget $${config.budgetUsd}. Aborting.\n`,
     );
@@ -169,7 +155,7 @@ async function evalCommand(argv: string[]): Promise<void> {
 
   const provenance = collectStaticProvenance(root, config, {
     ...buildProvenance(root),
-    inference: { provider: config.provider!, usageMode: config.usageMode!, mainModel: config.models.main, secondaryModel: config.models.secondary,
+    inference: { provider: config.provider!, mainModel: config.models.main, secondaryModel: config.models.secondary,
       temperature: useChatGPT || useDeepSeek ? null : config.temperature, ...(useChatGPT ? { stream: true as const, store: false as const } : {}) },
   });
 
@@ -185,10 +171,10 @@ async function evalCommand(argv: string[]): Promise<void> {
     subscription = boundSubscriptionClient(createChatGPTClient({ accessToken }), config.subscriptionLimits!);
   }
 
-  const estimated = useDeepSeek ? boundEstimatedClient(createDeepSeekClient({ apiKey }), config.estimatedLimits!) : undefined;
-
-  const classifierEstimated = config.classifier?.provider === "typesafe" ? boundClassifierEstimatedClient(
-    createTypeSafeDecisionsClient({ apiKey: process.env["TYPESAFE_API_KEY"] ?? "", model: config.classifier.model }), config.classifier.limits!) : undefined;
+  // Host-only direct clients; the scheduler meters them against the one run budget.
+  const llmClient = useDeepSeek ? createDeepSeekClient({ apiKey }) : undefined;
+  const classifierClient = config.classifier?.provider === "typesafe"
+    ? createTypeSafeDecisionsClient({ apiKey: process.env["TYPESAFE_API_KEY"] ?? "", model: config.classifier.model }) : undefined;
 
   const runId = generateRunId();
 
@@ -201,7 +187,7 @@ async function evalCommand(argv: string[]): Promise<void> {
     status: "in-progress" as const,
     config,
     provenance,
-    totals: { jobs: 0, attempts: 0, costUsd: config.usageMode !== "monetary" ? null : 0, pass: 0, fail: 0 },
+    totals: { jobs: 0, attempts: 0, costUsd: 0, pass: 0, fail: 0 },
     startedAt: new Date().toISOString(),
   };
 
@@ -213,7 +199,7 @@ async function evalCommand(argv: string[]): Promise<void> {
       repoRoot: root,
       apiKey,
       baseURL,
-      subscription, estimated, classifierEstimated,
+      subscription, llmClient, classifierClient,
       turnLimits: {}, // populated from provenance in full impl
       problemsDir,
       onJobDone: (job, result) => {

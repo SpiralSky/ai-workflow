@@ -84,8 +84,9 @@ export function installHostLLMBroker(client: Client, opts: HostLLMBrokerOptions)
       signal.throwIfAborted();
       // No access tokens or connection configuration are returned across this channel.
       return { response: completion.response, usage: completion.usage,
-        ...(completion.deepseekEstimate ? { deepseekEstimate: completion.deepseekEstimate } : {}),
         ...(completion.costUsd !== undefined ? { costUsd: completion.costUsd } : {}),
+        ...(completion.costSource !== undefined ? { costSource: completion.costSource } : {}),
+        ...(completion.priceTable !== undefined ? { priceTable: completion.priceTable } : {}),
         ...(completion.cacheHit !== undefined ? { cacheHit: completion.cacheHit } : {}) };
     } catch (error) {
       // Provider errors can contain headers or request details. Never reflect them into the sandbox.
@@ -115,7 +116,7 @@ export function installHostLLMBroker(client: Client, opts: HostLLMBrokerOptions)
       signal.throwIfAborted();
       const result = await opts.classifierClient!.classify({ instruction, candidates, signal });
       signal.throwIfAborted();
-      return { ...(result.classifierEstimate ? { classifierEstimate: result.classifierEstimate } : {}), failure: result.failure, answers: result.answers, usage: result.usage, costUsd: result.costUsd, providerModel: result.providerModel, provider: result.provider };
+      return { failure: result.failure, answers: result.answers, usage: result.usage, costUsd: result.costUsd, costSource: result.costSource, priceTable: result.priceTable, providerModel: result.providerModel, provider: result.provider };
     } catch {
       throw new McpError(ErrorCode.InternalError, signal.aborted ? "Host classifier request cancelled" : "Host classifier request failed");
     } finally { active.delete(requestId); }

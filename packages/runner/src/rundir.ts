@@ -66,7 +66,7 @@ export function createRunDir(
     status: "in-progress",
     config,
     provenance,
-    totals: { jobs: 0, attempts: 0, costUsd: config.usageMode === "subscription" ? null : 0, pass: 0, fail: 0 },
+    totals: { jobs: 0, attempts: 0, costUsd: 0, pass: 0, fail: 0 },
     startedAt: new Date().toISOString(),
   };
   writeRunJSON(path, runJSON);

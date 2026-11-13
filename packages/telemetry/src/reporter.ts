@@ -1,5 +1,5 @@
 import type { Blobs } from "./blobs.ts";
-import type { EventRecord, Role, Usage } from "./schema.ts";
+import type { CostSource, EventRecord, Role, Usage } from "./schema.ts";
 import type { Sink } from "./sink.ts";
 
 export interface Reporter {
@@ -10,9 +10,9 @@ export interface Reporter {
     providerSystemFingerprint?: string;
     role: Role;
     usage?: Usage;
-    classifierEstimate?: { basis: string; estimatedUsd: number; inputTokens: number; outputTokens: number };
-    deepseekEstimate?: { basis: string; estimatedUsd: number; cacheHitTokens: number; cacheMissTokens: number; outputTokens: number };
     costUsd?: number;
+    costSource?: CostSource;
+    priceTable?: string;
     cacheHit?: boolean;
     latencyMs: number;
   }): string;

@@ -16,6 +16,7 @@ export function readAttemptCost(eventsPath: string, extraReasons: string[] = [])
   const reasons = new Set(extraReasons);
   let knownCostUsd = 0;
   const ids = new Set<string>();
+  const sources = new Set<string>();
   let text: string;
   try { text = readFileSync(eventsPath, "utf8"); }
   catch { return { costUsd: null, knownCostUsd: 0, costIncompleteReasons: [...reasons, "events-unreadable"] }; }
@@ -34,7 +35,10 @@ export function readAttemptCost(eventsPath: string, extraReasons: string[] = [])
     if (event.costUsd === undefined || !Number.isFinite(event.costUsd) || event.costUsd < 0) {
       reasons.add("missing-or-invalid-turn-cost");
     } else knownCostUsd += event.costUsd;
+    if (event.costSource) sources.add(event.costSource);
   }
+  // API-equivalent plan cost is never added to billed cost (framework-runner §4.1).
+  if (sources.has("api-equivalent") && sources.size > 1) reasons.add("mixed-cost-sources");
   return { costUsd: reasons.size ? null : knownCostUsd, knownCostUsd, costIncompleteReasons: [...reasons] };
 }
 

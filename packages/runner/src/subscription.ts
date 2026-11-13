@@ -10,7 +10,7 @@ export interface SubscriptionLimits {
   maxDurationMs: number;
 }
 
-/** Observed usage across every role; allowance percentage and dollar cost are unknown. */
+/** Observed usage across every role; the allowance percentage is unknown. */
 export interface SubscriptionUsage {
   calls: number;
   completedCalls: number;
@@ -81,8 +81,9 @@ export function boundSubscriptionClient(client: LLMClient, limits: SubscriptionL
             usage.outputTokens += output;
             if (cachedRead !== undefined) { usage.cachedReadTokens = (usage.cachedReadTokens ?? 0) + cachedRead; usage.cachedReadReportedCalls++; }
             if (cacheWrite !== undefined) { usage.cacheWriteTokens = (usage.cacheWriteTokens ?? 0) + cacheWrite; usage.cacheWriteReportedCalls++; }
-            // Deliberately discard any accidental dollar field from this plan-usage backend.
-            const { costUsd: _cost, ...completion } = result;
+            // Plan usage has no bill: keep only API-equivalent cost, never a billed-looking field.
+            if (result.costSource === "api-equivalent") return result;
+            const { costUsd: _cost, costSource: _source, priceTable: _table, ...completion } = result;
             return completion;
           } catch (error) {
             usage.incomplete = true;

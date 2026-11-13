@@ -27,8 +27,8 @@ test("classifier config is explicit, pinned, host-only and cannot mix incompatib
   for (const override of [{ classifierModel: undefined }, { classifierThreshold: undefined }, { classifierModel: "generic/chat" }, { classifierThreshold: 0.5 }, { mode: "orchestrate" }]) {
     assert.throws(() => resolveConfig({ ...base, ...override }, []));
   }
-  assert.throws(() => frameworkLaunch(config.frameworks[0], { ...config, provider: "deepseek", usageMode: "estimated" }));
-  assert.throws(() => frameworkLaunch(config.frameworks[0], { ...config, provider: "chatgpt", usageMode: "subscription" }));
+  assert.throws(() => frameworkLaunch(config.frameworks[0], { ...config, provider: "deepseek" }));
+  assert.throws(() => frameworkLaunch(config.frameworks[0], { ...config, provider: "chatgpt" }));
   assert.equal(resolveConfig({ ...base, mode: "orchestrate", classifierModel: undefined, classifierThreshold: undefined }, []).classifier, undefined);
 });
 async function fixture(classifier: DecisionsClient, early = false) {

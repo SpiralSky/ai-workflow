@@ -14,7 +14,7 @@ import type { RunJSON } from "../src/types.ts";
 const req = { model: "fixture", system: "system", messages: [], tools: [] };
 const limits = { maxCalls: 4, maxTokens: 100, maxDurationMs: 30_000 };
 const flags: EvalFlags = { problems: "smoke", mode: "compare", tools: "S", reps: 1, model: "fixture", temperature: 0, budget: 0.5,
-  full: false, branchContext: "trace", secondaryCap: 4, provider: "chatgpt", usageMode: "subscription", subscriptionLimits: limits };
+  full: false, branchContext: "trace", secondaryCap: 4, provider: "chatgpt", subscriptionLimits: limits };
 const registry = [{ id: "p", size: "smoke", set: "dev" }];
 const result = { response: {}, usage: { input: 3, output: 2, cachedRead: 1 } };
 
@@ -66,9 +66,9 @@ test("deadline cancels in-flight work; caller cancellation before admission cost
   assert.equal(timed.snapshot().incomplete, true);
 });
 
-test("subscription configuration is explicit, serial, bounded, and rejects mixed monetary mode", () => {
+test("subscription configuration is explicit, serial, bounded, and takes a positive budget", () => {
   assert.equal(resolveConfig(flags, registry).provider, "chatgpt");
-  for (const changed of [ { usageMode: "monetary" }, { provider: "openrouter" }, { subscriptionLimits: undefined }, { concurrency: 2 },
+  for (const changed of [ { budget: 0 }, { provider: "openrouter" }, { subscriptionLimits: undefined }, { concurrency: 2 },
     { subscriptionLimits: { ...limits, maxCalls: 0 } }, { model: "deepseek/deepseek-v4-flash" } ]) {
     assert.throws(() => resolveConfig({ ...flags, ...changed } as EvalFlags, registry));
   }
@@ -78,7 +78,7 @@ test("subscription configuration is explicit, serial, bounded, and rejects mixed
   assert.ok(!JSON.stringify(launch).includes("attacker"));
 });
 
-test("scheduler completes full mock matrix with unknown dollars only in explicit bounded subscription mode", async t => {
+test("scheduler completes full mock matrix with unknown dollars only for an unpriced plan model", async t => {
   const root = mkdtempSync(join(tmpdir(), "aiw-subscription-")); t.after(() => rmSync(root, { recursive: true, force: true }));
   const config = resolveConfig(flags, registry);
   const subscription = boundSubscriptionClient({ complete: async () => result }, limits);
@@ -117,6 +117,6 @@ for (const scenario of ["quota", "telemetry", "failure"] as const) {
         eventsPath: "fixture", costUsd: null, knownCostUsd: 0, costIncompleteReasons: [scenario === "telemetry" ? "malformed-event" : "missing-or-invalid-turn-cost"] }; },
     }, run);
     assert.equal(attempts, 1); assert.equal(run.totals.jobs, 1); assert.equal(run.totals.costUsd, null);
-    assert.match(invalid!, scenario === "quota" ? /subscription-call-limit/ : scenario === "telemetry" ? /subscription-usage-incomplete/ : /job-failed/);
+    assert.match(invalid!, scenario === "quota" ? /subscription-call-limit/ : scenario === "telemetry" ? /cost-incomplete/ : /job-failed/);
   });
 }

@@ -38,10 +38,12 @@ export interface JobOptions {
   baseURL: string;
   /** AbortSignal for budget and fail-fast cancellation. */
   signal?: AbortSignal;
-  /** Host-only shared subscription gate; absent for the unchanged paid API client. */
-  classifierEstimated?: ReturnType<typeof import("./classifier-estimated.ts").boundClassifierEstimatedClient>;
-  estimated?: ReturnType<typeof import("./estimated.ts").boundEstimatedClient>;
-  subscription?: ReturnType<typeof import("./subscription.ts").boundSubscriptionClient>;
+  /** Host-provided main/secondary client (DeepSeek, ChatGPT plan), already metered; absent for OpenRouter. */
+  llmClient?: import("@aiw/telemetry").LLMClient;
+  /** Host-provided direct classifier (TypeSafe), already metered. */
+  classifierClient?: import("@aiw/llm").DecisionsClient;
+  /** Shared run cost meter for the clients this attempt creates itself (OpenRouter). */
+  meter?: import("./cost-meter.ts").CostMeter;
   /** Notify the campaign before terminal failure cleanup, so siblings stop promptly. */
   onFailure?: () => void;
   /** Per-problem turn limits override (task.json is the authoritative source; this is for overrides). */
@@ -82,18 +84,22 @@ function buildSystemPrompt(frameworkInstructions: string): string {
 export async function runJobAttempt(opts: JobOptions): Promise<JobResult> {
   const { job, config, runPath, repoRoot, apiKey, baseURL, signal, turnLimits, problemsDir } = opts;
 
-  if (config.provider === "chatgpt" && (!opts.subscription || config.usageMode !== "subscription")) throw new Error("ChatGPT requires bounded subscription runtime");
-  if (config.provider === "deepseek" && (!opts.estimated || config.usageMode !== "estimated")) throw new Error("DeepSeek requires bounded estimate runtime");
-  if (opts.estimated && (config.provider !== "deepseek" || opts.subscription)) throw new Error("Estimated runtime cannot be mixed with another provider");
-  const client = opts.estimated?.client ?? opts.subscription?.client ?? createChatClient({ baseURL, apiKey, timeoutMs: 300_000 });
+  const provider = config.provider ?? "openrouter";
+  if ((provider !== "openrouter") !== (opts.llmClient !== undefined)) throw new Error("Host client/provider mismatch");
+  // Identity only for direct test callers; the scheduler always supplies the run meter.
+  const meterLLM = opts.meter ? opts.meter.llm : (c: import("@aiw/telemetry").LLMClient) => c;
+  const client = opts.llmClient ?? meterLLM(createChatClient({ baseURL, apiKey, timeoutMs: 300_000 }));
 
   // Validate treatment before creating artifacts or starting any container.
   const launch = frameworkLaunch(job.framework, config);
   if (config.classifier?.provider === "openrouter-decisions" && launch.id.includes("rerank=classifier") && baseURL.replace(/\/$/, "") !== "https://openrouter.ai/api/v1") throw new Error("Classifier campaigns require the canonical OpenRouter chat provider; cross-endpoint credentials are refused");
-  if (config.classifier?.provider === "typesafe" && (!opts.classifierEstimated || config.provider !== "deepseek" || config.usageMode !== "estimated")) throw new Error("Direct classifier requires bounded host runtime");
-  if (opts.classifierEstimated && config.classifier?.provider !== "typesafe") throw new Error("Classifier runtime/provider mismatch");
+  if ((config.classifier?.provider === "typesafe") !== (opts.classifierClient !== undefined) || (opts.classifierClient && provider !== "deepseek")) throw new Error("Classifier runtime/provider mismatch");
+  const openRouterClassifier = () => {
+    const c = createDecisionsClient({ apiKey, model: config.classifier!.model });
+    return opts.meter ? opts.meter.classifier(c) : c;
+  };
   const classifierClient = config.classifier && launch.id.includes("rerank=classifier")
-    ? config.classifier.provider === "typesafe" ? opts.classifierEstimated!.client : createDecisionsClient({ apiKey, model: config.classifier.model }) : undefined;
+    ? config.classifier.provider === "typesafe" ? opts.classifierClient! : openRouterClassifier() : undefined;
   const jobDir = job.dir ?? createJobDir(runPath, job);
   const eventsPath = join(jobDir, "events.jsonl");
   const sink = new FileSink(eventsPath);

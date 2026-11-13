@@ -29,7 +29,7 @@ test("normaliseUsage maps chat-completions usage and omits unreported fields", (
   const r = normaliseUsage("openai-chat", {
     usage: { prompt_tokens: 10, completion_tokens: 3, cost: 0.002, prompt_tokens_details: { cached_tokens: 4 } },
   });
-  assert.deepEqual(r, { usage: { input: 10, output: 3, cachedRead: 4 }, costUsd: 0.002, cacheHit: true });
+  assert.deepEqual(r, { usage: { input: 10, output: 3, cachedRead: 4 }, costUsd: 0.002, costSource: "api", cacheHit: true });
   const miss = normaliseUsage("openai-chat", { usage: { prompt_tokens: 1, completion_tokens: 1, prompt_tokens_details: { cached_tokens: 0 } } });
   assert.equal(miss.cacheHit, false);
 });

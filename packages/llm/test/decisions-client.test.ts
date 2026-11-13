@@ -35,7 +35,7 @@ for (const model of DECISIONS_MODELS) test(`typed decisions wire protocol pins $
   }) as typeof fetch });
   const completion = await client.classify(request);
   assert.deepEqual(completion.usage, { input: 80, output: 2 });
-  assert.equal(completion.costUsd, 0.001);
+  assert.equal(completion.costUsd, 0.001); assert.equal(completion.costSource, "api"); assert.equal(completion.priceTable, undefined);
   assert.equal(completion.providerModel, valid.model);
   assert.equal(completion.provider, "TypeSafe");
   assert.equal(calls, 1);

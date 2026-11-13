@@ -1,4 +1,4 @@
-import type { Usage } from "@aiw/telemetry";
+import type { CostSource, Usage } from "@aiw/telemetry";
 
 /** API types with a usage normaliser (framework-runner §4.1). Only chat completions for now (A-24). */
 export type APIType = "openai-chat";
@@ -7,6 +7,8 @@ export type APIType = "openai-chat";
 export interface NormalisedUsage {
   usage: Usage;
   costUsd?: number;
+  /** `api` whenever `costUsd` is set: this normaliser only records provider-reported cost. */
+  costSource?: CostSource;
   cacheHit?: boolean;
 }
 
@@ -15,7 +17,7 @@ export interface NormalisedUsage {
  * Fields the API does not report are omitted, never estimated.
  * @param apiType - API the body came from
  * @param body - raw response body
- * @returns usage, plus `costUsd` (OpenRouter `usage.cost`) and `cacheHit` when reported
+ * @returns usage, plus `costUsd` with source `api` (OpenRouter `usage.cost`) and `cacheHit` when reported
  */
 export function normaliseUsage(apiType: APIType, body: unknown): NormalisedUsage {
   if (apiType !== "openai-chat") throw new Error(`no usage normaliser for API type ${apiType}`);
@@ -27,7 +29,7 @@ export function normaliseUsage(apiType: APIType, body: unknown): NormalisedUsage
   if (cacheWrite !== undefined) usage.cacheWrite = cacheWrite;
   const out: NormalisedUsage = { usage };
   const cost = num(u.cost);
-  if (cost !== undefined) out.costUsd = cost;
+  if (cost !== undefined) { out.costUsd = cost; out.costSource = "api"; }
   if (cachedRead !== undefined) out.cacheHit = cachedRead > 0;
   return out;
 }

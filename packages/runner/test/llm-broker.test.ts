@@ -26,7 +26,7 @@ test("host broker pins model and excludes caller overrides and credentials", asy
   let seen: Parameters<LLMClient["complete"]>[0] | undefined;
   const f = await fixture({ secondaryClient: { complete: async (req) => { seen = req; return completion; } } });
   try {
-    assert.deepEqual(await f.executor.complete({ ...request, temperature: 99, baseURL: "https://evil.invalid", apiKey: "not-a-credential" }), { ...completion, costUsd: undefined, cacheHit: undefined });
+    assert.deepEqual(await f.executor.complete({ ...request, temperature: 99, baseURL: "https://evil.invalid", apiKey: "not-a-credential" }), { ...completion, costUsd: undefined, costSource: undefined, priceTable: undefined, cacheHit: undefined });
     assert.equal(seen?.model, "configured-model");
     assert.equal(seen?.baseURL, undefined);
     assert.equal(seen?.apiKey, undefined);

@@ -15,7 +15,7 @@ import { createHostClassifierClient } from "../../server/src/host-classifier.ts"
 import { installHostLLMBroker } from "../src/llm-broker.ts";
 import { readAttemptCost } from "../src/accounting.ts";
 import { resolveConfig, type EvalFlags } from "../src/config.ts";
-import { boundClassifierEstimatedClient } from "../src/classifier-estimated.ts";
+import { createCostMeter } from "../src/cost-meter.ts";
 import { frameworkLaunch } from "../src/framework-launch.ts";
 const request = { instruction: "read file", candidates: [{ id: "c0", name: "read", whenToUse: "read file" }] };
 async function fixture(classifier: DecisionsClient, early = false) {
@@ -38,14 +38,15 @@ for (const scenario of ["missing-usage", "missing-model", "billed-failure"] as c
   const dir = mkdtempSync(join(tmpdir(), "aiw-classifier-failfast-")); t.after(() => rmSync(dir, { recursive: true, force: true }));
   const path = join(dir, "events.jsonl"), sink = new FileSink(path); t.after(() => sink.close());
   let classifierCalls = 0, executorCalls = 0, mainCalls = 0, failures = 0;
-  const bounded = boundClassifierEstimatedClient(createTypeSafeDecisionsClient({ apiKey: "SENTINEL", model: "jev-1.14.0", fetch: (async () => {
+  const meter = createCostMeter(1);
+  const bounded = meter.classifier(createTypeSafeDecisionsClient({ apiKey: "SENTINEL", model: "jev-1.14.0", fetch: (async () => {
     classifierCalls++;
     return Response.json({ answers: { c0: { type: "noul", noul: 0.9 } },
       ...(scenario !== "missing-model" ? { model: "jev-1.14.0" } : {}),
       ...(scenario !== "missing-usage" ? { usage: { input_tokens: 100, output_tokens: 10 } } : {}),
       ...(scenario === "billed-failure" ? { error: { message: "SENTINEL" } } : {}) }, { status: scenario === "billed-failure" ? 500 : 200 });
-  }) as typeof fetch }), { maxCalls: 10, maxTokens: 10000, maxDurationMs: 30000, estimateLimitUsd: 1 });
-  const f = await fixture(bounded.client); t.after(f.close); f.gate.open();
+  }) as typeof fetch }));
+  const f = await fixture(bounded); t.after(f.close); f.gate.open();
   const declarations = [{ name: "read", description: "read file", inputSchema: {}, meta: { whenToUse: "read file", effect: "read" as const } }];
   const framework = buildFramework("orchestrate", buildRegistry(declarations), {
     variant: { rerank: "classifier" }, host: { tools: async () => declarations, call: async () => "data", close: async () => {} },
@@ -62,7 +63,8 @@ for (const scenario of ["missing-usage", "missing-model", "billed-failure"] as c
     framework: "orchestrate[rerank=classifier]", onInfraError: () => { failures++; },
   });
   assert.equal(result.outcome, "infra-error"); assert.equal(classifierCalls, 1); assert.equal(executorCalls, 0); assert.equal(mainCalls, 1); assert.ok(failures > 0);
-  const cost = readAttemptCost(path); assert.equal(cost.costUsd, null); assert.equal(cost.knownCostUsd, 0.01);
-  assert.ok(bounded.stopReason());
-  if (scenario === "billed-failure") assert.equal(bounded.snapshot().knownEstimatedUsd, 100 * 0.042 / 1e6);
+  // A billed failure is fully priced; missing usage or model leaves the attempt cost unknown.
+  const cost = readAttemptCost(path); assert.equal(cost.costUsd, scenario === "billed-failure" ? cost.knownCostUsd : null); assert.equal(cost.knownCostUsd, 0.01 + (scenario === "billed-failure" ? 100 * 0.042 / 1e6 : 0));
+  if (scenario === "billed-failure") assert.equal(meter.snapshot().knownCostUsd, 100 * 0.042 / 1e6);
+  else assert.equal(meter.stopReason(), "cost-incomplete");
 });

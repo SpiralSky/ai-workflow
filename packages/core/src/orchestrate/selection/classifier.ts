@@ -1,4 +1,4 @@
-import { TYPESAFE_MODEL, TYPESAFE_PRICE_BASIS, LLMError, type DecisionsClient } from "@aiw/llm";
+import { LLMError, type DecisionsClient } from "@aiw/llm";
 import type { Reranker } from "./rerank.ts";
 
 /** Explicit experimental threshold policy; probabilities are not calibrated across models. */
@@ -21,13 +21,8 @@ export function classifierReranker(client: DecisionsClient, opts: { model: strin
     })), signal: ctx.signal });
     // Record a billed malformed answer too. Missing usage remains absent, never fabricated zero.
     ctx.reporter.turn({ role: "selection", model: opts.model, providerModel: result.providerModel,
-      classifierEstimate: result.classifierEstimate, usage: result.usage, costUsd: result.costUsd, latencyMs: Math.round(performance.now() - start) });
-    const estimate = result.classifierEstimate;
-    const directEstimateValid = opts.model === TYPESAFE_MODEL && result.provider === "TypeSafe" && result.providerModel === TYPESAFE_MODEL &&
-      estimate?.basis === TYPESAFE_PRICE_BASIS && Number.isFinite(estimate.estimatedUsd) && estimate.estimatedUsd >= 0 &&
-      estimate.inputTokens === result.usage?.input && estimate.outputTokens === result.usage?.output &&
-      estimate.estimatedUsd === estimate.inputTokens * 0.042 / 1e6 && result.costUsd === undefined;
-    if (result.failure || !result.usage || (result.costUsd === undefined && !directEstimateValid)) {
+      usage: result.usage, costUsd: result.costUsd, costSource: result.costSource, priceTable: result.priceTable, latencyMs: Math.round(performance.now() - start) });
+    if (result.failure || !result.usage || result.costUsd === undefined || result.costSource === undefined) {
       ctx.reporter.attach("classifierSelection", { policy: opts.policy, threshold: opts.threshold, fallback: false,
         stopped: true, reason: result.failure ? "provider-failure" : "unknown-accounting" });
       throw new LLMError(result.failure ?? "infra", result.failure ? "Classifier provider request failed" : "Classifier accounting incomplete");

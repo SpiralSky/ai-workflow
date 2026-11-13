@@ -4,6 +4,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import {
+  EventSchema,
   BlobStore, FileSink, NoopBlobStore, NoopSink, TranscriptWriter, buildTree, createReporter, currentReporter,
   fromMeta, parseEvents, runWithReporter, reconstruct, rollups, wrapLLM, wrapTools, writeJobEnd, writeJobStart,
   TranscriptEntrySchema, LLM_COST_INCOMPLETE_KEY, type EventRecord, type Sink, type LLMClient,
@@ -150,10 +151,13 @@ test("wrapLLM writes turn and transcript entry with matching turnId", async () =
   const ev = new MemSink();
   const tr = new MemSink();
   const r = createReporter({ sink: ev, writer: "r" });
-  const client: LLMClient = { complete: async () => ({ response: { ok: 1 }, usage: { input: 3, output: 4 }, costUsd: 0.01 }) };
+  const client: LLMClient = { complete: async () => ({ response: { ok: 1 }, usage: { input: 3, output: 4 }, costUsd: 0.01, costSource: "price-table", priceTable: "v1" }) };
   const w = wrapLLM(client, r, "main", { transcript: new TranscriptWriter({ sink: tr, blobs: new NoopBlobStore() }), session: "main" });
   await w.complete({ model: "m", system: "sys", tools: [{ b: 1, a: 2 }], messages: [{ role: "user" }] });
   assert.equal(ev.lines[0].kind, "turn");
+  assert.equal(ev.lines[0].costSource, "price-table");
+  assert.equal(ev.lines[0].priceTable, "v1");
+  assert.equal(EventSchema.safeParse(ev.lines[0]).success, true);
   assert.equal(ev.lines[0].model, "m");
   assert.equal(tr.lines[0].turnId, ev.lines[0].id);
   assert.equal(TranscriptEntrySchema.safeParse(tr.lines[0]).success, true);
@@ -256,6 +260,14 @@ test("rollups", () => {
   const incomplete = rollups([turn("a", null, "main"), failedRequest], { externalTools: [], refactorTools: [] });
   assert.equal(incomplete.costUsd, null);
   assert.equal(incomplete.mainTurns, 1, "uncertainty is not an additional charged turn");
+});
+
+test("rollup cost never mixes API-equivalent plan cost with other sources", () => {
+  const g = { externalTools: [], refactorTools: [] };
+  const priced = (id: string, costSource: string) => turn(id, null, "main", { costSource });
+  assert.ok(Math.abs(rollups([priced("a", "api-equivalent"), priced("b", "api-equivalent")], g).costUsd! - 0.2) < 1e-9);
+  assert.ok(Math.abs(rollups([priced("a", "price-table"), turn("b", null, "selection", { costSource: "api" })], g).costUsd! - 0.2) < 1e-9);
+  assert.equal(rollups([priced("a", "api-equivalent"), turn("b", null, "selection", { costSource: "price-table" })], g).costUsd, null);
 });
 
 test("parseEvents tolerates a truncated last line", () => {

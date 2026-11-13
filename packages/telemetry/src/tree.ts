@@ -69,7 +69,8 @@ export interface Rollups {
 
 /**
  * Computes the telemetry §7 rollups from `turn` and `tool` events. An uncertainty marker
- * can invalidate cost completeness, but never contributes a charge or token count.
+ * can invalidate cost completeness, but never contributes a charge or token count. `costUsd` is
+ * null when any turn lacks cost or when `api-equivalent` cost is mixed with another source.
  * `tokens` always has all three roles (zero input/output when a role had no turns); `cachedRead`
  * and `cacheWrite` appear only if some turn of that role reported them.
  * @param events - parsed events
@@ -103,6 +104,7 @@ export function rollups(
     selection: { input: 0, output: 0 },
   };
   let cost: number | null = events.some(e => e.kind === "attach" && e.key === LLM_COST_INCOMPLETE_KEY) ? null : 0;
+  const sources = new Set<string>();
   for (const t of turns) {
     const s = tokens[t.role];
     const u = t.usage;
@@ -112,7 +114,10 @@ export function rollups(
     if (u.cachedRead !== undefined) s.cachedRead = (s.cachedRead ?? 0) + u.cachedRead;
     if (u.cacheWrite !== undefined) s.cacheWrite = (s.cacheWrite ?? 0) + u.cacheWrite;
     cost = t.costUsd === undefined || cost === null ? null : cost + t.costUsd;
+    if (t.costSource) sources.add(t.costSource);
   }
+  // Plan usage priced at API rates is never added to billed cost (framework-runner §4.1).
+  if (sources.has("api-equivalent") && sources.size > 1) cost = null;
 
   const callsPerTool: Record<string, number> = {};
   for (const t of tools) callsPerTool[t.name] = (callsPerTool[t.name] ?? 0) + 1;

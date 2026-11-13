@@ -1,6 +1,6 @@
 import { runWithReporter } from "./context.ts";
 import { ReporterImpl, type Reporter } from "./reporter.ts";
-import type { Role, Usage } from "./schema.ts";
+import type { CostSource, Role, Usage } from "./schema.ts";
 import type { TranscriptWriter } from "./transcript.ts";
 
 type ToolFn = (args: any, ...rest: any[]) => Promise<unknown> | unknown;
@@ -73,8 +73,11 @@ export function fromMeta(meta: Record<string, unknown> | undefined, root: Report
 export interface LLMCompletion {
   response: unknown;
   usage: Usage;
-  deepseekEstimate?: { basis: string; estimatedUsd: number; cacheHitTokens: number; cacheMissTokens: number; outputTokens: number };
   costUsd?: number;
+  /** Required whenever `costUsd` is set. */
+  costSource?: CostSource;
+  /** Price-table version, only when `costSource` is `price-table` or `api-equivalent`. */
+  priceTable?: string;
   cacheHit?: boolean;
 }
 
@@ -124,7 +127,7 @@ export function wrapLLM(
       };
       const turnId = reporter.turn({
         ...observed,
-        model: req.model, role, usage: res.usage, deepseekEstimate: res.deepseekEstimate, costUsd: res.costUsd, cacheHit: res.cacheHit, latencyMs,
+        model: req.model, role, usage: res.usage, costUsd: res.costUsd, costSource: res.costSource, priceTable: res.priceTable, cacheHit: res.cacheHit, latencyMs,
       });
       if (opts.transcript && opts.session) {
         opts.transcript.record({

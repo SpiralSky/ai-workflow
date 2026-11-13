@@ -34770,7 +34770,10 @@ function normaliseUsage(apiType, body) {
   if (cacheWrite !== void 0) usage.cacheWrite = cacheWrite;
   const out = { usage };
   const cost = num(u.cost);
-  if (cost !== void 0) out.costUsd = cost;
+  if (cost !== void 0) {
+    out.costUsd = cost;
+    out.costSource = "api";
+  }
   if (cachedRead !== void 0) out.cacheHit = cachedRead > 0;
   return out;
 }
@@ -34865,8 +34868,6 @@ var MAX_EVENT_BYTES = 16 * 1024 * 1024;
 var MARGIN_MS = 5 * 6e4;
 
 // packages/llm/src/decisions-client.ts
-var TYPESAFE_MODEL = "jev-1.14.0";
-var TYPESAFE_PRICE_BASIS = "typesafe:jev-1.14.0:2026-11-01:input-0.042-per-million";
 var MAX_BODY_BYTES = 32 * 1024;
 var record2 = (value) => typeof value === "object" && value !== null && !Array.isArray(value);
 var text = (value, max) => typeof value === "string" && value.trim().length > 0 && value.length <= max;
@@ -34896,11 +34897,12 @@ function validateDecisionsRequest(req) {
 
 // packages/server/src/host-classifier.ts
 var Completion = ResultSchema.extend({
-  classifierEstimate: external_exports.object({ basis: external_exports.literal("typesafe:jev-1.14.0:2026-11-01:input-0.042-per-million"), estimatedUsd: external_exports.number().finite().nonnegative(), inputTokens: external_exports.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER), outputTokens: external_exports.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER) }).strict().optional(),
   failure: external_exports.enum(["infra", "context-limit", "other"]).optional(),
   answers: external_exports.record(external_exports.string(), external_exports.object({ type: external_exports.literal("noul"), noul: external_exports.number().finite().min(0).max(1) }).strict()).nullable(),
   usage: external_exports.object({ input: external_exports.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER), output: external_exports.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER) }).strict().optional(),
   costUsd: external_exports.number().finite().nonnegative().optional(),
+  costSource: external_exports.enum(["api", "price-table"]).optional(),
+  priceTable: external_exports.string().max(64).optional(),
   providerModel: external_exports.string().max(256).optional(),
   provider: external_exports.string().max(256).optional()
 });
@@ -38299,6 +38301,7 @@ var UsageSchema = external_exports.object({
   cachedRead: external_exports.number().optional(),
   cacheWrite: external_exports.number().optional()
 });
+var CostSourceSchema = external_exports.enum(["api", "price-table", "api-equivalent"]);
 var RoleSchema2 = external_exports.enum(["main", "secondary", "selection"]);
 var common = {
   v: external_exports.literal(1),
@@ -38326,9 +38329,10 @@ var EventSchema = external_exports.discriminatedUnion("kind", [
     providerSystemFingerprint: external_exports.string().optional(),
     role: RoleSchema2,
     usage: UsageSchema.optional(),
-    classifierEstimate: external_exports.object({ basis: external_exports.string(), estimatedUsd: external_exports.number().finite().nonnegative(), inputTokens: external_exports.number().int().nonnegative(), outputTokens: external_exports.number().int().nonnegative() }).optional(),
-    deepseekEstimate: external_exports.object({ basis: external_exports.string(), estimatedUsd: external_exports.number().nonnegative(), cacheHitTokens: external_exports.number().int().nonnegative(), cacheMissTokens: external_exports.number().int().nonnegative(), outputTokens: external_exports.number().int().nonnegative() }).optional(),
     costUsd: external_exports.number().optional(),
+    costSource: CostSourceSchema.optional(),
+    priceTable: external_exports.string().optional(),
+    // Price-table version, only for price-table costs.
     cacheHit: external_exports.boolean().optional(),
     latencyMs: external_exports.number()
   }),
@@ -38577,8 +38581,9 @@ function wrapLLM(client, reporter, role, opts = {}) {
         model: req.model,
         role,
         usage: res.usage,
-        deepseekEstimate: res.deepseekEstimate,
         costUsd: res.costUsd,
+        costSource: res.costSource,
+        priceTable: res.priceTable,
         cacheHit: res.cacheHit,
         latencyMs
       });
@@ -38756,14 +38761,13 @@ function classifierReranker(client, opts) {
       role: "selection",
       model: opts.model,
       providerModel: result.providerModel,
-      classifierEstimate: result.classifierEstimate,
       usage: result.usage,
       costUsd: result.costUsd,
+      costSource: result.costSource,
+      priceTable: result.priceTable,
       latencyMs: Math.round(performance.now() - start)
     });
-    const estimate = result.classifierEstimate;
-    const directEstimateValid = opts.model === TYPESAFE_MODEL && result.provider === "TypeSafe" && result.providerModel === TYPESAFE_MODEL && estimate?.basis === TYPESAFE_PRICE_BASIS && Number.isFinite(estimate.estimatedUsd) && estimate.estimatedUsd >= 0 && estimate.inputTokens === result.usage?.input && estimate.outputTokens === result.usage?.output && estimate.estimatedUsd === estimate.inputTokens * 0.042 / 1e6 && result.costUsd === void 0;
-    if (result.failure || !result.usage || result.costUsd === void 0 && !directEstimateValid) {
+    if (result.failure || !result.usage || result.costUsd === void 0 || result.costSource === void 0) {
       ctx.reporter.attach("classifierSelection", {
         policy: opts.policy,
         threshold: opts.threshold,
@@ -40552,7 +40556,8 @@ var HostCompletionSchema = ResultSchema.extend({
   }).refine((usage) => (usage.cachedRead ?? 0) <= usage.input),
   costUsd: external_exports.number().finite().nonnegative().optional(),
   cacheHit: external_exports.boolean().optional(),
-  deepseekEstimate: external_exports.object({ basis: external_exports.literal("deepseek-flash:2026-11-01:off-peak"), estimatedUsd: external_exports.number().finite().nonnegative(), cacheHitTokens: external_exports.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER), cacheMissTokens: external_exports.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER), outputTokens: external_exports.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER) }).strict().optional()
+  costSource: external_exports.enum(["api", "price-table", "api-equivalent"]).optional(),
+  priceTable: external_exports.string().max(64).optional()
 });
 var HostErrorDataSchema = external_exports.object({ aiwLLMError: external_exports.object({
   kind: external_exports.enum(["infra", "context-limit", "other"]),
@@ -40584,7 +40589,7 @@ function createHostLLMClient(server, opts = {}) {
           messages: req.messages,
           tools: req.tools
         } }, HostCompletionSchema, { signal, timeout: timeoutMs });
-        return { response: result.response, usage: result.usage, costUsd: result.costUsd, cacheHit: result.cacheHit, ...result.deepseekEstimate ? { deepseekEstimate: result.deepseekEstimate } : {} };
+        return { response: result.response, usage: result.usage, costUsd: result.costUsd, costSource: result.costSource, priceTable: result.priceTable, cacheHit: result.cacheHit };
       } catch (error62) {
         cancel();
         if (callerSignal?.aborted) throw new DOMException("Host LLM request cancelled", "AbortError");

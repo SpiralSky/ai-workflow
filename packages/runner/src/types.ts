@@ -27,16 +27,15 @@ export interface RunConfig {
   frameworks: string[];
   tier: Tier;
   reps: number;
-  /** Monetary API budget; null for explicitly bounded subscription mode. */
-  budgetUsd: number | null;
+  /** Run budget in USD over every role's cost (API, price-table or API-equivalent). */
+  budgetUsd: number;
   /** Both roles share this provider; omitted preserves the legacy OpenRouter default. */
   provider?: "openrouter" | "chatgpt" | "deepseek";
-  usageMode?: "monetary" | "subscription" | "estimated";
-  estimatedLimits?: import("./estimated.ts").EstimatedLimits;
+  /** ChatGPT plan runs only: call, token and time limits in addition to the budget. */
   subscriptionLimits?: import("./subscription.ts").SubscriptionLimits;
   concurrency: number;
   models: { main: string; secondary: string };
-  classifier?: { provider: "openrouter-decisions" | "typesafe"; limits?: import("./estimated.ts").EstimatedLimits; model: string; threshold: number; policy: "noul-v1" };
+  classifier?: { provider: "openrouter-decisions" | "typesafe"; model: string; threshold: number; policy: "noul-v1" };
   temperature: number;
   secondaryCap: number;
   branch: BranchConfig;
@@ -54,7 +53,7 @@ export interface Provenance {
   basePrompt: string;
   frameworks: Record<string, { prompt: string; tools: string; extra?: Record<string, string>; observedSettings?: Record<string, unknown> }>;
   images: Record<string, string>;
-  inference?: { provider: string; usageMode: string; mainModel: string; secondaryModel: string; temperature: number | null; store?: false; stream?: true };
+  inference?: { provider: string; mainModel: string; secondaryModel: string; temperature: number | null; store?: false; stream?: true };
   problems: Record<string, { taskHash: string; turnLimit: number; wallClockMs: number }>;
 }
 
@@ -86,8 +85,6 @@ export interface JobJSON {
   outcome: "pass" | "fail";
   reason: null | "checks" | "turn-limit" | "timeout" | "patch-failed" | "context-limit";
   attempts: AttemptRecord[];
-  estimatedCostComponents?: { deepseek: { basis: string; estimatedUsd: number | null; knownEstimatedUsd: number }; typesafe: { basis: string; estimatedUsd: number | null; knownEstimatedUsd: number } };
-  estimatedCost?: { basis: string; estimatedUsd: number | null; knownEstimatedUsd: number };
   costUsdAllAttempts: number | null;
   knownCostUsdAllAttempts?: number;
   costIncompleteReasons?: string[];
@@ -105,8 +102,6 @@ export interface RunJSON {
   config: RunConfig;
   provenance: Provenance;
   totals: { jobs: number; attempts: number; costUsd: number | null; knownCostUsd?: number; pass: number; fail: number };
-  classifierEstimatedUsage?: import("./classifier-estimated.ts").ClassifierEstimatedUsage;
-  estimatedUsage?: import("./estimated.ts").EstimatedUsage;
   subscriptionUsage?: import("./subscription.ts").SubscriptionUsage;
   startedAt: string;
   endedAt?: string;

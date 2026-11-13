@@ -1,4 +1,4 @@
-import { isDecisionsModel } from "@aiw/llm";
+import { isDecisionsModel, PRICE_TABLE } from "@aiw/llm";
 import { validateClassifierPolicy } from "@aiw/core";
 /**
  * Resolve run configuration from CLI flags and compute provenance fields.
@@ -123,7 +123,6 @@ export interface EvalFlags {
   model: string;
   secondaryModel?: string;
   classifierProvider?: "openrouter-decisions" | "typesafe";
-  classifierLimits?: import("./estimated.ts").EstimatedLimits;
   classifierModel?: string;
   classifierThreshold?: number;
   temperature: number;
@@ -135,8 +134,6 @@ export interface EvalFlags {
   untilReps?: number;
   combineWith?: string;
   provider?: "openrouter" | "chatgpt" | "deepseek";
-  usageMode?: "monetary" | "subscription" | "estimated";
-  estimatedLimits?: import("./estimated.ts").EstimatedLimits;
   subscriptionLimits?: SubscriptionLimits;
 }
 
@@ -211,11 +208,8 @@ export function resolveConfig(
   const concurrency = flags.concurrency ?? DEFAULT_CONCURRENCY;
   if (!Number.isSafeInteger(concurrency) || concurrency < 1) throw new Error("concurrency must be a positive integer");
   const provider = flags.provider ?? "openrouter";
-  const usageMode = flags.usageMode ?? "monetary";
   if (provider !== "openrouter" && provider !== "chatgpt" && provider !== "deepseek") throw new Error("Unknown provider");
-  if (usageMode !== "monetary" && usageMode !== "subscription" && usageMode !== "estimated") throw new Error("Unknown usage mode");
-  if ((provider === "deepseek") !== (usageMode === "estimated")) throw new Error("DeepSeek requires explicit estimated usage mode");
-  if ((provider === "chatgpt") !== (usageMode === "subscription")) throw new Error("ChatGPT requires explicit subscription usage mode; OpenRouter requires monetary mode");
+  if (!Number.isFinite(flags.budget) || flags.budget <= 0) throw new Error("--budget must be a positive dollar amount");
   if (provider === "chatgpt") {
     if (!flags.subscriptionLimits) throw new Error("Subscription usage requires explicit call, token and duration limits");
     validateSubscriptionLimits(flags.subscriptionLimits);
@@ -223,12 +217,10 @@ export function resolveConfig(
     if (!flags.model || flags.model.includes("/")) throw new Error("Select an explicit account-available OpenAI model slug");
   } else if (flags.subscriptionLimits) throw new Error("Subscription limits require ChatGPT provider");
   if (provider === "deepseek") {
-    if (!flags.estimatedLimits) throw new Error("DeepSeek requires explicit estimate, call, token and duration limits");
-    validateSubscriptionLimits(flags.estimatedLimits);
-    if (!Number.isFinite(flags.estimatedLimits.estimateLimitUsd) || flags.estimatedLimits.estimateLimitUsd <= 0) throw new Error("Invalid estimate limit");
     if (concurrency !== 1) throw new Error("DeepSeek campaigns require concurrency 1");
     if (flags.model !== "deepseek-flash" || (flags.secondaryModel && flags.secondaryModel !== "deepseek-flash")) throw new Error("Select deepseek-flash; retired aliases are not supported");
-  } else if (flags.estimatedLimits) throw new Error("Estimated limits require DeepSeek provider");
+    if (!PRICE_TABLE["deepseek-flash"]) throw new Error("deepseek-flash has no price-table entry; the run cost would be unknown");
+  }
   validateModel(flags.model);
   if (flags.secondaryModel) validateModel(flags.secondaryModel);
 
@@ -239,18 +231,15 @@ export function resolveConfig(
   const classifierProvider = flags.classifierProvider ?? "openrouter-decisions";
   if (classifierEnabled) {
     if (classifierProvider === "typesafe") {
-      if (provider !== "deepseek" || usageMode !== "estimated") throw new Error("Direct TypeSafe requires explicit DeepSeek estimated mode; mixed subscription/paid use is unsupported");
+      if (provider !== "deepseek") throw new Error("Direct TypeSafe requires the DeepSeek provider; mixed plan/paid use is unsupported");
       if (flags.classifierModel !== "jev-1.14.0") throw new Error("Direct TypeSafe requires pinned jev-1.14.0");
-      if (!flags.classifierLimits) throw new Error("Direct TypeSafe requires campaign classifier call/token/duration/estimate limits");
-      validateSubscriptionLimits(flags.classifierLimits);
-      if (!Number.isFinite(flags.classifierLimits.estimateLimitUsd) || flags.classifierLimits.estimateLimitUsd <= 0) throw new Error("Invalid classifier estimate limit");
+      if (!PRICE_TABLE["jev-1.14.0"]) throw new Error("jev-1.14.0 has no price-table entry; the run cost would be unknown");
     } else if (classifierProvider === "openrouter-decisions") {
-      if (provider !== "openrouter" || usageMode !== "monetary") throw new Error("OpenRouter classifier requires OpenRouter monetary accounting; mixed usage is unsupported");
+      if (provider !== "openrouter") throw new Error("OpenRouter classifier requires the OpenRouter provider; mixed usage is unsupported");
       if (!isDecisionsModel(flags.classifierModel)) throw new Error("Select an explicit supported classifier model");
-      if (flags.classifierLimits) throw new Error("Classifier estimate limits require direct TypeSafe");
     } else throw new Error("Unknown classifier provider");
     validateClassifierPolicy(flags.classifierThreshold!, "noul-v1");
-  } else if (flags.classifierModel !== undefined || flags.classifierThreshold !== undefined || flags.classifierProvider !== undefined || flags.classifierLimits !== undefined) throw new Error("Classifier settings require orchestrate[rerank=classifier]");
+  } else if (flags.classifierModel !== undefined || flags.classifierThreshold !== undefined || flags.classifierProvider !== undefined) throw new Error("Classifier settings require orchestrate[rerank=classifier]");
 
   const problemIds = selectProblems(flags.problems, availableProblems);
   if (problemIds.length === 0) throw new Error("No problems selected (--problems)");
@@ -268,12 +257,11 @@ export function resolveConfig(
     frameworks,
     tier: flags.tools,
     reps: flags.reps,
-    budgetUsd: usageMode !== "monetary" ? null : flags.budget,
-    provider, usageMode,
-    ...(flags.estimatedLimits ? { estimatedLimits: flags.estimatedLimits } : {}),
+    budgetUsd: flags.budget,
+    provider,
     ...(flags.subscriptionLimits ? { subscriptionLimits: flags.subscriptionLimits } : {}),
     concurrency,
-    ...(classifierEnabled ? { classifier: { provider: classifierProvider, ...(flags.classifierLimits ? { limits: flags.classifierLimits } : {}), model: flags.classifierModel!, threshold: flags.classifierThreshold!, policy: "noul-v1" as const } } : {}),
+    ...(classifierEnabled ? { classifier: { provider: classifierProvider, model: flags.classifierModel!, threshold: flags.classifierThreshold!, policy: "noul-v1" as const } } : {}),
     models: {
       main: flags.model,
       secondary: flags.secondaryModel ?? flags.model,

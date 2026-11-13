@@ -9,7 +9,7 @@ import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import type { Request } from "@modelcontextprotocol/sdk/types.js";
 import { buildFramework, buildRegistry, type Host, type HostToolDecl } from "@aiw/core";
 import { createReporter, FileSink, wrapLLM } from "@aiw/telemetry";
-import { createDeepSeekClient } from "@aiw/llm";
+import { createDeepSeekClient, PRICE_TABLE_VERSION } from "@aiw/llm";
 import { installHostLLMBroker } from "../src/llm-broker.ts";
 import { createHostLLMClient } from "../../server/src/host-client.ts";
 import { readAttemptCost } from "../src/accounting.ts";
@@ -20,7 +20,7 @@ import type { RunConfig } from "../src/types.ts";
 const secret = "SENTINEL-OPENROUTER-KEY-NOT-IN-TASK";
 const endpoint = "https://api.deepseek.com";
 
-test("mock DeepSeek main, selection and executor preserve thinking and estimated accounting", { timeout: 15000 }, async t => {
+test("mock DeepSeek main, selection and executor preserve thinking and price-table accounting", { timeout: 15000 }, async t => {
   const root = mkdtempSync(join(tmpdir(), "aiw-openrouter-broker-"));
   t.after(() => rmSync(root, { recursive: true, force: true }));
   writeFileSync(join(root, "a.ts"), "export const answer = 42;\n");
@@ -65,10 +65,11 @@ test("mock DeepSeek main, selection and executor preserve thinking and estimated
     }
     const lines = readFileSync(events, "utf8"), turns = lines.trim().split("\n").map(line => JSON.parse(line)).filter((event: any) => event.kind === "turn");
     assert.deepEqual(turns.map((event: any) => event.role), ["main", "selection", "secondary", "secondary"]);
-    assert.ok(turns.every((event: any) => event.costUsd === undefined && event.deepseekEstimate.estimatedUsd > 0));
+    const perTurn = (8 * 0.15 + 2 * 0.003 + 5 * 0.6) / 1e6;
+    assert.ok(turns.every((event: any) => event.costUsd === perTurn && event.costSource === "price-table" && event.priceTable === PRICE_TABLE_VERSION));
     assert.equal(bodies[3].messages.find((m: any) => m.role === "assistant").reasoning_content, "thinking-3");
     assert.ok(turns.every((event: any) => event.cacheHit === true && event.usage.cachedRead === 2));
-    assert.equal(readAttemptCost(events).costUsd, null, "estimates never masquerade as measured dollars");
+    assert.ok(Math.abs(readAttemptCost(events).costUsd! - 4 * perTurn) < 1e-15, "every role's table price counts");
     assert.doesNotMatch(JSON.stringify({ wire, bodies, result, lines }), /SENTINEL|https:\/\/openrouter/);
   } finally { admission.close(); await client.close(); await server.close(); sink.close(); }
 });
@@ -92,6 +93,6 @@ test("main workflow loop preserves thinking through a real tool-result turn", as
     const result = await runLoop({ client, reporter: createReporter({ sink, writer: "r" }), session: {
       tools: [{ name: "read", inputSchema: { type: "object" } }], _client: { callTool: async () => ({ content: [{ type: "text", text: "read result" }] }) } } as any,
       systemPrompt: "fixture", taskText: "read file", model: "deepseek-flash", temperature: 0, turnLimit: 3, framework: "baseline" });
-    assert.equal(result.outcome, "done"); assert.equal(calls, 2); assert.equal(result.metrics.costUsd, null);
+    assert.equal(result.outcome, "done"); assert.equal(calls, 2); assert.ok(Math.abs(result.metrics.costUsd! - 2 * (10 * 0.15 + 2 * 0.6) / 1e6) < 1e-15);
   } finally { sink.close(); }
 });

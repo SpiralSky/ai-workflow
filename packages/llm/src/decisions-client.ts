@@ -1,4 +1,6 @@
+import type { CostSource } from "@aiw/telemetry";
 import { LLMError, classifyAPIError } from "./errors.ts";
+import { tableCost } from "./prices.ts";
 
 /** Explicitly supported text-only Decisions models; no moving latest aliases. */
 export const DECISIONS_MODELS = [
@@ -14,15 +16,16 @@ export interface DecisionsRequest {
   signal?: AbortSignal;
 }
 export const TYPESAFE_MODEL = "jev-1.14.0";
-export const TYPESAFE_PRICE_BASIS = "typesafe:jev-1.14.0:2026-11-01:input-0.042-per-million";
-export interface ClassifierEstimate { basis: typeof TYPESAFE_PRICE_BASIS; estimatedUsd: number; inputTokens: number; outputTokens: number }
 
 export interface DecisionsCompletion {
-  classifierEstimate?: ClassifierEstimate;
   /** Typed, sanitized answers, or null when the provider answer set is malformed. */
   answers: unknown;
   usage?: { input: number; output: number };
   costUsd?: number;
+  /** `api` for OpenRouter `usage.cost`, `price-table` for direct TypeSafe. */
+  costSource?: CostSource;
+  /** Price-table version, only for price-table costs. */
+  priceTable?: string;
   /** Parseable provider failure: caller must record accounting before failing the task. */
   failure?: "infra" | "context-limit" | "other";
   /** Provider observations, not proof of exact weights. */
@@ -171,8 +174,8 @@ function createTypedClient(opts: { apiKey: string; model: string; fetch?: typeof
         answers: failure ? null : answers(data.answers, req),
         ...(failure ? { failure } : {}),
         ...(tokens(usage.input_tokens) && tokens(usage.output_tokens) ? { usage: { input: usage.input_tokens, output: usage.output_tokens } } : {}),
-        ...(direct && observedModel === TYPESAFE_MODEL && tokens(usage.input_tokens) && tokens(usage.output_tokens) ? { classifierEstimate: { basis: TYPESAFE_PRICE_BASIS, estimatedUsd: usage.input_tokens * 0.042 / 1e6, inputTokens: usage.input_tokens, outputTokens: usage.output_tokens } } : {}),
-        ...(!direct && typeof usage.cost === "number" && Number.isFinite(usage.cost) && usage.cost >= 0 ? { costUsd: usage.cost } : {}),
+        ...(direct && observedModel === TYPESAFE_MODEL && tokens(usage.input_tokens) && tokens(usage.output_tokens) ? tableCost(TYPESAFE_MODEL, { input: usage.input_tokens, output: usage.output_tokens }) : {}),
+        ...(!direct && typeof usage.cost === "number" && Number.isFinite(usage.cost) && usage.cost >= 0 ? { costUsd: usage.cost, costSource: "api" as const } : {}),
         ...(observedModel ? { providerModel: observedModel } : {}),
         ...(direct ? { provider: "TypeSafe" } : observedProvider ? { provider: observedProvider } : {}),
       };

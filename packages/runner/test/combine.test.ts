@@ -226,16 +226,21 @@ test("report preserves unknown task costs instead of presenting zero or partial 
   assert.match(readFileSync(join(root, "experiments/reports/result/report.md"), "utf8"), /unknown/);
 });
 
-test("combineRuns rejects mismatched provider, quota mode, admission limits and effective inference", async t => {
-  for (const field of ["provider", "usageMode", "subscriptionLimits", "inference"] as const) {
+test("combineRuns rejects mismatched provider, admission limits and effective inference", async t => {
+  for (const field of ["provider", "subscriptionLimits", "inference"] as const) {
     const first = fixtureRun("a"), second = fixtureRun("b");
-    if (field === "provider") second.config.provider = "chatgpt";
-    if (field === "usageMode") second.config.usageMode = "subscription";
+    if (field === "provider") second.config.provider = "deepseek";
     if (field === "subscriptionLimits") second.config.subscriptionLimits = { maxCalls: 5, maxTokens: 100, maxDurationMs: 1000 };
-    if (field === "inference") second.provenance.inference = { provider: "chatgpt", usageMode: "subscription", mainModel: "fixture", secondaryModel: "fixture", temperature: null, store: false, stream: true };
+    if (field === "inference") second.provenance.inference = { provider: "deepseek", mainModel: "fixture", secondaryModel: "fixture", temperature: null };
     const { root, dirs } = fixtureDirs(t, [first, second]);
     await assert.rejects(combineRuns(dirs, "result", root), /mismatched provider/);
   }
+});
+
+test("plan-usage runs are dev-only and never combined", async t => {
+  const plan = fixtureRun("plan"); plan.config.provider = "chatgpt";
+  const { root, dirs } = fixtureDirs(t, [plan]);
+  await assert.rejects(combineRuns(dirs, "plan", root), /plan usage/);
 });
 
 test("legacy reports explicitly label provenance as unattested rather than verified", async (t) => {
@@ -246,28 +251,24 @@ test("legacy reports explicitly label provenance as unattested rather than verif
   assert.match(readFileSync(join(root, "experiments/reports/legacy-label/report.md"), "utf8"), /not a verified baseline/);
 });
 
-test("DeepSeek estimates remain separately labeled and cannot combine with measured provider runs", async t => {
-  const a = fixtureRun("estimated");
-  a.config.provider = "deepseek"; a.config.usageMode = "estimated"; a.config.budgetUsd = null;
-  a.config.estimatedLimits = { maxCalls: 4, maxTokens: 100, maxDurationMs: 30000, estimateLimitUsd: 0.5 };
+test("DeepSeek price-table runs report cost and cannot combine with other provider runs", async t => {
+  const a = fixtureRun("deepseek");
+  a.config.provider = "deepseek";
   const { root, dirs } = fixtureDirs(t, [a]);
   const job = join(dirs[0]!, "p1.baseline.0"); mkdirSync(job);
-  writeFileSync(join(job, "job.json"), JSON.stringify({ format: 1, framework: "baseline", problem: "p1", rep: 0, outcome: "pass", reason: null, attempts: [], costUsdAllAttempts: null, estimatedCost: { basis: "deepseek-flash:2026-11-01:off-peak", estimatedUsd: 0.012, knownEstimatedUsd: 0.012 }, durationMs: 1 }));
-  await combineRuns(dirs, "estimate", root);
-  const report = JSON.parse(readFileSync(join(root, "experiments/reports/estimate/report.json"), "utf8"));
-  assert.equal(report.frameworks.baseline.meanCostUsd, null);
-  assert.equal(report.frameworks.baseline.meanEstimatedCostUsd, 0.012);
-  assert.match(readFileSync(join(root, "experiments/reports/estimate/report.md"), "utf8"), /ESTIMATE/);
+  writeFileSync(join(job, "job.json"), JSON.stringify({ format: 1, framework: "baseline", problem: "p1", rep: 0, outcome: "pass", reason: null, attempts: [], costUsdAllAttempts: 0.012, durationMs: 1 }));
+  await combineRuns(dirs, "deepseek", root);
+  const report = JSON.parse(readFileSync(join(root, "experiments/reports/deepseek/report.json"), "utf8"));
+  assert.equal(report.frameworks.baseline.meanCostUsd, 0.012);
   const b = fixtureRun("measured"); const mixed = fixtureDirs(t, [a, b]);
   await assert.rejects(combineRuns(mixed.dirs, "mixed", mixed.root), /provider/);
 });
 
-test("direct TypeSafe classifier provider and campaign limits isolate estimated reports", async t => {
+test("direct TypeSafe classifier provider isolates reports", async t => {
   const a = fixtureRun("a"), b = fixtureRun("b");
-  const classifier = { provider: "typesafe" as const, model: "jev-1.14.0", threshold: 0.8, policy: "noul-v1" as const,
-    limits: { maxCalls: 5, maxTokens: 1000, maxDurationMs: 30000, estimateLimitUsd: 0.01 } };
+  const classifier = { provider: "typesafe" as const, model: "jev-1.14.0", threshold: 0.8, policy: "noul-v1" as const };
   a.config.classifier = classifier;
-  for (const changed of [{ ...classifier, provider: "openrouter-decisions" as const }, { ...classifier, limits: { ...classifier.limits, maxCalls: 6 } }]) {
+  for (const changed of [{ ...classifier, provider: "openrouter-decisions" as const }, { ...classifier, threshold: 0.9 }]) {
     b.config.classifier = changed;
     const { root, dirs } = fixtureDirs(t, [a, b]); await assert.rejects(combineRuns(dirs, "mixed-classifier", root), /provider|limits/);
   }

@@ -1,4 +1,5 @@
 import type { LLMClient, LLMCompletion } from "@aiw/telemetry";
+import { tableCost } from "./prices.ts";
 import { LLMError, classifyAPIError } from "./errors.ts";
 
 /** Only public SIWC endpoints are supported. OAuth credentials never follow redirects. */
@@ -73,7 +74,7 @@ export function createChatGPTClient(opts: ChatGPTClientOptions): LLMClient {
           throw new LLMError("infra", "ChatGPT response is not an event stream");
         }
         const completed = await readCompleted(res.body, abort);
-        return mapCompletion(completed);
+        return mapCompletion(completed, req.model);
       } catch (e) { throw safeError(e, signal); }
     },
   };
@@ -184,8 +185,12 @@ async function readCompleted(stream: ReadableStream<Uint8Array>, signal: AbortSi
   }
 }
 
-/** Keep raw output for replay and expose the chat facade expected by existing agents. */
-function mapCompletion(response: RecordValue): LLMCompletion {
+/**
+ * Keeps raw output for replay and exposes the chat facade expected by existing agents.
+ * @param response - completed Responses API object
+ * @param model - requested model slug, the price-table key for API-equivalent cost
+ */
+function mapCompletion(response: RecordValue, model: string): LLMCompletion {
   if (!Array.isArray(response.output)) throw new LLMError("infra", "Malformed ChatGPT completion output");
   let content = "";
   const toolCalls: unknown[] = [];
@@ -210,11 +215,13 @@ function mapCompletion(response: RecordValue): LLMCompletion {
   const cached = u.input_tokens_details?.cached_tokens;
   if (cached !== undefined && (!validCount(cached) || cached > u.input_tokens)) throw new LLMError("infra", "Invalid ChatGPT cached usage");
   const message = { role: "assistant", content, ...(toolCalls.length ? { tool_calls: toolCalls } : {}), responses_output: response.output };
+  const usage = { input: u.input_tokens, output: u.output_tokens, ...(cached !== undefined ? { cachedRead: cached } : {}) };
   return {
     response: { id: response.id, model: response.model, choices: [{ message, finish_reason: toolCalls.length ? "tool_calls" : "stop" }] },
-    usage: { input: u.input_tokens, output: u.output_tokens, ...(cached !== undefined ? { cachedRead: cached } : {}) },
+    usage,
     ...(cached !== undefined ? { cacheHit: cached > 0 } : {}),
-    // Subscription usage has no measured per-request USD price. Never invent costUsd: 0.
+    // Plan usage has no bill: priced at the model's API rates only when the table has it, else no cost.
+    ...tableCost(model, usage, "api-equivalent"),
   };
 }
 

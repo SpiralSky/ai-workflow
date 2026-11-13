@@ -15,8 +15,8 @@ export function frameworkLaunch(framework: string, config: RunConfig): {
   const classifier = parsed.variant.rerank === "classifier" ? config.classifier : undefined;
   if (parsed.variant.rerank === "classifier") {
     const openrouter = classifier?.provider === "openrouter-decisions" && isDecisionsModel(classifier.model) &&
-      (config.provider ?? "openrouter") === "openrouter" && (config.usageMode ?? "monetary") === "monetary";
-    const direct = classifier?.provider === "typesafe" && classifier.model === "jev-1.14.0" && classifier.limits && config.provider === "deepseek" && config.usageMode === "estimated";
+      (config.provider ?? "openrouter") === "openrouter";
+    const direct = classifier?.provider === "typesafe" && classifier.model === "jev-1.14.0" && config.provider === "deepseek";
     if (!classifier || (!openrouter && !direct)) throw new Error("Unsupported classifier configuration");
     validateClassifierPolicy(classifier.threshold, classifier.policy);
   }
