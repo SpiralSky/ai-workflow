@@ -59,7 +59,8 @@ classifier, a main model, plan usage) can be compared per situation or in total:
 
 - **API-reported cost** is recorded when the provider returns one (e.g. OpenRouter `usage.cost`).
 - **Price-table cost** is computed from the token counts and a versioned price table per model
-  (rates per category; time-of-day rates such as DeepSeek off-peak are separate entries). The
+  (rates per category; time-of-day or service-tier rates, such as DeepSeek off-peak or OpenAI
+  Flex, are separate entries, chosen by what the provider reports it served). The
   record names the table version, so prices can be recomputed later from the stored tokens.
 - **Plan usage** (ChatGPT sign-in) has no per-token bill; it is priced at the same model's public
   API rates as an **API-equivalent** cost, marked as such. It is never mixed with billed cost.
@@ -74,19 +75,22 @@ Each API type reports usage in its own shape, so the runner normalises it per AP
 | Anthropic Messages | `usage.input_tokens`, `output_tokens`, `cache_read_input_tokens`, `cache_creation_input_tokens` | not reported |
 | Gemini | `usageMetadata.promptTokenCount`, `candidatesTokenCount`, `cachedContentTokenCount` | not reported |
 
-Direct providers (DeepSeek, TypeSafe) report no dollar cost, so their cost comes from the price
+Direct providers (OpenAI, DeepSeek, TypeSafe) report no dollar cost, so their cost comes from the price
 table. A model with no price-table entry has its cost recorded as missing. Adding an API type
 means adding one usage normaliser; adding a model means adding its price-table entry.
 
-**Models (project decision, 2026-11-13):**
+**Models (project decision, 2026-11-13; main model changed to OpenAI the same day):**
 
 | Role | Model | Access | Use |
 |------|-------|--------|-----|
-| Main and secondary (measured runs) | `deepseek-flash` (DeepSeek V4.1 Flash; `deepseek-v4-flash` is a retired alias) | DeepSeek API, direct | dev, pilot and full runs |
+| Main and secondary (measured runs) | `gpt-6-luna`, Flex tier (`service_tier: "flex"`) | OpenAI API, direct (paid from the API credit that comes with the ChatGPT plan) | dev, pilot and full runs |
+| Alternative main | `deepseek-flash` (DeepSeek V4.1 Flash), off-peak only | DeepSeek API, direct | kept supported; not combined with `gpt-6-luna` runs |
 | Selection classifier (orchestrate §7.2) | `jev-1.14` | TypeSafe Decisions API, direct | all runs |
 | Development only | ChatGPT plan model | ChatGPT sign-in (plan usage) | prompt and framework development; never combined or reported |
 
-Claude/Anthropic models are not used for experiments.
+Claude/Anthropic models are not used for experiments. A Flex request the provider cannot serve
+(`429 Resource Unavailable`, not billed) is an infra error and is retried (§6.5). A response that
+does not report the tier it was served on has no price; nothing assumes Flex.
 
 ### 4.2 Per-turn metrics
 
