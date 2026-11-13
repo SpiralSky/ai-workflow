@@ -31,9 +31,9 @@ test("metered DeepSeek client adds price-table cost and closes admission at the 
   const meter = createCostMeter(perCall * 1.5);
   const first = await meter.llm(client).complete(req);
   assert.equal(first.costUsd, perCall); assert.equal(first.costSource, "price-table"); assert.equal(first.priceTable, PRICE_TABLE_VERSION);
-  await meter.llm(client).complete(req); // Admitted below budget; its response may overshoot.
+  // The second call's estimate (same size, learned cost per byte) would cross the budget, so it is never sent.
   await assert.rejects(meter.llm(client).complete(req), /budget/);
-  assert.equal(calls, 2); assert.equal(meter.stopReason(), "budget"); assert.equal(meter.snapshot().knownCostUsd, 2 * perCall);
+  assert.equal(calls, 1); assert.equal(meter.stopReason(), "budget"); assert.equal(meter.snapshot().knownCostUsd, perCall);
 });
 test("each call rechecks off-peak and a failed request poisons admission, keeping its cost", async () => {
   let now = offPeak(), calls = 0;

@@ -349,6 +349,12 @@ valid over incomplete jobs.
   reaches the budget mid-run, the run stops and is marked invalid.
 - The budget counts every role's cost (main, secondary, selection classifier), API-reported or
   price-table (§4.1). If any model in the run has neither, the runner refuses to start.
+- Parallel requests (e.g. secondaries) share the budget: each request is admitted only if the
+  known cost, plus the estimated cost of requests still in flight, plus its own estimate stays
+  below the budget; otherwise it waits for in-flight requests to settle. If nothing is in flight
+  and it still does not fit, the run stops at the budget. Requests carry no output-token limit, so
+  the estimate is learned (request input size times the highest cost per input byte seen so far)
+  and a response costlier than any before it can still overshoot by the difference.
 - Runs on plan usage are dev-only: they track API-equivalent cost against the budget the same way,
   but are never combined or reported (§6.6).
 
