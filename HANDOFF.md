@@ -2,19 +2,41 @@
 
 > **To resume**: read this file, then see the [Roadmap](README.md#roadmap) in the main README for pending work.
 
+## 2026-11-13: shared fulfil codebase ready
+
+**Current state:** the previously untracked `experiments/problems/_codebases/fulfil/`
+is now ready as the clean base for the large problems: 31 non-package modules
+(40 Python source files), 4,529 source lines, standard library only. It implements
+the models, repositories, services, pricing, events, API/CLI and reports in problems §6.2.
+The README documents its entry points and test command. Module import tests now also
+use a fresh interpreter for each module, to expose import-order dependencies.
+
+**Verified:** `python3.12 -m unittest discover -s tests -q` from that directory:
+65 tests pass, including JSON fixtures and API/CLI workflows. A standard-library
+trace run confirmed that all 40 source files are reached by the suite. Docker
+validation and a model-token measurement have not been performed for this base.
+
+**Next unit:** build the `L1-rename-sku` problem (overlay, prompt, checks and reference
+patch) against this base, per problems §8.3, and verify failure before / success
+after the reference patch. L2–L5 remain unbuilt. The experiment-design section below
+predates this base and the uncommitted selection harness: `selection-check.ts`, its
+tests, CLI/config integration and `experiments/selection/cases.json` already exist
+in the working tree, but still need verification and a separate commit. Other
+pre-existing experiment-design changes remain uncommitted; preserve them.
+
 ## 2026-11-13: providers, classifier and run budget (`feat/providers-classifier`)
 
 **Goal:** move experiments off OpenRouter onto cheaper direct providers, and put every role under one run budget.
 
 **Key decisions** (specs updated in `037bf30`):
-- Models (framework-runner §4.1): DeepSeek v4 Flash direct for measured runs; TypeSafe `jev-1.14.0` direct as the classifier; ChatGPT plan sign-in for development only.
+- Models (framework-runner §4.1): measured runs use `gpt-6-luna` on OpenAI Flex (direct); `deepseek-flash` direct remains supported; TypeSafe `jev-1.14` direct is the classifier; ChatGPT plan sign-in is development only.
 - Every turn records token counts plus a price, with `costSource` and `priceTable`.
 - One `--budget` covers all roles.
 
 **State:**
 - `0e902c3` imports dot's code at the PR #4 head, plus the sign-in rotation fix, the cost-uncertainty fix and opt-in hot paths. The Specplane migration, native harness and progress docs were left out.
 - `91638f7` adds the price table (`packages/llm/src/prices.ts`) and the shared cost meter (`packages/runner/src/cost-meter.ts`). It removes `--usage-mode`, `--estimate-limit-usd` and the separate classifier limits.
-- Tests and typecheck pass in all workspaces. Run them with `AIW_VENV=$PWD/packages/tools/.venv npm test`.
+- Tests and typecheck pass in all workspaces. Run them with `npm test` (the tests find `packages/tools/.venv` themselves; set `AIW_VENV` only for a venv elsewhere).
 - dot's old branches are archived as `archive/dot/*` and `archive/status/*` tags on origin.
 
 **Open:**
@@ -26,7 +48,30 @@
 - Unverified before the first paid run: whether `gpt-6-luna` responses report `service_tier`, whether the API credit covers Flex, and when the credit expires.
 - DONE 2026-11-13: the meter reserves a learned estimate for each in-flight request and makes requests that don't fit wait (§6.5); the remaining overshoot is limited to one response costlier per byte than any before it.
 - Next design work: hierarchical budgets, where teams or roles negotiate against a main budgeter.
-- Classifier evaluation: none has been run on our own tool-selection cases yet.
+- Classifier evaluation: none has been run on our own tool-selection cases yet. Now specified as the offline selection check (orchestrate §10.3); not built.
+
+## 2026-11-13: experiment design review (uncommitted on `feat/providers-classifier`)
+
+**Goal:** remove design flaws that would bias or weaken the framework comparison, keeping each experiment's idea.
+
+**Decisions** (specs updated: framework-runner §4.4, §6.2, §6.6; orchestrate §10.2, new §10.3; problems §8; data-formats §4):
+- Cost headline is the paired cost on problems both frameworks passed, with a sign-test claim rule; cost per pass charges failed jobs to the passes. Mean cost of passing jobs alone is biased and no longer a headline.
+- A variance pilot (two small problems, 3–5 repetitions) comes before the full run; the report shows cost spread across repetitions.
+- The dev failure gate needs at least 10 dev jobs per framework; it was hard-coded to `ok` and is now computed.
+- Turn limits must be at least twice a baseline reference run. `task.json` limits were below the spec and are restored to problems §8.1.
+- Catalog-size grid has three arms (tool search, orchestrate without rerank, orchestrate default) and about one hard-negative distractor in five. It has its own runs and budget, N = 200 first.
+- Opt-in variants (hot paths) stay out of the three-way comparison. Latency is informational on Flex.
+
+**State:**
+- `packages/runner/src/combine.ts`: paired cost, `costPerPassUsd`, `costSpread`, sign test, gate. `packages/core/src/registry/distractors.ts`: ten software-delivery domains interleaved. Server bundle rebuilt. `npm test` (742) and `npm run typecheck` pass.
+- Problems: `04-vague-rate-limit` deleted (cut by problems §8.2); `06-import-cycle` is `set: "dev"` with its hidden constraint made visible; comments that named the bug removed from 03, 06, 08, 09 and reference patches regenerated. Checks verified locally with python3 (fail before, pass after); `aiw problems check` not run because Docker is unreachable from the agent shell.
+- Old runs archived in `experiments/runs-archive/` (git-ignored).
+
+**Next (nothing below is built):**
+1. `fulfil` codebase and L1–L5 (problems §6, §8.3). Without them tier L and most of orchestrate's case cannot be tested. This is the main blocker.
+2. Offline selection check harness and case file (orchestrate §10.3); required before a paid orchestrate run.
+3. Run `aiw problems build` and `aiw problems check` with Docker, then a baseline reference run per problem to confirm each turn limit is at least twice its turns.
+4. Report gaps: `turn-limit` failures per framework are in `failures` but not called out in `report.md`; hard-negative recall (orchestrate §10.2) and the runner's refusal to start without the §10.3 check are specified but not implemented.
 
 ---
 
