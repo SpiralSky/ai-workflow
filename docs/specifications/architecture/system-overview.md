@@ -164,8 +164,10 @@ docs/
   `process.env`. Tool child processes (`bash`, sidecar, test runs) get an environment with
   `OPENAI_*` and other configured secret names stripped. This keeps keys out of easy reach of
   model-written code; it is not a sandbox (branch isolation: branching-framework §5.2).
-- Model ids: experiments use `deepseek/deepseek-v4-flash` (project rule). The runner refuses
-  `anthropic/*` model ids on OpenRouter.
+- Models and providers: framework-runner §4.1 (DeepSeek v4 Flash direct for measured runs,
+  TypeSafe Jev 1.14 direct for selection, ChatGPT plan sign-in for development only). Keys
+  (`DEEPSEEK_API_KEY`, `TYPESAFE_API_KEY`, sign-in credentials) follow the same rules as
+  `OPENAI_*` above. The runner refuses Claude/Anthropic model ids.
 
 ---
 

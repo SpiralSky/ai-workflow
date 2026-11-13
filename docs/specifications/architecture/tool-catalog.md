@@ -65,7 +65,7 @@ Every tool throws `unsupported language: <lang>` for files the backend doesn't h
 > - **`bash`**: timeout → `code: 124`, abort → `code: 130`, with a note appended to `out`; the
 >   process group is SIGKILLed. Output over the cap keeps the first ~2 KB and last ~4 KB (line
 >   boundaries, UTF-8 safe) with `[N bytes cut]` between; the notes stay at the very end. Env from `toolEnv` (strips `OPENAI_*`, `ANTHROPIC_*`,
->   `OPENROUTER_*` and names in `AIW_SECRET_NAMES`).
+>   `OPENROUTER_*`, `DEEPSEEK_*`, `TYPESAFE_*` and names in `AIW_SECRET_NAMES`).
 > - **`readFile`**: `range: [start, end]` (1-based, inclusive), `cat -n` style numbering; over the
 >   cap it stops at a line boundary with `[truncated at line N of M; pass range to read more]`.
 > - **`grep`** returns `{ matches: [{ path, line, text }] }`; the matching line is the line of

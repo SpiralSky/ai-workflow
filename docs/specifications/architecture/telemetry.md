@@ -89,7 +89,7 @@ One JSON object per line. Common fields: `v` (schema version), `id`, `parent` (i
 |--------|--------|
 | `job` | first line written by the runner: `job`, `attempt`, `framework`, `problem`, `rep` |
 | `scope` | `label` |
-| `turn` | `model`, `role`, `usage { input, output, cachedRead?, cacheWrite? }`, `costUsd?`, `cacheHit?`, `latencyMs` |
+| `turn` | `model`, `role`, `usage { input, output, cachedRead?, cacheWrite? }`, `costUsd?`, `costSource?` (`api` \| `price-table` \| `api-equivalent`), `priceTable?` (table version), `cacheHit?`, `latencyMs` |
 | `toolStart` | `name`, `args`, `harnessId?` |
 | `tool` | `name`, `args`, `ok`, `error?`, `durationMs`, `startTs`, `harnessId?`, `resultBytes` |
 | `attach` | `key`, `data` (inline if its JSON is < 64 KB, else `blob: <hash>`) |

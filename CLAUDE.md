@@ -18,10 +18,14 @@ things easy to get wrong; the spec wins.
 - No backward compatibility with old run formats; delete stale runs rather than adapting to them.
 
 ## Running experiments
-**Models:** never use Claude/Anthropic models via OpenRouter. Use `deepseek/deepseek-v4-flash` only
-(system-overview §7; the runner refuses `anthropic/*`).
+**Models** (framework-runner §4.1): measured runs use `deepseek-v4-flash` via the DeepSeek API
+directly; the orchestrate selection classifier is TypeSafe `jev-1.14`, also direct. ChatGPT plan
+sign-in is for development only, never for combined or reported runs. Never use Claude/Anthropic
+models for experiments.
+**Cost:** every turn records token counts per category and a price (API-reported, price-table, or
+API-equivalent for plan usage), with the price-table version.
 **Budget:** per run, set with `--budget`: default $0.50 for dev and pilot runs, $1 for the full run
-(framework-runner §6.5–6.6). Every attempt's cost counts.
+(framework-runner §6.5–6.6). Every attempt's cost counts, including classifier calls.
 
 ## Naming
 - Acronyms stay fully capitalised in identifiers: `wrapLLM`, `LLMClient`, `putJSON`, `MCPServer`, `baseURL`

@@ -233,7 +233,8 @@ Goal: the needed tools are almost always in the top *K*. Precision does not matt
 
 Optionally reduce the *K* candidates to the minimal sufficient set using a stronger judge:
 a cross-encoder, a small classifier trained on logged runs (§10), or a cheap LLM call that sees
-`whenToUse`/`whenNotToUse`. Target size: a handful (default ≤ 6).
+`whenToUse`/`whenNotToUse`. Target size: a handful (default ≤ 6). The default judge is the
+TypeSafe Jev decision model (framework-runner §4.1); its calls count toward the run budget.
 
 The output is **ordered by fit for this intent**, not by retrieval score: the tool that should be
 tried first comes first. A specific tool (`findSymbol`) ranks above a general one that could also

@@ -50,9 +50,19 @@ reproducibly (so differences are not noise from a drifting environment).
 
 ### 4.1 Source of truth
 
-All token and cost figures come from the **API response**, never from local estimates or a price
-table. The API reflects what is actually billed, and tokenisation and pricing vary by provider and
-model. If the API does not report a field, the runner records it as missing rather than guessing.
+All token counts come from the **API response**, never from local tokenisation. If the API does
+not report a field, the runner records it as missing rather than guessing.
+
+Every turn records **both** its token counts per category (uncached input, cached-read input,
+cache-write, output) **and** a dollar price, so models with very different rates (a cheap
+classifier, a main model, plan usage) can be compared per situation or in total:
+
+- **API-reported cost** is recorded when the provider returns one (e.g. OpenRouter `usage.cost`).
+- **Price-table cost** is computed from the token counts and a versioned price table per model
+  (rates per category; time-of-day rates such as DeepSeek off-peak are separate entries). The
+  record names the table version, so prices can be recomputed later from the stored tokens.
+- **Plan usage** (ChatGPT sign-in) has no per-token bill; it is priced at the same model's public
+  API rates as an **API-equivalent** cost, marked as such. It is never mixed with billed cost.
 
 Each API type reports usage in its own shape, so the runner normalises it per API type into one
 `Usage` record (input, output, cached-read and cache-write tokens, cost). Supported API types:
@@ -64,9 +74,19 @@ Each API type reports usage in its own shape, so the runner normalises it per AP
 | Anthropic Messages | `usage.input_tokens`, `output_tokens`, `cache_read_input_tokens`, `cache_creation_input_tokens` | not reported |
 | Gemini | `usageMetadata.promptTokenCount`, `candidatesTokenCount`, `cachedContentTokenCount` | not reported |
 
-Only aggregators (OpenRouter) report dollar cost; with a direct provider, cost is recorded as
-missing and comparisons fall back to token counts. Experiments therefore run through an aggregator
-when cost is the metric. Adding an API type means adding one usage normaliser.
+Direct providers (DeepSeek, TypeSafe) report no dollar cost, so their cost comes from the price
+table. A model with no price-table entry has its cost recorded as missing. Adding an API type
+means adding one usage normaliser; adding a model means adding its price-table entry.
+
+**Models (project decision, 2026-11-13):**
+
+| Role | Model | Access | Use |
+|------|-------|--------|-----|
+| Main and secondary (measured runs) | `deepseek-v4-flash` | DeepSeek API, direct | dev, pilot and full runs |
+| Selection classifier (orchestrate §7.2) | `jev-1.14` | TypeSafe Decisions API, direct | all runs |
+| Development only | ChatGPT plan model | ChatGPT sign-in (plan usage) | prompt and framework development; never combined or reported |
+
+Claude/Anthropic models are not used for experiments.
 
 ### 4.2 Per-turn metrics
 
@@ -327,7 +347,10 @@ valid over incomplete jobs.
   retried ones. Before starting, the runner projects the run's cost from earlier combined runs
   (when there are any) and refuses to start if the projection exceeds the budget. If cost still
   reaches the budget mid-run, the run stops and is marked invalid.
-- The budget needs API-reported cost (§4.1); without it the runner refuses to start.
+- The budget counts every role's cost (main, secondary, selection classifier), API-reported or
+  price-table (§4.1). If any model in the run has neither, the runner refuses to start.
+- Runs on plan usage are dev-only: they track API-equivalent cost against the budget the same way,
+  but are never combined or reported (§6.6).
 
 ### 6.6 Staged evaluation
 
@@ -411,7 +434,6 @@ A run with uncommitted changes is recorded but cannot be combined, since it cann
 
 - Production use of frameworks; the runner is a test harness only.
 - Security isolation of tools (belongs to the framework/environment; see branching-framework §5.2).
-- Cost estimation from price tables.
 - Driving real harnesses (e.g. `claude -p`) from the runner. Attaching a framework to a real harness
   — for Claude Code, a bundle of MCP server, hooks, settings, and prompt/skill files — is a
   separate spec ([harness-integration.md](harness-integration.md)). The reporter and file sink (§5)
