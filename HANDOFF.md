@@ -2,6 +2,29 @@
 
 > **To resume**: read this file, then see the [Roadmap](README.md#roadmap) in the main README for pending work.
 
+## 2026-11-13: providers, classifier and run budget (`feat/providers-classifier`)
+
+**Goal:** move experiments off OpenRouter onto cheaper direct providers, and put every role under one run budget.
+
+**Key decisions** (specs updated in `037bf30`):
+- Models (framework-runner §4.1): DeepSeek v4 Flash direct for measured runs; TypeSafe `jev-1.14.0` direct as the classifier; ChatGPT plan sign-in for development only.
+- Every turn records token counts plus a price, with `costSource` and `priceTable`.
+- One `--budget` covers all roles.
+
+**State:**
+- `0e902c3` imports dot's code at the PR #4 head, plus the sign-in rotation fix, the cost-uncertainty fix and opt-in hot paths. The Specplane migration, native harness and progress docs were left out.
+- `91638f7` adds the price table (`packages/llm/src/prices.ts`) and the shared cost meter (`packages/runner/src/cost-meter.ts`). It removes `--usage-mode`, `--estimate-limit-usd` and the separate classifier limits.
+- Tests and typecheck pass in all workspaces. Run them with `AIW_VENV=$PWD/packages/tools/.venv npm test`.
+- dot's old branches are archived as `archive/dot/*` and `archive/status/*` tags on origin.
+
+**Open:**
+- Push the branch, close draft PRs #1–#4, and delete the old remote `dot/*` and `status/*` branches. These were blocked by the permission check and need the user.
+- The DeepSeek model id in code is `deepseek-flash`, but the specs say `deepseek-v4-flash`. Check which id DeepSeek's API uses and align them.
+- §6.5 says a run refuses to start if any model has no price. ChatGPT has no price-table entry, so plan runs start anyway, with cost `null`, bounded only by plan limits. Either add an API-equivalent entry or amend §6.5.
+- The meter doesn't serialise calls, so parallel secondaries can overshoot the budget by the in-flight responses.
+- Next design work: hierarchical budgets, where teams or roles negotiate against a main budgeter.
+- Classifier evaluation: none has been run on our own tool-selection cases yet.
+
 ---
 
 ## Specs: Final
