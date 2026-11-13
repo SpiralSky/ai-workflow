@@ -19,10 +19,14 @@ validation and a model-token measurement have not been performed for this base.
 **Next unit:** build the `L1-rename-sku` problem (overlay, prompt, checks and reference
 patch) against this base, per problems §8.3, and verify failure before / success
 after the reference patch. L2–L5 remain unbuilt. The experiment-design section below
-predates this base and the uncommitted selection harness: `selection-check.ts`, its
-tests, CLI/config integration and `experiments/selection/cases.json` already exist
-in the working tree, but still need verification and a separate commit. Other
-pre-existing experiment-design changes remain uncommitted; preserve them.
+predates this base. The experiment-design changes are committed as `b339d0f` and the
+selection harness (`aiw selection check`, 44 cases, start gate) as `fc37132`; `npm test`
+(746 tests) and `npm run typecheck` passed before both. The branch is pushed to origin.
+The classifier mode of the selection check and any paid `gpt-6-luna` run are still unrun.
+
+**Exploratory, not specced:** procedural action selection
+(`docs/ideas/procedural-action-selection.md`, `950ce38`): Jev decision tree, vector or
+flat selection of reusable procedures, with a small model filling arguments.
 
 ## 2026-11-13: providers, classifier and run budget (`feat/providers-classifier`)
 
