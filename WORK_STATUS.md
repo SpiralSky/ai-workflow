@@ -1,7 +1,7 @@
 # Work status
 
-Updated: 2026-11-11, diagnostic and accounting checkpoint
-Previous checkpoint: 2026-11-11 08:05 UTC, commit 01faf12
+Updated: 2026-11-13 05:05 UTC checkpoint
+Previous published checkpoint: diagnostic and accounting update, commit 2f7d012
 
 - Evaluation: One limited baseline attempt reached its existing action deadline. It produced no grade or valid paired comparison. No task-quality improvement or measured cost saving is established.
 - Readiness remediation: The reviewed readiness fix is published. It passed 91 focused tests. The fixed no-model full-runner preflight passed with three accepted completions and clean exit. No real actor ran in that control; it does not establish a successful real baseline, valid comparison, or reliability under real-worker conditions.
@@ -15,6 +15,15 @@ Previous checkpoint: 2026-11-11 08:05 UTC, commit 01faf12
 - Preservation: The fresh diagnostic result and blocked accounting prototype are privately checkpointed. Independent restore verified 187 and 64 payloads respectively; retained download hashes and current external file metadata match. Restore success is not runtime or actor admission.
 - Activity and waste since 08:05: Bounded diagnostics, independent review, a fresh synthetic experiment, runtime/offline checks, audit tests and a shared-budget prototype were completed. No actors, paid calls, replay of the failed operation or valid comparison. The experiment took about 2.136 seconds; total effort, token use and cost remain unknown. Earlier failures remain counted.
 - Final outcome: Pending. Earlier dated records remain historical evidence, not approval or current validation. This update changes only the status file on the existing status branch; it does not approve or merge development work.
+
+## Publication handoff
+
+The owner requested publication so they can make changes. Both development branches are available on origin:
+
+- [Screening fixes](https://github.com/SpiralSky/ai-workflow/tree/dot/native-screening-fixes-20261113), verified head `51e4fe57f6ec88d34af5b7c6b3ed4db1d4207484`.
+- [Shared-budget prototype](https://github.com/SpiralSky/ai-workflow/tree/dot/native-role-budget-prototype-20261113), verified head `a664f599de532456198aa320ad6e99fae7bf4376`. This branch includes the fixes; the prototype remains incomplete.
+
+The exact tool-result transfer blocker is unchanged. No competing development edits or actor runs were performed for this checkpoint. The publication handoff is progress, not a successful baseline or measured savings. Publication effort and costs are not established by this checkpoint. Prior private evidence checkpoints remain available at the same versions; no fresh restore was performed here.
 
 ## Previously published checkpoints
 
