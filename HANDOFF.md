@@ -18,9 +18,12 @@
 - dot's old branches are archived as `archive/dot/*` and `archive/status/*` tags on origin.
 
 **Open:**
-- Push the branch, close draft PRs #1–#4, and delete the old remote `dot/*` and `status/*` branches. These were blocked by the permission check and need the user.
-- DONE 2026-11-13: DeepSeek's API id is `deepseek-flash` (V4.1 Flash); `deepseek-v4-flash` is a retired alias. Specs and docs aligned to the code. Still open: the CLI defaults to `--provider openrouter --model deepseek/deepseek-v4-flash` and `--classifier-provider openrouter-decisions`, but §4.1 lists only direct DeepSeek and TypeSafe.
+- Push the branch, close draft PRs #1–#4, and delete the old remote `dot/*` and `status/*` branches. These were blocked by the permission check and need the user. First tag `status/monitor-2026-11-04`'s new tip `358fd54` as `archive/status/monitor-2026-11-04-tip`, because its archive tag is one commit behind.
+- `server-sigterm stops the owned workspace child and grandchild` failed once in a full `npm test` run and passed on three reruns, so it looks flaky.
+- DONE 2026-11-13: DeepSeek's API id is `deepseek-flash` (V4.1 Flash); `deepseek-v4-flash` is a retired alias. Specs and docs aligned to the code. The CLI defaults are now `--provider openai --model gpt-6-luna`.
 - §6.5 says a run refuses to start if any model has no price. ChatGPT has no price-table entry, so plan runs start anyway, with cost `null`, bounded only by plan limits. Either add an API-equivalent entry or amend §6.5.
+- 2026-11-13 decision: measured runs move to OpenAI `gpt-6-luna` on Flex, paid from the $100 API credit included with the ChatGPT plan (spec `195898c`). Flex prices are half the standard rate. Each response is priced by the `service_tier` it reports, and a response that reports no tier has no price. DeepSeek stays supported. The direct OpenAI client is in `e32748f`; with any direct provider the classifier now defaults to TypeSafe.
+- Unverified before the first paid run: whether `gpt-6-luna` responses report `service_tier`, whether the API credit covers Flex, and when the credit expires.
 - DONE 2026-11-13: the meter reserves a learned estimate for each in-flight request and makes requests that don't fit wait (§6.5); the remaining overshoot is limited to one response costlier per byte than any before it.
 - Next design work: hierarchical budgets, where teams or roles negotiate against a main budgeter.
 - Classifier evaluation: none has been run on our own tool-selection cases yet.
