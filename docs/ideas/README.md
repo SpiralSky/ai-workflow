@@ -12,3 +12,4 @@ Each file is one idea. When an idea graduates to a feature spec, link to it here
 | File | Idea | Status |
 |------|------|--------|
 | [known-good-hot-paths.md](known-good-hot-paths.md) | Pre-populate branches with reusable patterns the model can rely on | Raw |
+| [procedural-action-selection.md](procedural-action-selection.md) | Retrieve reusable procedures through Jev decisions or vector search, then fill arguments with a small LLM | Exploratory |
