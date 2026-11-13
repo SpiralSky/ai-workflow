@@ -232,7 +232,8 @@ export function resolveConfig(
   if (frameworks.length === 0) throw new Error("No framework modes selected (--mode)");
 
   const classifierEnabled = frameworks.some(id => parseFrameworkVariant(id).variant.rerank === "classifier");
-  const classifierProvider = flags.classifierProvider ?? "openrouter-decisions";
+  // TypeSafe direct is the spec classifier (framework-runner §4.1); OpenRouter decisions only pair with the OpenRouter provider.
+  const classifierProvider = flags.classifierProvider ?? (provider === "openrouter" ? "openrouter-decisions" : "typesafe");
   if (classifierEnabled) {
     if (classifierProvider === "typesafe") {
       if (provider !== "deepseek" && provider !== "openai") throw new Error("Direct TypeSafe requires a paid direct provider (OpenAI or DeepSeek); mixed plan/paid use is unsupported");

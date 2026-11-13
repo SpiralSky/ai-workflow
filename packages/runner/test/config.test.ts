@@ -203,3 +203,9 @@ test("openai provider: gpt-6-luna only, parallel allowed, direct TypeSafe allowe
   assert.equal(resolveConfig(orch, sampleProblems).classifier?.provider, "typesafe");
   assert.throws(() => resolveConfig({ ...orch, provider: "chatgpt" as const }, sampleProblems));
 });
+
+test("the classifier defaults to direct TypeSafe on the OpenAI provider", () => {
+  const config = resolveConfig({ problems: "dev", mode: "orchestrate[rerank=classifier]", tools: "S", reps: 1, provider: "openai", model: "gpt-6-luna",
+    temperature: 0, budget: 0.5, full: false, branchContext: "trace", secondaryCap: 4, classifierModel: "jev-1.14.0", classifierThreshold: 0.8 }, sampleProblems);
+  assert.equal(config.classifier?.provider, "typesafe");
+});
