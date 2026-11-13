@@ -1,3 +1,5 @@
+import { isDecisionsModel } from "@aiw/llm";
+import { validateClassifierPolicy } from "@aiw/core";
 /**
  * Resolve run configuration from CLI flags and compute provenance fields.
  * Runner architecture §9; framework-runner §6.6, §7.1.
@@ -8,8 +10,10 @@ import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { createRequire } from "node:module";
-import { DEFAULT_TRACE_LIMITS } from "@aiw/core";
+import { DEFAULT_TRACE_LIMITS, parseFrameworkVariant } from "@aiw/core";
 import type { RunConfig, Provenance, Tier, BranchContext } from "./types.ts";
+
+import { validateSubscriptionLimits, type SubscriptionLimits } from "./subscription.ts";
 
 export { RunConfig, Provenance };
 
@@ -27,20 +31,7 @@ function runnerVersion(): string {
  * @returns canonical variant string
  */
 export function parseVariant(raw: string): string {
-  const bracket = raw.indexOf("[");
-  if (bracket === -1) return raw.trim();
-  const base = raw.slice(0, bracket).trim();
-  const inner = raw.slice(bracket + 1, raw.endsWith("]") ? raw.length - 1 : raw.length).trim();
-  if (!inner) return base;
-  // Split on commas not inside values (values are simple strings, no commas)
-  const pairs = inner.split(",").map((p) => p.trim()).filter(Boolean);
-  // Sort pairs by key for canonical form
-  pairs.sort((a, b) => {
-    const ka = a.split("=")[0] ?? "";
-    const kb = b.split("=")[0] ?? "";
-    return ka.localeCompare(kb);
-  });
-  return `${base}[${pairs.join(",")}]`;
+  return parseFrameworkVariant(raw).id;
 }
 
 /** The three modes that `compare` expands to. */
@@ -120,6 +111,9 @@ export function resolveKind(
   return "pilot";
 }
 
+/** Conservative campaign default: calibrate one paid task at a time. */
+export const DEFAULT_CONCURRENCY = 1;
+
 /** Options parsed from `aiw eval` flags. */
 export interface EvalFlags {
   problems: string;
@@ -128,14 +122,22 @@ export interface EvalFlags {
   reps: number;
   model: string;
   secondaryModel?: string;
+  classifierProvider?: "openrouter-decisions" | "typesafe";
+  classifierLimits?: import("./estimated.ts").EstimatedLimits;
+  classifierModel?: string;
+  classifierThreshold?: number;
   temperature: number;
   budget: number;
   full: boolean;
-  concurrency: number;
+  concurrency?: number;
   branchContext: BranchContext;
   secondaryCap: number;
   untilReps?: number;
   combineWith?: string;
+  provider?: "openrouter" | "chatgpt" | "deepseek";
+  usageMode?: "monetary" | "subscription" | "estimated";
+  estimatedLimits?: import("./estimated.ts").EstimatedLimits;
+  subscriptionLimits?: SubscriptionLimits;
 }
 
 /**
@@ -158,13 +160,7 @@ function sha256(text: string): string {
 function basePromptHash(): string {
   // Resolve relative to this package's location
   const dir = fileURLToPath(new URL("../../core/prompts/base.md", import.meta.url));
-  let text: string;
-  try {
-    text = readFileSync(dir, "utf8");
-  } catch {
-    return sha256("(missing)");
-  }
-  return sha256(text);
+  return sha256(readFileSync(dir, "utf8"));
 }
 
 /**
@@ -172,16 +168,10 @@ function basePromptHash(): string {
  * @param cwd - working directory for git commands
  */
 export function gitProvenance(cwd: string): { commit: string; dirty: boolean } {
-  let commit = "(unknown)";
-  let dirty = false;
-  try {
-    commit = execSync("git rev-parse HEAD", { cwd, encoding: "utf8" }).trim();
-    const status = execSync("git status --porcelain", { cwd, encoding: "utf8" }).trim();
-    dirty = status.length > 0;
-  } catch {
-    // Not a git repo or git unavailable
-  }
-  return { commit, dirty };
+  const commit = execSync("git rev-parse HEAD", { cwd, encoding: "utf8" }).trim();
+  const status = execSync("git status --porcelain", { cwd, encoding: "utf8" }).trim();
+  if (!/^[a-f0-9]{40,64}$/.test(commit)) throw new Error("git did not report a valid commit");
+  return { commit, dirty: status.length > 0 };
 }
 
 /**
@@ -195,7 +185,7 @@ export function buildProvenance(cwd: string): Omit<Provenance, "frameworks" | "i
     commit: git.commit,
     dirty: git.dirty,
     runnerVersion: runnerVersion(),
-    engine: "isolated-vm",
+    engine: "pending",
     basePrompt: basePromptHash(),
   };
 }
@@ -218,11 +208,49 @@ export function resolveConfig(
   flags: EvalFlags,
   availableProblems: Array<{ id: string; size: string; set: string }>,
 ): RunConfig {
+  const concurrency = flags.concurrency ?? DEFAULT_CONCURRENCY;
+  if (!Number.isSafeInteger(concurrency) || concurrency < 1) throw new Error("concurrency must be a positive integer");
+  const provider = flags.provider ?? "openrouter";
+  const usageMode = flags.usageMode ?? "monetary";
+  if (provider !== "openrouter" && provider !== "chatgpt" && provider !== "deepseek") throw new Error("Unknown provider");
+  if (usageMode !== "monetary" && usageMode !== "subscription" && usageMode !== "estimated") throw new Error("Unknown usage mode");
+  if ((provider === "deepseek") !== (usageMode === "estimated")) throw new Error("DeepSeek requires explicit estimated usage mode");
+  if ((provider === "chatgpt") !== (usageMode === "subscription")) throw new Error("ChatGPT requires explicit subscription usage mode; OpenRouter requires monetary mode");
+  if (provider === "chatgpt") {
+    if (!flags.subscriptionLimits) throw new Error("Subscription usage requires explicit call, token and duration limits");
+    validateSubscriptionLimits(flags.subscriptionLimits);
+    if (concurrency !== 1) throw new Error("Subscription campaigns require concurrency 1");
+    if (!flags.model || flags.model.includes("/")) throw new Error("Select an explicit account-available OpenAI model slug");
+  } else if (flags.subscriptionLimits) throw new Error("Subscription limits require ChatGPT provider");
+  if (provider === "deepseek") {
+    if (!flags.estimatedLimits) throw new Error("DeepSeek requires explicit estimate, call, token and duration limits");
+    validateSubscriptionLimits(flags.estimatedLimits);
+    if (!Number.isFinite(flags.estimatedLimits.estimateLimitUsd) || flags.estimatedLimits.estimateLimitUsd <= 0) throw new Error("Invalid estimate limit");
+    if (concurrency !== 1) throw new Error("DeepSeek campaigns require concurrency 1");
+    if (flags.model !== "deepseek-flash" || (flags.secondaryModel && flags.secondaryModel !== "deepseek-flash")) throw new Error("Select deepseek-flash; retired aliases are not supported");
+  } else if (flags.estimatedLimits) throw new Error("Estimated limits require DeepSeek provider");
   validateModel(flags.model);
   if (flags.secondaryModel) validateModel(flags.secondaryModel);
 
   const frameworks = expandModes(flags.mode);
   if (frameworks.length === 0) throw new Error("No framework modes selected (--mode)");
+
+  const classifierEnabled = frameworks.some(id => parseFrameworkVariant(id).variant.rerank === "classifier");
+  const classifierProvider = flags.classifierProvider ?? "openrouter-decisions";
+  if (classifierEnabled) {
+    if (classifierProvider === "typesafe") {
+      if (provider !== "deepseek" || usageMode !== "estimated") throw new Error("Direct TypeSafe requires explicit DeepSeek estimated mode; mixed subscription/paid use is unsupported");
+      if (flags.classifierModel !== "jev-1.14.0") throw new Error("Direct TypeSafe requires pinned jev-1.14.0");
+      if (!flags.classifierLimits) throw new Error("Direct TypeSafe requires campaign classifier call/token/duration/estimate limits");
+      validateSubscriptionLimits(flags.classifierLimits);
+      if (!Number.isFinite(flags.classifierLimits.estimateLimitUsd) || flags.classifierLimits.estimateLimitUsd <= 0) throw new Error("Invalid classifier estimate limit");
+    } else if (classifierProvider === "openrouter-decisions") {
+      if (provider !== "openrouter" || usageMode !== "monetary") throw new Error("OpenRouter classifier requires OpenRouter monetary accounting; mixed usage is unsupported");
+      if (!isDecisionsModel(flags.classifierModel)) throw new Error("Select an explicit supported classifier model");
+      if (flags.classifierLimits) throw new Error("Classifier estimate limits require direct TypeSafe");
+    } else throw new Error("Unknown classifier provider");
+    validateClassifierPolicy(flags.classifierThreshold!, "noul-v1");
+  } else if (flags.classifierModel !== undefined || flags.classifierThreshold !== undefined || flags.classifierProvider !== undefined || flags.classifierLimits !== undefined) throw new Error("Classifier settings require orchestrate[rerank=classifier]");
 
   const problemIds = selectProblems(flags.problems, availableProblems);
   if (problemIds.length === 0) throw new Error("No problems selected (--problems)");
@@ -240,8 +268,12 @@ export function resolveConfig(
     frameworks,
     tier: flags.tools,
     reps: flags.reps,
-    budgetUsd: flags.budget,
-    concurrency: flags.concurrency,
+    budgetUsd: usageMode !== "monetary" ? null : flags.budget,
+    provider, usageMode,
+    ...(flags.estimatedLimits ? { estimatedLimits: flags.estimatedLimits } : {}),
+    ...(flags.subscriptionLimits ? { subscriptionLimits: flags.subscriptionLimits } : {}),
+    concurrency,
+    ...(classifierEnabled ? { classifier: { provider: classifierProvider, ...(flags.classifierLimits ? { limits: flags.classifierLimits } : {}), model: flags.classifierModel!, threshold: flags.classifierThreshold!, policy: "noul-v1" as const } } : {}),
     models: {
       main: flags.model,
       secondary: flags.secondaryModel ?? flags.model,

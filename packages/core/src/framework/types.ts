@@ -55,7 +55,9 @@ export interface OrchestrateOptions {
   /** Workspace root for change tracking and, by default, reading code references. */
   workspaceRoot: string;
   /** Rerank stage: `llm` (default) or `none` (ablation). */
-  rerank?: "llm" | "none";
+  rerank?: "llm" | "none" | "classifier";
+  /** Explicit typed classifier; never a chat-completion adapter. */
+  classifier?: { client: import("@aiw/llm").DecisionsClient; model: string; threshold: number; policy: "noul-v1" };
   /** Model of the LLM reranker; default = `model`. */
   rerankModel?: string;
   /** Reads current code for references; default reads files under `workspaceRoot`. */
@@ -75,7 +77,7 @@ export interface BuildOptions {
   /** Already checked/composed by the caller. */
   host: Host;
   /** Variant keys: `branch-only[toolSearch]`, `catalog=N` (any framework), `orchestrate[hotPaths]`, `orchestrate[executor=calls]`. */
-  variant?: { toolSearch?: boolean; catalog?: number; hotPaths?: boolean; executor?: "branch" | "calls" };
+  variant?: import("./variant.ts").FrameworkVariantKeys;
   /** Required for `orchestrate`. */
   orchestrate?: OrchestrateOptions;
   /** Default QuickJS. */

@@ -18,7 +18,8 @@ function passRate(jobs: JobSummary[]): string {
 
 function meanCost(jobs: JobSummary[]): string {
   if (jobs.length === 0) return "";
-  const mean = jobs.reduce((s, j) => s + j.costUsdAllAttempts, 0) / jobs.length;
+  if (jobs.some((j) => j.costUsdAllAttempts == null)) return "unknown";
+  const mean = jobs.reduce((s, j) => s + j.costUsdAllAttempts!, 0) / jobs.length;
   return `$${mean.toFixed(4)}`;
 }
 

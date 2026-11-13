@@ -1,51 +1,100 @@
 #!/usr/bin/env node
-/**
- * Bundles the server into dist/aiw-server.mjs and copies external packages + prompts alongside it.
- * Run with: node build.mjs (from packages/server/)
- *
- * The bundle uses `readFileSync(new URL("../../prompts/...", import.meta.url))` which in the
- * source tree resolves to packages/core/prompts/. In the bundle, import.meta.url points to the
- * bundle file itself, so "../../prompts/" would escape the bundle directory. We patch the output
- * to "../../prompts/" → "./prompts/" and copy the prompts into dist/prompts/.
- */
+/** Build the exact server artifact mounted by the runner, or verify its reproducible freshness. */
 import { build } from "esbuild";
-import { cpSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { resolve, dirname } from "node:path";
+import { cpSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync, mkdtempSync } from "node:fs";
+import { resolve, dirname, join } from "node:path";
+import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const root = resolve(__dirname, "../..");
-const outDir = resolve(__dirname, "dist");
-const bundlePath = resolve(outDir, "aiw-server.mjs");
+const directory = dirname(fileURLToPath(import.meta.url));
+const root = resolve(directory, "../..");
+const dist = resolve(directory, "dist");
 
-// Clean dist
-rmSync(outDir, { recursive: true, force: true });
-mkdirSync(outDir, { recursive: true });
-
-await build({
-  entryPoints: [resolve(__dirname, "src/cli.ts")],
-  bundle: true,
-  platform: "node",
-  format: "esm",
-  target: "node22",
-  outfile: bundlePath,
-  external: ["isolated-vm", "typescript-api"],
-  logLevel: "warning",
-});
-
-// Patch prompt path: "../../prompts/" → "./prompts/" so readFileSync resolves inside dist/.
-let bundle = readFileSync(bundlePath, "utf8");
-const patched = bundle.replaceAll('"../../prompts/"', '"./prompts/"');
-if (patched === bundle) throw new Error("Prompt path not found in bundle — check prompts.ts");
-writeFileSync(bundlePath, patched);
-
-// Copy prompt files into dist/prompts/.
-cpSync(resolve(root, "packages/core/prompts"), resolve(outDir, "prompts"), { recursive: true });
-
-// Copy external native/CJS packages so Node can resolve them from the bundle's location.
-mkdirSync(resolve(outDir, "node_modules"), { recursive: true });
-for (const pkg of ["isolated-vm", "typescript-api"]) {
-  cpSync(resolve(root, "node_modules", pkg), resolve(outDir, "node_modules", pkg), { recursive: true });
+/** Build source and prompts; native dependency copying is omitted for freshness verification. */
+export async function buildServer(outDir, copyDependencies = true) {
+  rmSync(outDir, { recursive: true, force: true });
+  mkdirSync(outDir, { recursive: true });
+  const bundlePath = resolve(outDir, "aiw-server.mjs");
+  await build({
+    absWorkingDir: root,
+    entryPoints: [resolve(directory, "src/cli.ts")],
+    bundle: true,
+    platform: "node",
+    format: "esm",
+    target: "node22",
+    outfile: bundlePath,
+    external: ["isolated-vm", "typescript-api"],
+    logLevel: "warning",
+  });
+  const bundle = readFileSync(bundlePath, "utf8");
+  let patched = bundle;
+  for (const [source, destination] of [
+    ['"../../prompts/"', '"./prompts/"'],
+    ['"../python"', '"./python"'],
+    ['"../../../fixtures/external/"', '"./fixtures/external/"'],
+  ]) {
+    if (!patched.includes(source)) throw new Error(`Resource path not found in bundle: ${source}`);
+    patched = patched.replaceAll(source, destination);
+  }
+  writeFileSync(bundlePath, patched);
+  cpSync(resolve(root, "packages/core/prompts"), resolve(outDir, "prompts"), { recursive: true });
+  cpSync(resolve(root, "packages/tools/python"), resolve(outDir, "python"), {
+    recursive: true, filter: source => !source.endsWith("__pycache__") && !source.endsWith(".pyc"),
+  });
+  cpSync(resolve(root, "packages/tools/fixtures/external"), resolve(outDir, "fixtures/external"), { recursive: true });
+  if (copyDependencies) {
+    mkdirSync(resolve(outDir, "node_modules"), { recursive: true });
+    const copied = new Set();
+    /** Copy the installed, lockfile-resolved runtime dependency closure, never install packages here. */
+    function copyPackage(pkg) {
+      if (copied.has(pkg)) return;
+      copied.add(pkg);
+      const source = resolve(root, "node_modules", pkg);
+      const manifest = JSON.parse(readFileSync(resolve(source, "package.json"), "utf8"));
+      // Prefer ABI-tagged package prebuilds, never a foreign host's build/Release addon.
+      cpSync(source, resolve(outDir, "node_modules", pkg), {
+        recursive: true, filter: path => pkg !== "isolated-vm" || path !== resolve(source, "build"),
+      });
+      for (const dependency of Object.keys(manifest.dependencies ?? {})) copyPackage(dependency);
+    }
+    for (const pkg of ["isolated-vm", "typescript-api"]) copyPackage(pkg);
+  }
 }
 
-console.log("Built: dist/aiw-server.mjs + dist/prompts/ + dist/node_modules/{isolated-vm,typescript-api}");
+/** List portable artifacts recursively, excluding machine-specific external dependencies. */
+function artifacts(dir, prefix = "") {
+  return readdirSync(dir, { withFileTypes: true }).flatMap(entry => {
+    if (!prefix && entry.name === "node_modules") return [];
+    const relative = join(prefix, entry.name);
+    return entry.isDirectory() ? artifacts(join(dir, entry.name), relative) : [relative];
+  }).sort();
+}
+
+/** Compare actual generated bytes and file inventory without mutating the checked-in artifact. */
+export async function checkServerBundle() {
+  const temporary = mkdtempSync(join(tmpdir(), "aiw-server-freshness-"));
+  try {
+    await buildServer(temporary, false);
+    const expected = artifacts(temporary);
+    const actual = artifacts(dist);
+    if (JSON.stringify(expected) !== JSON.stringify(actual)) throw new Error("Server artifact inventory is stale; run npm run build -w @aiw/server");
+    for (const file of expected) {
+      if (!readFileSync(join(temporary, file)).equals(readFileSync(join(dist, file)))) {
+        throw new Error(`Server artifact is stale: ${file}; run npm run build -w @aiw/server`);
+      }
+    }
+  } finally {
+    rmSync(temporary, { recursive: true, force: true });
+  }
+}
+
+if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  if (process.argv.length > 3 || (process.argv[2] && process.argv[2] !== "--check")) throw new Error("Usage: node build.mjs [--check]");
+  if (process.argv[2] === "--check") {
+    await checkServerBundle();
+    console.log("Server bundle and portable resources match source.");
+  } else {
+    await buildServer(dist);
+    console.log("Built: dist/aiw-server.mjs + dist/prompts/ + dist/python/ + dist/fixtures/ + native dependency closure");
+  }
+}

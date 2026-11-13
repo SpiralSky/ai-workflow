@@ -1,0 +1,19 @@
+{
+  "cases": [
+    {
+      "match": {
+        "url": "docs.python.org"
+      },
+      "result": {
+        "url": "{{url}}",
+        "title": "Python 3.12 documentation",
+        "text": "Python 3.12 documentation. Welcome! This is the official documentation for Python 3.12. Parts of the documentation: What's new, Tutorial, Library reference, Language reference."
+      }
+    }
+  ],
+  "default": {
+    "url": "{{url}}",
+    "title": "Example Domain",
+    "text": "Example Domain. This domain is for use in illustrative examples in documents. You may use this domain in literature without prior coordination or asking for permission."
+  }
+}

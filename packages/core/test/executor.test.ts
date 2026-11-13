@@ -258,7 +258,7 @@ test("handoff record has exactly the §8.4 fields; references and hot paths are 
     },
   });
   t.input.step = t.store.startStep({ instruction: "use @prior and check @s1" });
-  t.input.hotPaths = [{ id: "hp1", description: "widen search", code: "async (tools) => 1" }];
+  t.input.hotPaths = [{ id: "hp1", description: "widen search", tools: ["readFile"], outcome: "empty-result", code: "async (tools) => 1" }];
   t.input.override = ["readFile"];
   const r = await t.run();
   assert.deepEqual(Object.keys(r.handoff).sort(), ["budget", "hotPaths", "instruction", "model", "references", "selection"]);

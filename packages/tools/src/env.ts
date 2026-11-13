@@ -1,8 +1,8 @@
 /** Env var name prefixes that never reach tool processes (system-overview §7). */
-const SECRET_PREFIXES = ["OPENAI_", "ANTHROPIC_", "OPENROUTER_"];
+const SECRET_PREFIXES = ["OPENAI_", "ANTHROPIC_", "OPENROUTER_", "DEEPSEEK_", "TYPESAFE_", "CHATGPT_"];
 
 /**
- * Copy of an environment with API secrets removed: `OPENAI_*`, `ANTHROPIC_*`, `OPENROUTER_*` and any
+ * Copy of an environment with API secrets removed: provider-prefixed variables (including direct DeepSeek/TypeSafe and defensive ChatGPT names) and any
  * names listed (comma-separated) in `AIW_SECRET_NAMES`.
  * @param base - source environment
  */

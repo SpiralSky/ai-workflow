@@ -1,0 +1,58 @@
+{
+  "cases": [
+    {
+      "match": {
+        "op": "set"
+      },
+      "result": {
+        "flag": {
+          "name": "{{flag}}",
+          "enabled": true,
+          "rollout": 100
+        },
+        "updated": true
+      }
+    },
+    {
+      "match": {
+        "op": "get",
+        "flag": "new-checkout"
+      },
+      "result": {
+        "flag": {
+          "name": "new-checkout",
+          "enabled": true,
+          "rollout": 25
+        }
+      }
+    },
+    {
+      "match": {
+        "op": "get"
+      },
+      "result": {
+        "flag": {
+          "name": "{{flag}}",
+          "enabled": false,
+          "rollout": 0
+        }
+      }
+    }
+  ],
+  "default": {
+    "flags": [
+      {
+        "name": "new-checkout",
+        "enabled": true
+      },
+      {
+        "name": "dark-mode",
+        "enabled": false
+      },
+      {
+        "name": "beta-search",
+        "enabled": true
+      }
+    ]
+  }
+}

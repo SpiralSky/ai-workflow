@@ -6,8 +6,12 @@ export interface Reporter {
   readonly scope: string | null;
   turn(e: {
     model: string;
+    providerModel?: string;
+    providerSystemFingerprint?: string;
     role: Role;
-    usage: Usage;
+    usage?: Usage;
+    classifierEstimate?: { basis: string; estimatedUsd: number; inputTokens: number; outputTokens: number };
+    deepseekEstimate?: { basis: string; estimatedUsd: number; cacheHitTokens: number; cacheMissTokens: number; outputTokens: number };
     costUsd?: number;
     cacheHit?: boolean;
     latencyMs: number;

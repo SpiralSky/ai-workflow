@@ -98,7 +98,7 @@ export function Sidebar({ runs, selectedRunId, onSelect }: Props) {
                 </span>
               )}
               <span style={{ color: "var(--fg3)", marginLeft: "auto" }}>
-                ${run.totals.costUsd.toFixed(3)}
+                {run.totals.costUsd == null ? "unknown" : "$" + run.totals.costUsd.toFixed(3)}
               </span>
             </div>
           </button>

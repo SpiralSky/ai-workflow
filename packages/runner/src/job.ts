@@ -1,3 +1,4 @@
+import { createDecisionsClient } from "@aiw/llm";
 /**
  * Runs one job attempt end to end.
  * Runner architecture §4; job lifecycle §4.1–§4.4.
@@ -15,10 +16,19 @@ import { openMCPSession, closeMCPSession } from "./mcp.ts";
 import { gradeJob } from "./grade.ts";
 import { runLoop } from "./loop.ts";
 import { createJobDir } from "./rundir.ts";
+import { readAttemptCost, AttemptFailure } from "./accounting.ts";
+import { frameworkLaunch } from "./framework-launch.ts";
+import { attestJob, verifyStaticProvenance, inspectContainerImage } from "./provenance.ts";
+import { onCancellation } from "./cancellation.ts";
 
 /** Options for running a single job attempt. */
 export interface JobOptions {
   job: Job;
+  provenance?: import("./types.ts").Provenance;
+  /** Persist observations before any model request; failure stops the attempt. */
+  onProvenance?: () => void | Promise<void>;
+  /** Zero-based retry number for per-attempt telemetry. */
+  attempt?: number;
   config: RunConfig;
   runPath: string;
   repoRoot: string;
@@ -26,8 +36,14 @@ export interface JobOptions {
   apiKey: string;
   /** LLM base URL. */
   baseURL: string;
-  /** AbortSignal for budget cancellation. */
+  /** AbortSignal for budget and fail-fast cancellation. */
   signal?: AbortSignal;
+  /** Host-only shared subscription gate; absent for the unchanged paid API client. */
+  classifierEstimated?: ReturnType<typeof import("./classifier-estimated.ts").boundClassifierEstimatedClient>;
+  estimated?: ReturnType<typeof import("./estimated.ts").boundEstimatedClient>;
+  subscription?: ReturnType<typeof import("./subscription.ts").boundSubscriptionClient>;
+  /** Notify the campaign before terminal failure cleanup, so siblings stop promptly. */
+  onFailure?: () => void;
   /** Per-problem turn limits override (task.json is the authoritative source; this is for overrides). */
   turnLimits: Record<string, number>;
   /** Path to the problem directories. */
@@ -66,14 +82,26 @@ function buildSystemPrompt(frameworkInstructions: string): string {
 export async function runJobAttempt(opts: JobOptions): Promise<JobResult> {
   const { job, config, runPath, repoRoot, apiKey, baseURL, signal, turnLimits, problemsDir } = opts;
 
-  const jobDir = createJobDir(runPath, job);
+  if (config.provider === "chatgpt" && (!opts.subscription || config.usageMode !== "subscription")) throw new Error("ChatGPT requires bounded subscription runtime");
+  if (config.provider === "deepseek" && (!opts.estimated || config.usageMode !== "estimated")) throw new Error("DeepSeek requires bounded estimate runtime");
+  if (opts.estimated && (config.provider !== "deepseek" || opts.subscription)) throw new Error("Estimated runtime cannot be mixed with another provider");
+  const client = opts.estimated?.client ?? opts.subscription?.client ?? createChatClient({ baseURL, apiKey, timeoutMs: 300_000 });
+
+  // Validate treatment before creating artifacts or starting any container.
+  const launch = frameworkLaunch(job.framework, config);
+  if (config.classifier?.provider === "openrouter-decisions" && launch.id.includes("rerank=classifier") && baseURL.replace(/\/$/, "") !== "https://openrouter.ai/api/v1") throw new Error("Classifier campaigns require the canonical OpenRouter chat provider; cross-endpoint credentials are refused");
+  if (config.classifier?.provider === "typesafe" && (!opts.classifierEstimated || config.provider !== "deepseek" || config.usageMode !== "estimated")) throw new Error("Direct classifier requires bounded host runtime");
+  if (opts.classifierEstimated && config.classifier?.provider !== "typesafe") throw new Error("Classifier runtime/provider mismatch");
+  const classifierClient = config.classifier && launch.id.includes("rerank=classifier")
+    ? config.classifier.provider === "typesafe" ? opts.classifierEstimated!.client : createDecisionsClient({ apiKey, model: config.classifier.model }) : undefined;
+  const jobDir = job.dir ?? createJobDir(runPath, job);
   const eventsPath = join(jobDir, "events.jsonl");
   const sink = new FileSink(eventsPath);
   const reporter = createReporter({ sink, writer: "r" });
 
   writeJobStart(reporter, {
     job: `${job.problem}.${job.framework}.${job.rep}`,
-    attempt: 0,
+    attempt: opts.attempt ?? 0,
     framework: job.framework,
     problem: job.problem,
     rep: job.rep,
@@ -82,40 +110,55 @@ export async function runJobAttempt(opts: JobOptions): Promise<JobResult> {
   const startMs = Date.now();
   let outcome: "pass" | "fail" = "fail";
   let reason: JobResult["reason"] = null;
-  let costUsd = 0;
+  let failure: unknown;
+  let failed = false;
+  const costReasons: string[] = [];
+  let modelLoopStarted = false;
 
   const problemDir = join(problemsDir, job.problem);
 
   try {
-    // Build image and start container (stubs in this implementation)
+    signal?.throwIfAborted();
     await buildImage(problemDir, job.problem);
-    // orchestrate executor makes LLM calls from inside the container; bridge gives outbound internet access
-    const ctr = await startContainer(job.problem, jobDir, join(repoRoot, "packages", "server", "dist"), job.framework === "orchestrate" ? "bridge" : undefined);
+    signal?.throwIfAborted();
+    // Every executor uses the closed-until-attested host broker; task containers need no egress.
+    const ctr = await startContainer(job.problem, jobDir, join(repoRoot, "packages", "server", "dist"), launch.network);
 
+    const settleCancellation = onCancellation(signal, async () => {
+      if (modelLoopStarted) costReasons.push("cancelled-container-lifecycle");
+      try { await killContainer(ctr); }
+      catch { costReasons.push("container-cancel-failed"); }
+    });
+    let session: Awaited<ReturnType<typeof openMCPSession>> | undefined;
     try {
+      signal?.throwIfAborted();
       const serverArgs = [
         "--engine", "isolated-vm",
-        "--framework", job.framework,
+        "--framework", launch.id,
         "--tier", config.tier ?? "S",
+        "--branch-context", config.branch.context,
         "--host", "local",
         "--root", "/work",
         "--events", "/out/events.jsonl",
         "--transcript", "/out/transcript.jsonl",
         "--blobs", "/out/blobs",
-        ...(job.framework === "orchestrate" ? [
-          "--executor-model", config.models.secondary,
-          "--executor-api-key", apiKey,
-          "--executor-base-url", baseURL,
-          "--secondary-cap", String(config.secondaryCap),
-        ] : []),
+        ...launch.executorArgs,
       ];
       const serverDescriptor = await startServer(ctr, serverArgs);
-      const session = await openMCPSession(serverDescriptor);
+      session = await openMCPSession(serverDescriptor, launch.needsExecutor
+        ? { secondaryClient: client, secondaryModel: config.models.secondary, signal,
+            ...(classifierClient ? { classifierClient } : {}) } : undefined);
 
+      signal?.throwIfAborted();
+      if (!opts.provenance || !opts.onProvenance) throw new Error("job lacks persisted provenance gate");
+      verifyStaticProvenance(repoRoot, config, opts.provenance, job.problem);
+      if (turnLimits[job.problem] !== undefined && turnLimits[job.problem] !== opts.provenance.problems[job.problem]?.turnLimit) throw new Error("turn-limit override differs from attested problem");
+      attestJob(opts.provenance, config, job.problem, launch.id, await inspectContainerImage(ctr.id), session);
+      await opts.onProvenance();
+      signal?.throwIfAborted();
       const taskText = readTaskText(problemsDir, job.problem);
       const systemPrompt = buildSystemPrompt(session.instructions ?? "");
 
-      const client = createChatClient({ baseURL, apiKey, timeoutMs: 300_000 });
       // Read turnLimit from task.json; turnLimits map allows overrides, fallback to 20.
       const taskJsonPath = join(problemsDir, job.problem, "task.json");
       const taskJson = existsSync(taskJsonPath)
@@ -123,6 +166,9 @@ export async function runJobAttempt(opts: JobOptions): Promise<JobResult> {
         : {};
       const turnLimit = turnLimits[job.problem] ?? taskJson.turnLimit ?? 20;
 
+      signal?.throwIfAborted();
+      modelLoopStarted = true;
+      session.inferenceAdmission?.open();
       const loopResult = await runLoop({
         client,
         reporter,
@@ -134,11 +180,15 @@ export async function runJobAttempt(opts: JobOptions): Promise<JobResult> {
         turnLimit,
         framework: job.framework,
         signal,
+        onInfraError: opts.onFailure,
       });
 
-      costUsd += loopResult.metrics.costUsd;
+      session.inferenceAdmission?.close();
+      modelLoopStarted = false;
+      costReasons.push(...(loopResult.metrics.costIncompleteReasons ?? []));
 
       if (loopResult.outcome === "infra-error") {
+        costReasons.push("unobserved-failed-model-request");
         throw new Error(`infra error: ${loopResult.infraError}`);
       }
       if (loopResult.outcome === "turn-limit") {
@@ -148,7 +198,12 @@ export async function runJobAttempt(opts: JobOptions): Promise<JobResult> {
       } else {
         // Model finished; grade the result
         await closeMCPSession(session);
-        const gradeResult = await gradeJob(ctr, problemDir, jobDir);
+        session = undefined;
+        signal?.throwIfAborted();
+        verifyStaticProvenance(repoRoot, config, opts.provenance!, job.problem);
+        const gradeResult = await gradeJob(ctr, problemDir, jobDir, opts.provenance!.images[job.problem]);
+        signal?.throwIfAborted();
+        verifyStaticProvenance(repoRoot, config, opts.provenance!, job.problem);
         if (gradeResult.pass) {
           outcome = "pass";
           reason = null;
@@ -156,20 +211,33 @@ export async function runJobAttempt(opts: JobOptions): Promise<JobResult> {
           reason = gradeResult.reason ?? "checks";
         }
       }
+      if (outcome !== "pass") opts.onFailure?.();
+    } catch (error) {
+      opts.onFailure?.();
+      throw error;
     } finally {
-      await removeContainer(ctr).catch(() => void 0);
+      if (session) {
+        try { await closeMCPSession(session); }
+        catch { costReasons.push("server-close-failed"); }
+      }
+      await settleCancellation();
+      await removeContainer(ctr).catch(() => { costReasons.push("container-stop-failed"); });
     }
   } catch (e) {
-    // Re-throw for job.ts retry logic
-    throw e;
+    opts.onFailure?.();
+    failure = e;
+    failed = true;
+    if (modelLoopStarted) costReasons.push("unobserved-failed-model-request");
+  } finally {
+    writeJobEnd(reporter, { outcome: failed ? "infra-error" : outcome, reason: reason ?? undefined });
+    sink.close();
   }
 
   const durationMs = Date.now() - startMs;
 
-  writeJobEnd(reporter, { outcome, reason: reason ?? undefined });
-  sink.close();
-
-  return { outcome, reason, costUsd, durationMs, eventsPath };
+  const cost = readAttemptCost(eventsPath, costReasons);
+  if (failed) throw new AttemptFailure(failure, cost, eventsPath, durationMs);
+  return { outcome, reason, ...cost, durationMs, eventsPath };
 }
 
 /**

@@ -1,19 +1,22 @@
+import { createHostClassifierClient } from "./host-classifier.ts";
+import { createHash } from "node:crypto";
+import { readFileSync } from "node:fs";
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import { CallToolRequestSchema, ListToolsRequestSchema } from "@modelcontextprotocol/sdk/types.js";
-import { buildFramework, buildRegistry, type Host } from "@aiw/core";
-import { createReporter, NoopSink, FileSink } from "@aiw/telemetry";
+import { CallToolRequestSchema, ListToolsRequestSchema, type Request, type Notification } from "@modelcontextprotocol/sdk/types.js";
+import { hotPathCatalogFingerprint, HOT_PATH_PROMPT_KEY, buildFramework, buildRegistry, isolatedVMRuntime, quickJSRuntime, loadPrompt, type Host } from "@aiw/core";
+import { canonicalJSON, createReporter, NoopSink, FileSink, fromMeta } from "@aiw/telemetry";
 import { createChatClient } from "@aiw/llm";
+import { createHostLLMClient } from "./host-client.ts";
 import type { FrameworkKind } from "@aiw/core";
 
-/** Parsed variant keys from the --framework flag. */
-export interface VariantKeys {
-  toolSearch?: boolean;
-  catalog?: number;
-}
+/** Parsed variant keys shared with runner/core. */
+export type VariantKeys = import("@aiw/core").FrameworkVariantKeys;
 
 /** Options for `startServer`. */
 export interface ServerOptions {
+  /** Selected isolate runtime; omitted preserves the core QuickJS default. */
+  runtime?: import("@aiw/core").IsolateRuntime;
   /** Framework kind (baseline | branch-only | orchestrate). */
   kind: FrameworkKind;
   /** Parsed variant keys. */
@@ -32,6 +35,8 @@ export interface ServerOptions {
   readOnly?: boolean;
   /** Orchestrate executor: model id (framework-server §5). */
   orchestrateModel?: string;
+  /** Host broker leaves all provider credentials outside the task container. */
+  orchestrateProvider?: "openrouter" | "host";
   /** Orchestrate executor: API key. */
   orchestrateApiKey?: string;
   /** Orchestrate executor: base URL (default: https://openrouter.ai/api/v1). */
@@ -40,6 +45,8 @@ export interface ServerOptions {
   orchestrateWorkspaceRoot?: string;
   /** Orchestrate executor: per-executor turn cap (default 4). */
   secondaryCap?: number;
+  classifierModel?: string;
+  classifierThreshold?: number;
 }
 
 /**
@@ -52,19 +59,22 @@ export async function startServer(opts: ServerOptions): Promise<void> {
   const hostDecls = await opts.host.tools();
   const registry = buildRegistry(hostDecls);
 
+  let mcpServer: Server<Request, Notification>;
   // 2. Build orchestrate options if needed.
   let orchestrateOpts: import("@aiw/core").OrchestrateOptions | undefined;
   if (opts.kind === "orchestrate") {
     if (!opts.orchestrateModel) throw new Error("orchestrate requires --executor-model");
-    if (!opts.orchestrateApiKey) throw new Error("orchestrate requires an executor API key (--executor-api-key or OPENROUTER_API_KEY)");
-    const client = createChatClient({
+    if (opts.orchestrateProvider !== "host" && !opts.orchestrateApiKey) throw new Error("orchestrate requires an executor API key (--executor-api-key or OPENROUTER_API_KEY)");
+    const client = opts.orchestrateProvider === "host" ? createHostLLMClient(() => mcpServer) : createChatClient({
       baseURL: opts.orchestrateBaseURL ?? "https://openrouter.ai/api/v1",
-      apiKey: opts.orchestrateApiKey,
+      apiKey: opts.orchestrateApiKey!,
       timeoutMs: 300_000,
     });
+    if (opts.variant?.rerank === "classifier" && (opts.orchestrateProvider !== "host" || !opts.classifierModel || opts.classifierThreshold === undefined)) throw new Error("Classifier requires explicit host model/settings");
     orchestrateOpts = {
       client,
       model: opts.orchestrateModel,
+      ...(opts.variant?.rerank === "classifier" ? { classifier: { client: createHostClassifierClient(() => mcpServer), model: opts.classifierModel!, threshold: opts.classifierThreshold!, policy: "noul-v1" as const } } : {}),
       workspaceRoot: opts.orchestrateWorkspaceRoot ?? process.cwd(),
       ...(opts.secondaryCap !== undefined ? { turns: opts.secondaryCap } : {}),
     };
@@ -72,6 +82,7 @@ export async function startServer(opts: ServerOptions): Promise<void> {
 
   // 3. Assemble the framework.
   const framework = buildFramework(opts.kind, registry, {
+    runtime: opts.runtime,
     host: opts.host,
     variant: opts.variant,
     branchContext: opts.branchContext,
@@ -81,7 +92,7 @@ export async function startServer(opts: ServerOptions): Promise<void> {
   });
 
   // 3. Create MCP Server with instructions set.
-  const mcpServer = new Server(
+  mcpServer = new Server<Request, Notification>(
     { name: "aiw-server", version: "1.0.0" },
     {
       capabilities: { tools: {} },
@@ -89,14 +100,28 @@ export async function startServer(opts: ServerOptions): Promise<void> {
     },
   );
 
+  // Derive this observation from the selected runtime object and executed entrypoint, not CLI strings.
+  const actualRuntime = opts.runtime ?? quickJSRuntime;
+  const engine = actualRuntime === isolatedVMRuntime ? "isolated-vm" : actualRuntime === quickJSRuntime ? "quickjs" : "custom-unattested";
+  const digest = (value: string | Buffer) => createHash("sha256").update(value).digest("hex");
+  const prompts = Object.fromEntries(["base", "branch-only", "branch-tool", "do-tool", "executor", "orchestrate", "rerank", "resolve-tool"]
+    .map((name) => [name, digest(loadPrompt(name))]));
+  prompts[HOT_PATH_PROMPT_KEY] = hotPathCatalogFingerprint();
+  const entryHash = process.argv[1] ? digest(readFileSync(process.argv[1])) : null;
+
   // 4. Advertise framework tools via tools/list.
   mcpServer.setRequestHandler(ListToolsRequestSchema, async () => ({
+    _meta: { "aiw/runtimeProvenance": { version: 1, engine, entryHash, prompts, catalogHash: digest(canonicalJSON(hostDecls)), settings: { kind: opts.kind, variant: opts.variant ?? {}, branchContext: opts.branchContext ?? "trace", secondaryCap: opts.secondaryCap ?? 4, secondaryTemperature: orchestrateOpts?.temperature ?? null, ...(orchestrateOpts?.classifier ? { classifier: { model: orchestrateOpts.classifier.model, threshold: orchestrateOpts.classifier.threshold, policy: orchestrateOpts.classifier.policy } } : {}) }, nodeVersion: process.version, runtimePlatform: { platform: process.platform, arch: process.arch, moduleABI: process.versions.modules } } },
     tools: framework.tools.map((t) => ({
       name: t.name,
       description: t.description,
       inputSchema: t.inputSchema,
     })),
   }));
+
+  // One writer/counter per server process prevents overlapping request IDs.
+  const eventSink = opts.eventsPath ? new FileSink(opts.eventsPath) : new NoopSink();
+  const eventRoot = createReporter({ sink: eventSink, writer: "s" });
 
   // 5. Handle tool calls.
   mcpServer.setRequestHandler(CallToolRequestSchema, async (req, extra) => {
@@ -110,19 +135,10 @@ export async function startServer(opts: ServerOptions): Promise<void> {
       };
     }
 
-    // Build a reporter for this call.
-    const sink = opts.eventsPath ? new FileSink(opts.eventsPath) : new NoopSink();
-    const reporter = createReporter({ sink, writer: "s" });
-
-    // Extract telemetry parent from _meta if provided.
     const meta = req.params._meta as Record<string, unknown> | undefined;
-    const harnessId = typeof meta?.["aiw/harnessId"] === "string" ? meta["aiw/harnessId"] : undefined;
-    const parentId = typeof meta?.["aiw/parent"] === "string" ? meta["aiw/parent"] : undefined;
-    void parentId; // reserved for future telemetry correlation
-    void harnessId;
+    const reporter = fromMeta(meta, eventRoot);
 
-    // Abort controller for this call.
-    const ac = new AbortController();
+    // MCP cancellation must reach host, selection and executor work.
 
     // Throttled progress notification (≤ 2/s).
     const progressToken = meta?.progressToken;
@@ -132,7 +148,7 @@ export async function startServer(opts: ServerOptions): Promise<void> {
     const args = (req.params.arguments ?? {}) as Record<string, unknown>;
     const result = await toolDef.handle(args, {
       reporter,
-      signal: ac.signal,
+      signal: extra.signal,
       onEvent: progressToken !== undefined
         ? (e) => {
             const now = Date.now();
@@ -160,5 +176,12 @@ export async function startServer(opts: ServerOptions): Promise<void> {
 
   // 6. Connect via stdio transport.
   const transport = new StdioServerTransport();
+  // The SDK transport does not close itself on stdin EOF. Release long-lived sidecars explicitly.
+  const closeOnEOF = () => { void mcpServer.close(); };
+  process.stdin.once("end", closeOnEOF);
+  mcpServer.onclose = () => {
+    process.stdin.off("end", closeOnEOF);
+    void opts.host.close().catch(error => console.error("aiw-server: host close failed", error));
+  };
   await mcpServer.connect(transport);
 }

@@ -51,10 +51,10 @@ export function createChatClient(opts: ChatClientOptions): LLMClient {
           signal: abort,
         });
         text = await res.text();
-      } catch (e) {
-        // A caller's abort is not an infra error; rethrow it unchanged.
-        if (signal instanceof AbortSignal && signal.aborted) throw e;
-        throw new LLMError("infra", `request failed: ${(e as Error).message}`);
+      } catch {
+        // Provider/transport diagnostics may echo credentials or signed URLs; never expose them.
+        if (signal instanceof AbortSignal && signal.aborted) throw new DOMException("Model request cancelled", "AbortError");
+        throw new LLMError("infra", "Model request failed");
       }
 
       let json: any;
@@ -62,13 +62,13 @@ export function createChatClient(opts: ChatClientOptions): LLMClient {
         json = JSON.parse(text);
       } catch {
         const kind = res.ok ? "infra" : classifyAPIError(res.status, text);
-        throw new LLMError(kind, `HTTP ${res.status}: unparseable body: ${text.slice(0, 300)}`, res.status);
+        throw new LLMError(kind, `HTTP ${res.status}: invalid provider response`, res.status);
       }
       // OpenRouter can report upstream errors in a 200 body.
       if (!res.ok || json?.error) {
         const message = String(json?.error?.message ?? text).slice(0, 500);
         const status = res.ok ? numericCode(json?.error?.code) : res.status;
-        throw new LLMError(classifyAPIError(status, message), `HTTP ${res.status}: ${message}`, status);
+        throw new LLMError(classifyAPIError(status, message), `HTTP ${res.status}: provider request rejected`, status);
       }
 
       const choice = json?.choices?.[0];
@@ -77,7 +77,7 @@ export function createChatClient(opts: ChatClientOptions): LLMClient {
       }
       const msg = choice?.message;
       if (!msg || (!msg.content && !msg.tool_calls?.length)) {
-        throw new LLMError("infra", `empty response: ${text.slice(0, 300)}`, res.status);
+        throw new LLMError("infra", "empty provider response", res.status);
       }
       return { response: json, ...normaliseUsage("openai-chat", json) };
     },

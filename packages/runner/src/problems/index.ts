@@ -5,8 +5,8 @@
 
 import { execFile as _execFile } from "node:child_process";
 import { promisify } from "node:util";
-import { readdir, readFile, access, rm, stat, writeFile } from "node:fs/promises";
-import { join } from "node:path";
+import { readdir, readFile, access, rm, stat, writeFile, lstat, cp } from "node:fs/promises";
+import { join, resolve, relative, isAbsolute, sep } from "node:path";
 import { createHash } from "node:crypto";
 
 const execFile = promisify(_execFile);
@@ -45,6 +45,74 @@ async function allProblemIds(problemsDir: string): Promise<string[]> {
 async function readTaskJson(problemsDir: string, id: string): Promise<TaskJson> {
   const raw = await readFile(join(problemsDir, id, "task.json"), "utf8");
   return JSON.parse(raw) as TaskJson;
+}
+
+/** Reject links along an existing path so copy/delete cannot traverse outside the workspace. */
+async function rejectSymlinkPath(root: string, path: string): Promise<void> {
+  const parts = relative(root, path).split(sep).filter(Boolean);
+  let current = root;
+  for (const part of ["", ...parts]) {
+    if (part) current = join(current, part);
+    try {
+      if ((await lstat(current)).isSymbolicLink()) {
+        throw new Error(`overlay path traverses a symbolic link: ${current}`);
+      }
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") return;
+      throw error;
+    }
+  }
+}
+
+/**
+ * Apply overlay files, then consume (never copy) its root .delete control file.
+ * Reject unsafe deletion paths and symlink traversal before modifying the workspace.
+ * Missing overlays/control files are allowed; malformed files and I/O failures propagate.
+ */
+export async function applyProblemOverlay(overlayDir: string, workspaceDir: string): Promise<void> {
+  const root = resolve(workspaceDir);
+  try {
+    if (!(await lstat(overlayDir)).isDirectory()) throw new Error("overlay must be a directory, not a symlink");
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return;
+    throw error;
+  }
+  await rejectSymlinkPath(root, root);
+  const controlFile = join(overlayDir, ".delete");
+  let deleteList = "";
+  try {
+    if (!(await lstat(controlFile)).isFile()) throw new Error("overlay .delete must be a regular file");
+    deleteList = await readFile(controlFile, "utf8");
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+  }
+  const targets = deleteList.split("\n").map((line) => line.trim()).filter(Boolean).map((line) => {
+    const target = resolve(root, line);
+    const rel = relative(root, target);
+    if (isAbsolute(line) || line.includes("\0") || line.split(/[\\/]/).includes("..") ||
+        !rel || rel === ".." || rel.startsWith(`..${sep}`) || isAbsolute(rel)) {
+      throw new Error(`unsafe overlay .delete path: ${line}`);
+    }
+    return target;
+  });
+  for (const target of targets) await rejectSymlinkPath(root, target);
+
+  /** Preflight copy destinations too: an existing link must not redirect overlay writes. */
+  async function validateCopy(dir: string, prefix = ""): Promise<void> {
+    for (const entry of await readdir(dir, { withFileTypes: true })) {
+      if (!prefix && entry.name === ".delete") continue;
+      const rel = join(prefix, entry.name);
+      if (entry.isSymbolicLink()) throw new Error(`overlay symbolic links are unsupported: ${rel}`);
+      await rejectSymlinkPath(root, join(root, rel));
+      if (entry.isDirectory()) await validateCopy(join(dir, entry.name), rel);
+    }
+  }
+  await validateCopy(overlayDir);
+  await cp(overlayDir, root, {
+    recursive: true,
+    filter: (source) => resolve(source) !== resolve(controlFile),
+  });
+  for (const target of targets) await rm(target, { recursive: true, force: true });
 }
 
 /**
@@ -96,25 +164,7 @@ export async function buildProblems(problemIds: string[], problemsDir: string): 
       await rm(workspaceDir, { recursive: true, force: true });
       await execFile("cp", ["-r", codebaseDir + "/.", workspaceDir]);
 
-      // Apply overlay if present
-      const overlayDir = join(problemDir, "overlay");
-      try {
-        await access(overlayDir);
-        await execFile("cp", ["-r", overlayDir + "/.", workspaceDir]);
-
-        // Process .delete file if present
-        const deleteFile = join(problemDir, "overlay", ".delete");
-        try {
-          const deleteList = await readFile(deleteFile, "utf8");
-          for (const line of deleteList.split("\n").map((l) => l.trim()).filter(Boolean)) {
-            await rm(join(workspaceDir, line), { recursive: true, force: true });
-          }
-        } catch {
-          // no .delete file — fine
-        }
-      } catch {
-        // no overlay — fine
-      }
+      await applyProblemOverlay(join(problemDir, "overlay"), workspaceDir);
 
       // Strip .git/ and __pycache__/
       await rm(join(workspaceDir, ".git"), { recursive: true, force: true });

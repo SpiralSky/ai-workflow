@@ -11,8 +11,8 @@ test("parseVariant: bare mode name passes through", () => {
 });
 
 test("parseVariant: keys are sorted for canonical form", () => {
-  assert.equal(parseVariant("orchestrate[secondary=2,foo=bar]"), "orchestrate[foo=bar,secondary=2]");
-  assert.equal(parseVariant("branch-only[z=1,a=2]"), "branch-only[a=2,z=1]");
+  assert.equal(parseVariant("orchestrate[secondary=2,rerank=none]"), "orchestrate[rerank=none,secondary=2]");
+  assert.equal(parseVariant("branch-only[toolSearch,catalog=50]"), "branch-only[catalog=50,toolSearch]");
 });
 
 test("parseVariant: single key passes through unchanged", () => {
@@ -49,7 +49,7 @@ test("expandModes: deduplicates", () => {
 });
 
 test("expandModes: variant string is canonicalised", () => {
-  assert.deepEqual(expandModes("orchestrate[z=1,a=2]"), ["orchestrate[a=2,z=1]"]);
+  assert.deepEqual(expandModes("orchestrate[secondary=2,catalog=50]"), ["orchestrate[catalog=50,secondary=2]"]);
 });
 
 // --- validateModel ---
@@ -171,4 +171,22 @@ test("resolveConfig: throws on anthropic model", () => {
       ),
     /not allowed/,
   );
+});
+
+test("campaign concurrency defaults to one, accepts explicit parallelism and rejects invalid values", () => {
+  const flags = { problems: "dev", mode: "baseline", tools: "S" as const, reps: 1,
+    model: "deepseek/deepseek-v4-flash", temperature: 0, budget: 0.5, full: false,
+    branchContext: "trace" as const, secondaryCap: 4 };
+  assert.equal(resolveConfig(flags, sampleProblems).concurrency, 1);
+  assert.equal(resolveConfig({ ...flags, concurrency: 3 }, sampleProblems).concurrency, 3);
+  for (const concurrency of [0, -1, 1.5, NaN, Infinity]) {
+    assert.throws(() => resolveConfig({ ...flags, concurrency }, sampleProblems), /positive integer/);
+  }
+});
+
+test("hotPaths is a distinct canonical opt-in, never part of compare", () => {
+  assert.equal(parseVariant("orchestrate[rerank=none,hotPaths]"), "orchestrate[hotPaths,rerank=none]");
+  assert.deepEqual(expandModes("compare,orchestrate[hotPaths]"), ["baseline", "branch-only", "orchestrate", "orchestrate[hotPaths]"]);
+  assert.deepEqual(expandModes("compare"), ["baseline", "branch-only", "orchestrate"]);
+  assert.throws(() => parseVariant("baseline[hotPaths]"));
 });

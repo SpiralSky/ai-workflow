@@ -73,6 +73,7 @@ export function fromMeta(meta: Record<string, unknown> | undefined, root: Report
 export interface LLMCompletion {
   response: unknown;
   usage: Usage;
+  deepseekEstimate?: { basis: string; estimatedUsd: number; cacheHitTokens: number; cacheMissTokens: number; outputTokens: number };
   costUsd?: number;
   cacheHit?: boolean;
 }
@@ -87,9 +88,13 @@ export interface LLMClient {
   }): Promise<LLMCompletion>;
 }
 
+/** Advisory uncertainty marker, never a charge or a replacement for a completed turn. */
+export const LLM_COST_INCOMPLETE_KEY = "llm.cost-incomplete";
+
 /**
  * Wraps an LLM client: times each request, writes a `turn` event and, when a transcript writer
- * and session are given, the transcript entry keyed by the turn id. Failed requests write nothing.
+ * and session are given, the transcript entry keyed by the turn id. Failed requests write no
+ * turn, but retain cost uncertainty even when an enclosing tool recovers from the failure.
  * @param client - client to wrap
  * @param reporter - reporter receiving `turn` events
  * @param role - role recorded on every turn
@@ -104,10 +109,22 @@ export function wrapLLM(
   return {
     async complete(req) {
       const t0 = performance.now();
-      const res = await client.complete(req);
+      let res: LLMCompletion;
+      try {
+        res = await client.complete(req);
+      } catch (error) {
+        reporter.attach(LLM_COST_INCOMPLETE_KEY, { role, model: req.model });
+        throw error;
+      }
       const latencyMs = Math.round(performance.now() - t0);
+      const response = res.response as { model?: unknown; system_fingerprint?: unknown } | null;
+      const observed = {
+        ...(typeof response?.model === "string" && response.model ? { providerModel: response.model } : {}),
+        ...(typeof response?.system_fingerprint === "string" && response.system_fingerprint ? { providerSystemFingerprint: response.system_fingerprint } : {}),
+      };
       const turnId = reporter.turn({
-        model: req.model, role, usage: res.usage, costUsd: res.costUsd, cacheHit: res.cacheHit, latencyMs,
+        ...observed,
+        model: req.model, role, usage: res.usage, deepseekEstimate: res.deepseekEstimate, costUsd: res.costUsd, cacheHit: res.cacheHit, latencyMs,
       });
       if (opts.transcript && opts.session) {
         opts.transcript.record({

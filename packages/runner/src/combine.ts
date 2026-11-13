@@ -5,11 +5,18 @@
 
 import { readFileSync, mkdirSync, writeFileSync, existsSync, readdirSync } from "node:fs";
 import { join } from "node:path";
+import { isDeepStrictEqual } from "node:util";
 import type { RunJSON, JobJSON } from "./types.ts";
+import { assertCompleteProvenance } from "./provenance.ts";
 import { FORMAT_VERSION } from "./types.ts";
 
 /** Fields that must match across combined runs (data-formats §1.1). */
 const MUST_MATCH: Array<keyof RunJSON["config"]> = ["tier", "models", "temperature", "secondaryCap", "branch"];
+
+/** All provenance except per-problem metadata must match (data-formats §1.1). */
+const PROVENANCE_MUST_MATCH: Array<keyof RunJSON["provenance"]> = [
+  "commit", "dirty", "runnerVersion", "engine", "basePrompt", "frameworks", "images",
+];
 
 /** Combined report format (data-formats §4). */
 export interface CombinedReport {
@@ -17,6 +24,7 @@ export interface CombinedReport {
   name: string;
   runs: string[];
   provenance: RunJSON["provenance"];
+  provenanceStatus: "runtime-observed" | "legacy-unattested";
   frameworks: Record<string, FrameworkStats>;
   paired: PairedComparison[];
   audits: Record<string, { label: "setup" | "framework"; note: string }>;
@@ -28,8 +36,10 @@ export interface FrameworkStats {
   pass: number;
   passRate: number;
   wilson95: [number, number];
-  costPerSuccessUsd: number;
-  meanCostUsd: number;
+  costPerSuccessUsd: number | null;
+  meanEstimatedCostUsd?: number | null;
+  estimateBasis?: string;
+  meanCostUsd: number | null;
   turns: { main: number; secondary: number };
   toolCalls: { topLevel: number; leaf: number };
   failures: Record<string, number>;
@@ -42,7 +52,7 @@ export interface PairedComparison {
   b: string;
   mdd: number;
   verdict: "better" | "worse" | "inconclusive";
-  problems: Array<{ problem: string; passA: number; passB: number; costA: number; costB: number }>;
+  problems: Array<{ problem: string; passA: number; passB: number; costA: number | null; costB: number | null }>;
 }
 
 /**
@@ -82,7 +92,14 @@ export function mdd(passA: number, passB: number, n: number): number {
  */
 function readRunJSON(runDir: string): RunJSON {
   const path = join(runDir, "run.json");
-  return JSON.parse(readFileSync(path, "utf8")) as RunJSON;
+  const run = JSON.parse(readFileSync(path, "utf8")) as RunJSON;
+  if (run?.format !== FORMAT_VERSION) {
+    throw new Error(`Unsupported run format in ${path}: ${JSON.stringify(run?.format)}`);
+  }
+  if (!run.config || typeof run.config !== "object" || !run.provenance || typeof run.provenance !== "object") {
+    throw new Error(`Run ${run.id} has missing or malformed config/provenance`);
+  }
+  return run;
 }
 
 /**
@@ -100,11 +117,17 @@ function readJobs(runDir: string): JobJSON[] {
   for (const entry of entries) {
     const jobPath = join(runDir, entry, "job.json");
     if (!existsSync(jobPath)) continue;
+    let job: JobJSON;
     try {
-      jobs.push(JSON.parse(readFileSync(jobPath, "utf8")) as JobJSON);
+      job = JSON.parse(readFileSync(jobPath, "utf8")) as JobJSON;
     } catch {
-      // Skip malformed records
+      // Preserve the existing behavior for malformed JSON; schema validation is separate.
+      continue;
     }
+    if (job?.format !== FORMAT_VERSION) {
+      throw new Error(`Unsupported job format in ${jobPath}: ${JSON.stringify(job?.format)}`);
+    }
+    jobs.push(job);
   }
   return jobs;
 }
@@ -112,20 +135,56 @@ function readJobs(runDir: string): JobJSON[] {
 /**
  * Checks that the "must match" provenance fields agree across all runs.
  * @param runs - parsed run records
- * @throws Error if any field disagrees
+ * @returns Common provenance with the union of compatible problem metadata
+ * @throws Error if a required field is missing or disagrees
  */
-function validateProvenance(runs: RunJSON[]): void {
-  if (runs.length === 0) return;
+function validateProvenance(runs: RunJSON[]): RunJSON["provenance"] {
   const first = runs[0]!;
-  for (const run of runs.slice(1)) {
-    for (const field of MUST_MATCH) {
-      const a = JSON.stringify(first.config[field]);
-      const b = JSON.stringify(run.config[field]);
-      if (a !== b) {
-        throw new Error(`Run ${run.id} has mismatched config.${field}: expected ${a}, got ${b}`);
+  const problems: RunJSON["provenance"]["problems"] = Object.create(null);
+  for (const run of runs) {
+    if (run.provenance.integrity || first.provenance.integrity) {
+      assertCompleteProvenance(run.provenance, run.config);
+      if (!isDeepStrictEqual(run.provenance.integrity?.runtimePlatform, first.provenance.integrity?.runtimePlatform)) throw new Error(`Run ${run.id} has mismatched runtime platform`);
+      for (const field of ["sourceHash", "bundleHash", "entryHash", "nodeVersion", "wallClockEnforced"] as const) {
+        if (run.provenance.integrity?.[field] !== first.provenance.integrity?.[field]) throw new Error(`Run ${run.id} has mismatched provenance.integrity.${field}`);
       }
     }
+    if ((run.config.provider ?? "openrouter") !== (first.config.provider ?? "openrouter") ||
+        (run.config.usageMode ?? "monetary") !== (first.config.usageMode ?? "monetary") ||
+        !isDeepStrictEqual(run.config.subscriptionLimits, first.config.subscriptionLimits) ||
+        !isDeepStrictEqual(run.config.estimatedLimits, first.config.estimatedLimits) ||
+        !isDeepStrictEqual(run.config.classifier, first.config.classifier) ||
+        !isDeepStrictEqual(run.provenance.inference, first.provenance.inference)) {
+      throw new Error(`Run ${run.id} has mismatched provider, usage mode, limits or inference settings`);
+    }
+    for (const field of MUST_MATCH) {
+      if (run.config[field] === undefined || !isDeepStrictEqual(first.config[field], run.config[field])) {
+        throw new Error(`Run ${run.id} has missing or mismatched config.${field}`);
+      }
+    }
+    for (const field of PROVENANCE_MUST_MATCH) {
+      if (run.provenance[field] === undefined || !isDeepStrictEqual(first.provenance[field], run.provenance[field])) {
+        throw new Error(`Run ${run.id} has missing or mismatched provenance.${field}`);
+      }
+    }
+    if (!run.provenance.problems) {
+      throw new Error(`Run ${run.id} has missing provenance.problems`);
+    }
+    for (const [problem, metadata] of Object.entries(run.provenance.problems)) {
+      if (Object.hasOwn(problems, problem) && !isDeepStrictEqual(problems[problem], metadata)) {
+        throw new Error(`Run ${run.id} has mismatched provenance.problems.${problem}`);
+      }
+      problems[problem] = metadata;
+    }
   }
+  // Preserve the full problem union instead of silently retaining only the first run's subset.
+  return { ...first.provenance, problems };
+}
+
+/** Returns null if any task's full cost is unknown; lower bounds are not billed totals. */
+function sumJobCosts(jobs: JobJSON[]): number | null {
+  if (jobs.some((j) => typeof j.costUsdAllAttempts !== "number" || !Number.isFinite(j.costUsdAllAttempts) || j.costUsdAllAttempts < 0)) return null;
+  return jobs.reduce((sum, j) => sum + j.costUsdAllAttempts!, 0);
 }
 
 /**
@@ -139,11 +198,10 @@ function aggregateFramework(jobs: JobJSON[]): FrameworkStats {
   const wilson95 = wilsonCI95(passCount, n);
 
   const successJobs = jobs.filter((j) => j.outcome === "pass");
-  const totalCost = jobs.reduce((sum, j) => sum + (j.costUsdAllAttempts ?? 0), 0);
-  const costPerSuccessUsd = successJobs.length > 0
-    ? successJobs.reduce((sum, j) => sum + (j.costUsdAllAttempts ?? 0), 0) / successJobs.length
-    : 0;
-  const meanCostUsd = n > 0 ? totalCost / n : 0;
+  const totalCost = sumJobCosts(jobs);
+  const successCost = sumJobCosts(successJobs);
+  const costPerSuccessUsd = successJobs.length > 0 && successCost !== null ? successCost / successJobs.length : null;
+  const meanCostUsd = n > 0 && totalCost !== null ? totalCost / n : null;
 
   const failures: Record<string, number> = {};
   for (const job of jobs.filter((j) => j.outcome === "fail")) {
@@ -158,6 +216,11 @@ function aggregateFramework(jobs: JobJSON[]): FrameworkStats {
     wilson95,
     costPerSuccessUsd,
     meanCostUsd,
+    ...(jobs.some(j => j.estimatedCost) ? {
+      estimateBasis: jobs[0]?.estimatedCost?.basis,
+      meanEstimatedCostUsd: jobs.every(j => j.estimatedCost?.basis === jobs[0]?.estimatedCost?.basis && typeof j.estimatedCost?.estimatedUsd === "number" && Number.isFinite(j.estimatedCost.estimatedUsd) && j.estimatedCost.estimatedUsd >= 0)
+        ? jobs.reduce((sum, j) => sum + j.estimatedCost!.estimatedUsd!, 0) / n : null,
+    } : {}),
     turns: { main: 0, secondary: 0 }, // rollup data not yet implemented
     toolCalls: { topLevel: 0, leaf: 0 },
     failures,
@@ -209,8 +272,8 @@ function computePaired(frameworkJobs: Map<string, JobJSON[]>): PairedComparison[
           problem,
           passA: pA.filter((jb) => jb.outcome === "pass").length,
           passB: pB.filter((jb) => jb.outcome === "pass").length,
-          costA: pA.reduce((sum, jb) => sum + (jb.costUsdAllAttempts ?? 0), 0),
-          costB: pB.reduce((sum, jb) => sum + (jb.costUsdAllAttempts ?? 0), 0),
+          costA: sumJobCosts(pA),
+          costB: sumJobCosts(pB),
         };
       });
 
@@ -228,16 +291,20 @@ function computePaired(frameworkJobs: Map<string, JobJSON[]>): PairedComparison[
 function generateMarkdown(report: CombinedReport): string {
   const lines: string[] = [`# Report: ${report.name}`, ""];
   lines.push(`Runs: ${report.runs.join(", ")}`, "");
+  lines.push(report.provenanceStatus === "runtime-observed" ? "Provenance: runtime observed (local metadata, not cryptographic attestation)." : "Provenance: legacy/unattested — not a verified baseline.", "");
   lines.push("## Frameworks", "");
   lines.push("| Framework | Jobs | Pass | Pass Rate | 95% CI | Mean Cost |");
   lines.push("|-----------|------|------|-----------|--------|-----------|");
   for (const [fw, stats] of Object.entries(report.frameworks)) {
     const ci = `[${stats.wilson95[0].toFixed(2)}, ${stats.wilson95[1].toFixed(2)}]`;
     lines.push(
-      `| ${fw} | ${stats.jobs} | ${stats.pass} | ${(stats.passRate * 100).toFixed(1)}% | ${ci} | $${stats.meanCostUsd.toFixed(4)} |`,
+      `| ${fw} | ${stats.jobs} | ${stats.pass} | ${(stats.passRate * 100).toFixed(1)}% | ${ci} | ${stats.meanCostUsd === null ? "unknown" : "$" + stats.meanCostUsd.toFixed(4)} |`,
     );
   }
   lines.push("");
+  for (const [framework, stats] of Object.entries(report.frameworks)) {
+    if (stats.meanEstimatedCostUsd !== undefined) lines.push(`${framework}: mean price-table ESTIMATE per task ${stats.meanEstimatedCostUsd === null ? "unknown" : "$" + stats.meanEstimatedCostUsd.toFixed(6)} (${stats.estimateBasis ?? "unknown basis"}); actual billed dollars remain unknown.`);
+  }
   if (report.paired.length > 0) {
     lines.push("## Paired Comparisons", "");
     for (const p of report.paired) {
@@ -274,7 +341,7 @@ export async function combineRuns(runDirs: string[], name: string, repoRoot: str
   if (validRuns.length === 0) throw new Error("No valid runs to combine");
 
   const runJSONs = validRuns.map((r) => r.run);
-  validateProvenance(runJSONs);
+  const provenance = validateProvenance(runJSONs);
 
   // Collect all jobs
   const frameworkJobs = new Map<string, JobJSON[]>();
@@ -294,7 +361,8 @@ export async function combineRuns(runDirs: string[], name: string, repoRoot: str
     format: FORMAT_VERSION,
     name,
     runs: runJSONs.map((r) => r.id),
-    provenance: runJSONs[0]!.provenance,
+    provenance,
+    provenanceStatus: provenance.integrity ? "runtime-observed" : "legacy-unattested",
     frameworks,
     paired: computePaired(frameworkJobs),
     audits: {},

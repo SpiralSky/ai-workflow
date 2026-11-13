@@ -1,3 +1,6 @@
+import { HotPathIndex } from "../orchestrate/hot-paths/index.ts";
+import { HOT_PATH_SEEDS } from "../orchestrate/hot-paths/catalog.ts";
+import { classifierReranker } from "../orchestrate/selection/classifier.ts";
 import { canonicalJSON, currentReporter, sha256, wrapTools } from "@aiw/telemetry";
 import { compileBranch } from "../branch/compile.ts";
 import { quickJSRuntime } from "../branch/engines/index.ts";
@@ -150,9 +153,10 @@ function branchOnlyTool(registry: Registry, opts: BuildOptions, state: State): F
  * @param kind - which framework
  * @param registry - registered tools
  * @param opts - also `variant` (`toolSearch` for branch-only, `catalog` padding for any framework) and `orchestrate` settings (required for `orchestrate`)
- * @throws Error for `orchestrate` without `opts.orchestrate`, hot paths on, executor variant `calls`, `toolSearch` outside `branch-only`, or an unknown kind
+ * @throws Error for `orchestrate` without `opts.orchestrate`, executor variant `calls`, `toolSearch` outside `branch-only`, or an unknown kind
  */
 export function buildFramework(kind: FrameworkKind, realRegistry: Registry, opts: BuildOptions): Framework {
+  if (opts.variant?.hotPaths && kind !== "orchestrate") throw new Error("variant hotPaths applies to orchestrate only");
   if (opts.variant?.toolSearch && kind !== "branch-only") throw new Error("variant toolSearch applies to branch-only only");
   const registry = opts.variant?.catalog !== undefined ? padRegistry(realRegistry, opts.variant.catalog) : realRegistry;
   let state: State = {};
@@ -168,18 +172,21 @@ export function buildFramework(kind: FrameworkKind, realRegistry: Registry, opts
   } else if (kind === "orchestrate") {
     const o = opts.orchestrate;
     if (!o) throw new Error("orchestrate needs opts.orchestrate (client, model, workspaceRoot)");
-    if (opts.variant?.hotPaths) throw new Error("hot paths not built yet");
     if (opts.variant?.executor === "calls") throw new Error("executor variant `calls` is not built yet");
     task = o.task ?? new Task({ workspaceRoot: o.workspaceRoot });
-    const reranker = (o.rerank ?? "llm") === "none" ? noneReranker : llmReranker(o.client, { model: o.rerankModel ?? o.model });
+    const rerankMode = opts.variant?.rerank ?? o.rerank ?? "llm";
+    if (rerankMode === "classifier" && !o.classifier) throw new Error("classifier rerank requires explicit typed client/settings");
+    const reranker = rerankMode === "classifier" ? classifierReranker(o.classifier!.client, o.classifier!)
+      : rerankMode === "none" ? noneReranker : llmReranker(o.client, { model: o.rerankModel ?? o.model });
     const planner = {
       task, registry, host: opts.host, client: o.client, model: o.model, temperature: o.temperature, transcript: o.transcript,
       selector: o.selector ?? createSelector({ reranker }),
       reader: o.reader ?? fsCodeReader(o.workspaceRoot),
       pathExists: o.pathExists ?? fsPathExists(o.workspaceRoot),
       runtime: opts.runtime,
+      hotPathIndex: opts.variant?.hotPaths ? new HotPathIndex(HOT_PATH_SEEDS) : undefined,
       limits: {
-        turns: o.turns, reportMaxChars: o.reportMaxChars, outputCap: opts.outputCap, timeoutMs: opts.timeoutMs,
+        turns: opts.variant?.secondary ?? o.turns, reportMaxChars: o.reportMaxChars, outputCap: opts.outputCap, timeoutMs: opts.timeoutMs,
         memoryMb: opts.memoryMb, branchContext: opts.branchContext,
       },
     };

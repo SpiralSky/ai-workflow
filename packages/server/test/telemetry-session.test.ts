@@ -1,0 +1,133 @@
+import { hotPathCatalogFingerprint, HOT_PATH_PROMPT_KEY } from "@aiw/core";
+import test from "node:test";
+import assert from "node:assert/strict";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { fileURLToPath } from "node:url";
+import { Client } from "@modelcontextprotocol/sdk/client/index.js";
+import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
+import { LLM_COST_INCOMPLETE_KEY } from "@aiw/telemetry";
+
+for (const entry of ["source", "bundle"] as const) {
+test(`${entry} server shares telemetry counter and parent correlation across successive requests`, async (t) => {
+  const root = mkdtempSync(join(tmpdir(), "aiw-server-telemetry-"));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  const eventsPath = join(root, "events.jsonl");
+  const client = new Client({ name: "fixture", version: "1" });
+  const transport = new StdioClientTransport({ command: process.execPath,
+    args: [...(entry === "source"
+      ? ["--import", "tsx", fileURLToPath(new URL("../src/cli.ts", import.meta.url))]
+      : [fileURLToPath(new URL("../dist/aiw-server.mjs", import.meta.url))]),
+      "--framework", "branch-only", "--root", root, "--events", eventsPath], stderr: "pipe" });
+  try {
+    await client.connect(transport);
+    const listed = await client.listTools();
+    const observed = listed._meta?.["aiw/runtimeProvenance"] as any;
+    assert.equal(observed.engine, "quickjs"); // Actual default runtime, not the runner's requested native flag.
+    assert.match(observed.entryHash, /^[a-f0-9]{64}$/);
+    assert.equal(observed.nodeVersion, process.version);
+    assert.equal(observed.runtimePlatform.moduleABI, process.versions.modules);
+    for (const name of ["executor", "rerank", "base"]) assert.match(observed.prompts[name], /^[a-f0-9]{64}$/);
+    assert.equal(observed.prompts[HOT_PATH_PROMPT_KEY], hotPathCatalogFingerprint());
+    assert.match(observed.catalogHash, /^[a-f0-9]{64}$/);
+    for (const n of [1, 2]) {
+      const result = await client.callTool({ name: "branch", arguments: { code: 'async (tools) => await tools.bash({ cmd: "printf fixture" })' },
+        _meta: { "aiw/parent": `r:${n}`, "aiw/harnessId": `call-${n}` } });
+      assert.notEqual(result.isError, true);
+    }
+  } finally { await client.close(); }
+  const events = readFileSync(eventsPath, "utf8").trim().split("\n").map((line) => JSON.parse(line));
+  const tools = events.filter((e) => e.kind === "tool");
+  assert.equal(tools.length, 2);
+  assert.equal(new Set(tools.map((e) => e.id)).size, 2);
+  assert.ok(events.some((e) => e.parent === "r:1"));
+  assert.ok(events.some((e) => e.parent === "r:2"));
+});
+
+test("MCP cancellation reaches the actual server host request", { timeout: 10_000 }, async (t) => {
+  const { existsSync } = await import("node:fs");
+  const { setTimeout: delay } = await import("node:timers/promises");
+  const root = mkdtempSync(join(tmpdir(), "aiw-server-cancel-"));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  const started = join(root, "started"), cancelled = join(root, "cancelled");
+  const source = `
+    import { startServer } from ${JSON.stringify(new URL("../src/server.ts", import.meta.url).href)};
+    import { writeFileSync } from 'node:fs';
+    await startServer({ kind: 'baseline', host: {
+      tools: async () => [{ name: 'wait', description: 'Fixture only', inputSchema: {}, meta: { effect: 'read', whenToUse: 'wait' } }],
+      call: async (_req, ctx) => {
+        writeFileSync(${JSON.stringify(started)}, 'started');
+        return new Promise((_resolve, reject) => {
+          const abort = () => { writeFileSync(${JSON.stringify(cancelled)}, 'cancelled'); reject(new Error('cancelled')); };
+          ctx.signal.addEventListener('abort', abort, { once: true });
+          if (ctx.signal.aborted) abort();
+        });
+      }, close: async () => {}
+    } });`;
+  const client = new Client({ name: "fixture", version: "1" });
+  const transport = new StdioClientTransport({ command: process.execPath,
+    args: ["--import", "tsx", "--input-type=module", "-e", source], stderr: "pipe" });
+  const controller = new AbortController();
+  try {
+    await client.connect(transport);
+    const request = client.callTool({ name: "wait", arguments: {} }, undefined, { signal: controller.signal });
+    const rejected = assert.rejects(request, /campaign stopped/);
+    const until = Date.now() + 5000;
+    while (!existsSync(started) && Date.now() < until) await delay(10);
+    assert.ok(existsSync(started), "host received request before cancellation");
+    controller.abort(new Error("campaign stopped"));
+    await rejected;
+    while (!existsSync(cancelled) && Date.now() < until) await delay(10);
+    assert.equal(readFileSync(cancelled, "utf8"), "cancelled");
+  } finally { controller.abort(); await client.close(); }
+});
+test(`${entry} server preserves recovered selection failure uncertainty`, async (t) => {
+  const root = mkdtempSync(join(tmpdir(), "aiw-server-cost-"));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  const eventsPath = join(root, "events.jsonl"), preload = join(root, "scripted-fetch.mjs");
+  // Stub the fetch boundary before loading either artifact. No network/provider request is made.
+  writeFileSync(preload, `
+    let secondary = 0;
+    globalThis.fetch = async (url, opts) => {
+      if (url !== 'https://fixture.invalid/v1/chat/completions') throw new Error('Unexpected fixture URL');
+      const body = JSON.parse(opts.body);
+      if (!body.tools?.length) throw new Error('selection request lost after dispatch');
+      const message = ++secondary === 1
+        ? {tool_calls:[{id:'inner',type:'function',function:{name:'branch',arguments:JSON.stringify({code:'async (tools) => await tools.findTools({need:"read contents file"})'})}}]}
+        : {content:'Ending after failed tool search.'};
+      return new Response(JSON.stringify({choices:[{message}],usage:{prompt_tokens:1,completion_tokens:1,cost:1}}));
+    };
+  `);
+  const client = new Client({ name: "fixture", version: "1" });
+  const args = entry === "source"
+    ? ["--import", "tsx", fileURLToPath(new URL("../src/cli.ts", import.meta.url))]
+    : [fileURLToPath(new URL("../dist/aiw-server.mjs", import.meta.url))];
+  const transport = new StdioClientTransport({ command: process.execPath,
+    args: ["--import", preload, ...args, "--framework", "orchestrate", "--root", root, "--events", eventsPath,
+      "--executor-model", "fixture", "--executor-api-key", "fixture", "--executor-base-url", "https://fixture.invalid/v1"], stderr: "pipe" });
+  try {
+    await client.connect(transport);
+    const result = await client.callTool({ name: "do", arguments: { instruction: "Inspect task", tools: ["bash"] } });
+    assert.equal(result.isError, false);
+  } finally { await client.close(); }
+  const events = readFileSync(eventsPath, "utf8").trim().split("\n").map(line => JSON.parse(line));
+  assert.equal(events.filter(event => event.kind === "turn" && event.role === "secondary").length, 2);
+  assert.equal(events.filter(event => event.kind === "turn" && event.role === "selection").length, 0);
+  assert.equal(events.filter(event => event.kind === "attach" && event.key === LLM_COST_INCOMPLETE_KEY).length, 1);
+});
+}
+
+test("compiled server observes its own reviewed hot-path catalog fingerprint without model calls", async t => {
+  const root = mkdtempSync(join(tmpdir(), "aiw-hotpath-fingerprint-"));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  const client = new Client({ name: "fingerprint-fixture", version: "1" });
+  const transport = new StdioClientTransport({ command: process.execPath,
+    args: [fileURLToPath(new URL("../dist/aiw-server.mjs", import.meta.url)), "--framework", "orchestrate[hotPaths]", "--executor-model", "fixture", "--executor-provider", "host", "--root", root], stderr: "pipe" });
+  try {
+    await client.connect(transport);
+    const observed = (await client.listTools())._meta?.["aiw/runtimeProvenance"] as any;
+    assert.equal(observed.prompts[HOT_PATH_PROMPT_KEY], hotPathCatalogFingerprint());
+    assert.equal(observed.settings.variant.hotPaths, true);
+  } finally { await client.close(); }
+});

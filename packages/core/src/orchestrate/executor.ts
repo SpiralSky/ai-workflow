@@ -24,12 +24,8 @@ export const DEFAULT_ESCALATION_LIMIT = 6;
 /** Appended before the last allowed turn (orchestrate §8.2). */
 export const LAST_TURN_NOTICE = "This is your last turn: report what you have.";
 
-/** A hot-path snippet to include in the prompt (orchestrate-engine §4.5); the index is built elsewhere. */
-export interface HotPathSnippet {
-  id: string;
-  description: string;
-  code: string;
-}
+export type { HotPathSnippet } from "./hot-paths/types.ts";
+import type { HotPathSnippet } from "./hot-paths/types.ts";
 
 /** Limits and rendering options of one executor run. */
 export interface ExecutorLimits {
@@ -252,7 +248,7 @@ export async function runExecutor(input: ExecutorInput): Promise<ExecutorResult>
     async findTools(args: Record<string, unknown>): Promise<string> {
       const need = typeof args.need === "string" ? args.need.trim() : "";
       if (!need) throw new Error("findTools: `need` must be a non-empty string");
-      const sel = await input.selector.select({ instruction: need, exclude: [...present.keys()], reporter: currentReporter() ?? reporter }, registry.decls);
+      const sel = await input.selector.select({ instruction: need, exclude: [...present.keys()], reporter: currentReporter() ?? reporter, signal: input.signal }, registry.decls);
       const added = sel.tools.filter((d) => !present.has(d.name)).slice(0, escalationLimit);
       escalations.push({ kind: "escalation", need, tools: added.map((d) => d.name) });
       if (!added.length) return "No other tools match that need.";
@@ -329,6 +325,7 @@ export async function runExecutor(input: ExecutorInput): Promise<ExecutorResult>
   let exhausted = false;
   const request = async (): Promise<AssistantMessage> => {
     used++;
+    input.signal?.throwIfAborted();
     const body: Record<string, unknown> = { model: input.model, system, tools: [branchToolDef()], messages: [...messages], signal: input.signal };
     if (input.temperature !== undefined) body.temperature = input.temperature;
     const res = await llm.complete(body as Parameters<LLMClient["complete"]>[0]);

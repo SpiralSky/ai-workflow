@@ -9,7 +9,7 @@
     "build": "npm run build:indexer && vite build",
     "dev": "vite",
     "preview": "vite preview",
-    "test": "echo 'no viewer tests yet' && exit 0"
+    "test": "node --import tsx --test test/*.test.ts"
   },
   "dependencies": {
     "react": "^18.3.1",

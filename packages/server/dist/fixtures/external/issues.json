@@ -1,0 +1,99 @@
+{
+  "cases": [
+    {
+      "match": {
+        "op": "get",
+        "id": "PROJ-123"
+      },
+      "result": {
+        "issue": {
+          "id": "PROJ-123",
+          "title": "Login times out behind the corporate proxy",
+          "status": "In Progress",
+          "assignee": "m.alvarez",
+          "labels": [
+            "bug",
+            "auth"
+          ],
+          "description": "Users behind the proxy see a 30s hang on sign-in, then a 504. Reproduces on staging.",
+          "comments": 2
+        }
+      }
+    },
+    {
+      "match": {
+        "op": "get"
+      },
+      "result": {
+        "issue": {
+          "id": "{{id}}",
+          "title": "Refactor settings loader",
+          "status": "Open",
+          "assignee": "unassigned",
+          "labels": [
+            "tech-debt"
+          ],
+          "description": "The settings loader mixes env parsing and validation.",
+          "comments": 0
+        }
+      }
+    },
+    {
+      "match": {
+        "op": "search",
+        "query": "login"
+      },
+      "result": {
+        "issues": [
+          {
+            "id": "PROJ-123",
+            "title": "Login times out behind the corporate proxy",
+            "status": "In Progress",
+            "assignee": "m.alvarez"
+          },
+          {
+            "id": "PROJ-98",
+            "title": "Login page shows stale CSRF token",
+            "status": "Done",
+            "assignee": "k.osei"
+          }
+        ]
+      }
+    },
+    {
+      "match": {
+        "op": "search"
+      },
+      "result": {
+        "issues": [
+          {
+            "id": "PROJ-141",
+            "title": "Flaky integration test in CI",
+            "status": "Open",
+            "assignee": "unassigned"
+          },
+          {
+            "id": "PROJ-87",
+            "title": "Update contributor guide",
+            "status": "Open",
+            "assignee": "j.lindqvist"
+          }
+        ]
+      }
+    },
+    {
+      "match": {
+        "op": "comment"
+      },
+      "result": {
+        "commentId": "c-20418",
+        "issue": "{{id}}",
+        "posted": true
+      }
+    }
+  ],
+  "default": {
+    "issues": [],
+    "note": "no matching issues"
+  }
+}

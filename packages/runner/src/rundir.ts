@@ -3,7 +3,7 @@
  * Data-formats §1; runner §7.
  */
 
-import { mkdirSync, writeFileSync, renameSync } from "node:fs";
+import { mkdirSync, writeFileSync, renameSync, readdirSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import { randomBytes } from "node:crypto";
 import type { RunConfig, Provenance, JobJSON, RunJSON, Job } from "./types.ts";
@@ -66,7 +66,7 @@ export function createRunDir(
     status: "in-progress",
     config,
     provenance,
-    totals: { jobs: 0, attempts: 0, costUsd: 0, pass: 0, fail: 0 },
+    totals: { jobs: 0, attempts: 0, costUsd: config.usageMode === "subscription" ? null : 0, pass: 0, fail: 0 },
     startedAt: new Date().toISOString(),
   };
   writeRunJSON(path, runJSON);
@@ -112,7 +112,11 @@ export function createAttemptDir(jobDir: string, attemptN: number): string {
   mkdirSync(attemptsDir, { recursive: true });
   const archiveDir = join(attemptsDir, String(attemptN - 1));
   // The previous attempt's files are already in jobDir; the new attempt starts fresh
-  mkdirSync(archiveDir, { recursive: true });
+  if (existsSync(archiveDir)) throw new Error(`Attempt archive already exists: ${archiveDir}`);
+  mkdirSync(archiveDir);
+  for (const entry of readdirSync(jobDir)) {
+    if (entry !== "attempts" && entry !== "job.json") renameSync(join(jobDir, entry), join(archiveDir, entry));
+  }
   return jobDir;
 }
 

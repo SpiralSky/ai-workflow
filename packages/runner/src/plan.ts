@@ -101,7 +101,8 @@ function loadHistory(repoRoot: string): JobJSON[] {
 function meanCost(history: JobJSON[], problem: string, framework: string): number | undefined {
   const matching = history.filter((j) => j.problem === problem && j.framework === framework);
   if (matching.length === 0) return undefined;
-  const total = matching.reduce((sum, j) => sum + (j.costUsdAllAttempts ?? 0), 0);
+  if (matching.some((j) => typeof j.costUsdAllAttempts !== "number" || !Number.isFinite(j.costUsdAllAttempts))) return undefined;
+  const total = matching.reduce((sum, j) => sum + j.costUsdAllAttempts!, 0);
   return total / matching.length;
 }
 
@@ -113,7 +114,9 @@ function meanCost(history: JobJSON[], problem: string, framework: string): numbe
  * @returns plan with jobs and optional projected cost
  */
 export function buildPlan(config: RunConfig, repoRoot: string): Plan {
+  if (config.usageMode === "estimated") return { jobs: expandJobs(config) };
   const jobs = expandJobs(config);
+  if (config.usageMode === "subscription") return { jobs };
   const history = loadHistory(repoRoot);
   if (history.length === 0) return { jobs };
 

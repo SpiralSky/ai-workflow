@@ -1,0 +1,11 @@
+# The root build context is needed only for the canonical dependency pins.
+# Do not transmit credentials, repository history, worktrees or host node_modules to the builder.
+**
+!experiments/
+!experiments/docker/
+!experiments/docker/aiw-base/
+!experiments/docker/aiw-base/Dockerfile
+!packages/
+!packages/tools/
+!packages/tools/python/
+!packages/tools/python/requirements.txt

@@ -1,3 +1,4 @@
+import type { HotPathIndex } from "./hot-paths/index.ts";
 import type { LLMClient, TranscriptWriter } from "@aiw/telemetry";
 import type { IsolateRuntime } from "../branch/isolate.ts";
 import type { FrameworkCall, FrameworkResult, FrameworkTool } from "../framework/types.ts";
@@ -5,7 +6,7 @@ import { loadPrompt } from "../framework/prompts.ts";
 import type { Host } from "../host/types.ts";
 import { extractRefs, formatRefIssues, isLiveRef, RefError, resolveRef, validateRefs, type CodeReader } from "../refs/index.ts";
 import type { Registry } from "../registry/types.ts";
-import { runExecutor, type ExecutorLimits, type HotPathSnippet } from "./executor.ts";
+import { runExecutor, type ExecutorLimits } from "./executor.ts";
 import type { Selector } from "./selection/index.ts";
 import type { Task } from "./task.ts";
 
@@ -26,7 +27,7 @@ export interface PlannerToolsInput {
   reader: CodeReader;
   pathExists?: (path: string) => Promise<boolean>;
   runtime?: IsolateRuntime;
-  hotPaths?: HotPathSnippet[];
+  hotPathIndex?: HotPathIndex;
   variant?: "branch" | "calls";
   limits?: ExecutorLimits;
 }
@@ -56,6 +57,7 @@ export function doTool(input: PlannerToolsInput): FrameworkTool {
       additionalProperties: false,
     },
     async handle(args: Record<string, unknown>, call: FrameworkCall): Promise<FrameworkResult> {
+      call.signal?.throwIfAborted();
       const instruction = args.instruction;
       if (typeof instruction !== "string" || !instruction.trim()) return fail("do: `instruction` must be a non-empty string");
       let override: string[] | undefined;
@@ -74,9 +76,12 @@ export function doTool(input: PlannerToolsInput): FrameworkTool {
       let lease: Awaited<ReturnType<Task["acquire"]>> | undefined;
       try {
         // 3. select
-        const selection = await input.selector.select({ instruction, override, reporter: call.reporter }, registry.decls);
+        let selection = await input.selector.select({ instruction, override, reporter: call.reporter, signal: call.signal }, registry.decls);
+        const patterns = input.hotPathIndex?.select(instruction, selection, registry.decls, override);
+        if (patterns) selection = patterns.selection;
         // 4. lock: shared only when every shortlisted tool is read-only
         lease = await task.acquire(selection.tools.every((d) => d.meta.effect === "read") ? "shared" : "exclusive");
+        call.signal?.throwIfAborted();
         const held = lease;
         // 5-8. snapshot, run, finalise (inside runExecutor)
         const result = await runExecutor({
@@ -98,7 +103,7 @@ export function doTool(input: PlannerToolsInput): FrameworkTool {
           selection,
           selector: input.selector,
           override,
-          hotPaths: input.hotPaths,
+          hotPaths: patterns?.hotPaths,
           variant: input.variant,
           limits: input.limits,
           signal: call.signal,

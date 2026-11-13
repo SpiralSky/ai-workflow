@@ -33,9 +33,13 @@ export const EventSchema = z.discriminatedUnion("kind", [
   z.object({
     ...common,
     kind: z.literal("turn"),
-    model: z.string(),
+    model: z.string(), // Requested identifier, possibly an alias.
+    providerModel: z.string().optional(),
+    providerSystemFingerprint: z.string().optional(),
     role: RoleSchema,
-    usage: UsageSchema,
+    usage: UsageSchema.optional(),
+    classifierEstimate: z.object({ basis: z.string(), estimatedUsd: z.number().finite().nonnegative(), inputTokens: z.number().int().nonnegative(), outputTokens: z.number().int().nonnegative() }).optional(),
+    deepseekEstimate: z.object({ basis: z.string(), estimatedUsd: z.number().nonnegative(), cacheHitTokens: z.number().int().nonnegative(), cacheMissTokens: z.number().int().nonnegative(), outputTokens: z.number().int().nonnegative() }).optional(),
     costUsd: z.number().optional(),
     cacheHit: z.boolean().optional(),
     latencyMs: z.number(),
