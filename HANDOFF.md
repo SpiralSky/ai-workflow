@@ -2,6 +2,35 @@
 
 > **To resume**: read this file, then see the [Roadmap](README.md#roadmap) in the main README for pending work.
 
+## 2026-11-14 (later): L2–L5 landed on PR #5; start here
+
+**State:** branch `dot/procedural-selection-20261113`, head `daef1af`, pushed; draft PR #5 against
+`feat/providers-classifier`. After the review below, dot added the four remaining large problems,
+one commit each: `9728556` L2-split-pricing, `1612b30` L3-import-cycle, `4b34b0d` L4-currency-param,
+`daef1af` L5-refund-double-count. All five L problems now exist under `experiments/problems/`.
+
+**Verified here at `daef1af`:** `npm test` exits 0 with 761 tests, 0 failed (the same count as before
+L2–L5, so the suite does not exercise the new problems); `npm run typecheck` exits 0.
+
+**Reported by dot, not rerun here** (PR #5 comment of 2026-11-14T04:21Z; local Python 3.12, no Docker):
+for each of L2–L5 the unmodified workspace fails, the reference passes five runs in a row, two lazy
+variants are rejected, the clean fulfil base still passes its 65 tests, and the workspace equals the
+base plus the overlay. L3 has a five-file overlay and L5 a four-file overlay; L2 and L4 have none.
+
+**Open:**
+- Review L2–L5 independently, as L1 was (L1's reference had a real defect that dot's own checks
+  missed). Nobody but dot has read these four.
+- Docker self-check (`aiw problems check`) for L1–L5: not run for any of them.
+- Decision, still the user's (tools §6.4, Final): should `renameSymbol` update `__all__` entries and
+  report other string and comment mentions? With it, `renameSymbol` alone solves L1.
+- The procedure prototype's precondition and exit schema; the paid checks listed further down.
+- The PR #5 description is stale: it says Unit 3 is unfinished, the suite has not passed and
+  `testDirs` is validated after writes. The two PR comments are the accurate record.
+- Draft PRs #1–#4 are unchanged since 2026-11-01 and still to be closed (see the 2026-11-13
+  providers section).
+
+The section below predates L2–L5; its "L2–L5 are unbuilt" line is superseded by this one.
+
 ## 2026-11-14: PR #5 reviewed and fixed (`dot/procedural-selection-20261113`)
 
 **State:** dot's draft PR #5 (draft spec `procedural-selection.md`, problem `L1-rename-sku`, offline
