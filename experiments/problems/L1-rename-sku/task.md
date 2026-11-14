@@ -1,0 +1,1 @@
+Rename the Python `Sku` type to `ProductCode` everywhere in fulfil, including its imports, type hints and tests. `ProductCode` must be importable from every module that previously exposed `Sku`, and the old Python identifier must disappear from application source. Keep the existing lowercase `sku` attributes and JSON keys, stored fixture contents and all other behavior unchanged.

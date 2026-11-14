@@ -1,0 +1,16 @@
+{
+  "id": "L1-rename-sku",
+  "size": "large",
+  "codebase": "fulfil",
+  "turnLimit": 25,
+  "tags": [
+    "rename",
+    "multi-file"
+  ],
+  "expectedTools": [
+    "findDefinition",
+    "findReferences",
+    "renameSymbol",
+    "check"
+  ]
+}

@@ -1,0 +1,3 @@
+[
+  {"schema_version":1,"entity":"order","data":{"id":"ord-old-001","customer":"cus-001","currency":"USD","items":[{"sku":"BOT-ALPINE","name":"Alpine Bottle","qty":2,"unit_price":1899}],"status":"placed","shipping":595,"tax":313,"created":"2025-12-01T10:30:00+00:00"}}
+]
