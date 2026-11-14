@@ -28,7 +28,7 @@ async function run(symbol: string) {
 test("rename-known-symbol-tierL renames definition and importer", { skip: skipReason }, async () => {
   const { root, result } = await run("app/models.py#Sku");
   assert.equal(result.status, "completed", result.reason ?? "");
-  assert.deepEqual(result.completed, ["findReferences", "renameSymbol", "check"]);
+  assert.deepEqual(result.completed, ["findReferences", "checkBefore", "renameSymbol", "check"]);
   assert.match(readFileSync(join(root, "app/models.py"), "utf8"), /class ProductCode:/);
   const use = readFileSync(join(root, "app/use.py"), "utf8");
   assert.match(use, /from app.models import ProductCode/);

@@ -28,10 +28,12 @@ function wrap(tool: ToolDef, interpret: (value: any) => Partial<ToolResult>, noF
 
 /**
  * Procedure tools backed by the tier-L tools `findReferences`, `renameSymbol` and `check`.
+ * `checkBefore` records the diagnostics before a change; `check` fails only when errors rose above that baseline.
  * @param sidecar - Python sidecar started for the workspace the procedure will run in
  * @returns tool map for `executeProcedure`
  */
 export function tierLProcedureTools(sidecar: Sidecar): Record<string, ProcedureTool> {
+  const check = wrap(makeCheck(sidecar), () => ({}));
   return {
     findReferences: wrap(
       makeFindReferences(sidecar),
@@ -39,14 +41,29 @@ export function tierLProcedureTools(sidecar: Sidecar): Record<string, ProcedureT
       /symbol not found|no such file/,
     ),
     renameSymbol: wrap(makeRenameSymbol(sidecar), () => ({})),
-    check: wrap(makeCheck(sidecar), (v) => {
-      const errors = v.counts?.error ?? 0;
-      return errors ? { ok: false, reason: `${errors} type or lint errors` } : {};
-    }),
+    checkBefore: check,
+    check: async (workspace, args) => {
+      const { baseline, ...toolArgs } = args as { baseline?: ToolResult };
+      const after = await check(workspace, toolArgs);
+      if (!after.ok) return after;
+      // Workspaces usually carry diagnostics of their own, so only errors the change added count.
+      const before = errorCount(baseline);
+      const now = errorCount(after);
+      return now > before ? { ...after, ok: false, reason: `type or lint errors rose from ${before} to ${now}` } : after;
+    },
   };
 }
 
-/** Renames a Python symbol with the tier-L tools: find references, rename (rope), then type check and lint. */
+/**
+ * Reads the error count from a `check` result.
+ * @param result - a `check` step result, or nothing when no baseline was taken
+ * @returns the number of error-severity diagnostics, 0 when absent
+ */
+function errorCount(result: ToolResult | undefined): number {
+  return (result?.counts as Record<string, number> | undefined)?.error ?? 0;
+}
+
+/** Renames a Python symbol with the tier-L tools: find references, rename (rope), then fail only if type or lint errors rose above the count taken before the rename. */
 export const renameKnownSymbolTierL: Procedure = {
   version: 1,
   id: "rename-known-symbol-tierL",
@@ -55,7 +72,8 @@ export const renameKnownSymbolTierL: Procedure = {
   inputs: { symbol: "string", newName: "identifier", checkPath: "string" },
   steps: [
     { id: "findReferences", tool: "findReferences", dependsOn: [], args: { symbol: { input: "symbol" } } },
-    { id: "renameSymbol", tool: "renameSymbol", dependsOn: ["findReferences"], args: { symbol: { input: "symbol" }, newName: { input: "newName" } } },
-    { id: "check", tool: "check", dependsOn: ["renameSymbol"], args: { path: { input: "checkPath" } } },
+    { id: "checkBefore", tool: "checkBefore", dependsOn: ["findReferences"], args: { path: { input: "checkPath" } } },
+    { id: "renameSymbol", tool: "renameSymbol", dependsOn: ["checkBefore"], args: { symbol: { input: "symbol" }, newName: { input: "newName" } } },
+    { id: "check", tool: "check", dependsOn: ["renameSymbol", "checkBefore"], args: { path: { input: "checkPath" }, baseline: { result: "checkBefore" } } },
   ],
 };
