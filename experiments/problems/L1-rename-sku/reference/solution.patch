@@ -1,6 +1,6 @@
 --- a/fulfil/api/handlers.py
 +++ b/fulfil/api/handlers.py
-@@ -5,7 +5,7 @@
+@@ -5,7 +5,7 @@ from fulfil.events.bus import EventBus
  from fulfil.events.handlers import register_handlers
  from fulfil.events.types import CustomerAddressChanged
  from fulfil.models.customer import Address
@@ -9,7 +9,7 @@
  from fulfil.models.money import Money
  from fulfil.services.inventory import InventoryService
  from fulfil.services.orders import OrderService
-@@ -62,7 +62,7 @@
+@@ -62,7 +62,7 @@ def get_product(app: Application, sku: str) -> ApiResponse:
  def place_order(app: Application, request: OrderRequest) -> ApiResponse:
      try:
          request.validate()
@@ -18,7 +18,7 @@
          order = app.orders.place(request.customer_id, lines, request.currency,
                                   request.shipping_address, request.promotion_code,
                                   request.allow_backorder, request.coupon_codes)
-@@ -132,7 +132,7 @@
+@@ -132,7 +132,7 @@ def restock_product(app: Application, sku: str, quantity: int) -> ApiResponse:
          product = app.inventory.restock(ProductLookup.parse(sku).sku, quantity, "api")
      except (KeyError, ValueError) as exc:
          return ApiResponse(400, {"error": "restock_failed", "detail": str(exc)})
@@ -27,7 +27,7 @@
      return ApiResponse(200, {"sku": str(product.sku), "available": product.stock_on_hand})
  
  
-@@ -147,7 +147,7 @@
+@@ -147,7 +147,7 @@ def amend_order(app: Application, order_id: str, request: OrderRequest) -> ApiRe
          request.validate()
          if request.customer_id != app.repositories.orders.get(order_id).customer_id:
              raise ValueError("customer cannot amend another customer's order")
@@ -36,7 +36,7 @@
          order = app.orders.amend(order_id, rows, request.allow_backorder)
      except KeyError:
          return ApiResponse(404, {"error": "order_not_found"})
-@@ -170,7 +170,7 @@
+@@ -170,7 +170,7 @@ def cancel_order_line(app: Application, order_id: str, sku: str, quantity: int)
  def refund_order(app: Application, order_id: str, amount: Money | None = None,
                   reason: str = "returned goods", restock: dict[str, int] | None = None) -> ApiResponse:
      try:
@@ -55,7 +55,7 @@
  from fulfil.util.validation import positive_integer, require_text
  
  
-@@ -23,7 +23,7 @@
+@@ -23,7 +23,7 @@ class OrderRequest:
          for row in self.lines:
              if not isinstance(row, dict) or "sku" not in row or "quantity" not in row:
                  raise ValueError("each line requires sku and quantity")
@@ -64,7 +64,7 @@
              positive_integer(row["quantity"], "quantity")
          if self.promotion_code is not None:
              require_text(self.promotion_code, "promotion_code", 24)
-@@ -50,11 +50,11 @@
+@@ -50,11 +50,11 @@ class OrderSummary:
  
  @dataclass(frozen=True)
  class ProductLookup:
@@ -80,7 +80,7 @@
  @dataclass(frozen=True)
 --- a/fulfil/cli/commands.py
 +++ b/fulfil/cli/commands.py
-@@ -6,7 +6,7 @@
+@@ -6,7 +6,7 @@ from fulfil.events.types import (
      ShipmentLabelCreated, StockChanged, event_name,
  )
  from fulfil.models.money import Money
@@ -89,7 +89,7 @@
  from fulfil.pricing import margin_percent, price_with_margin, price_with_markup, tax_for, tax_rate_for
  from fulfil.reports.refunds import RefundReport
  from fulfil.reports.revenue import RevenueReport
-@@ -27,7 +27,7 @@
+@@ -27,7 +27,7 @@ class AdminCommands:
          self.refunds = RefundService(repositories, bus, self.inventory)
  
      def restock(self, sku: str, quantity: int, note: str = "admin") -> str:
@@ -98,7 +98,7 @@
          return f"Restocked {product.sku}: {product.stock_on_hand} on hand"
  
      def stock_report(self, low_stock_level: int = 5) -> str:
-@@ -62,7 +62,7 @@
+@@ -62,7 +62,7 @@ class AdminCommands:
          return parsed
  
      def product_lookup(self, sku: str) -> str:
@@ -107,7 +107,7 @@
          return f"{product.name} ({product.sku}): {format_money(product.unit_price)}; {product.stock_on_hand} units"
  
      def event_summary(self) -> str:
-@@ -71,13 +71,13 @@
+@@ -71,13 +71,13 @@ class AdminCommands:
          return f"{total} handler(s) across {len(subscriptions)} event type(s); {len(self.bus.history())} event(s) recorded"
  
      def deactivate_product(self, sku: str) -> str:
@@ -123,7 +123,7 @@
          product.activate()
          self.repositories.products.save(product)
          return f"Enabled {product.sku} ({product.name})"
-@@ -90,13 +90,13 @@
+@@ -90,13 +90,13 @@ class AdminCommands:
          return f"Estimated tax: {format_money(amount)} ({region} at {tax_rate_for(region) * 100}%)"
  
      def markup_product(self, sku: str, markup_percent) -> str:
@@ -139,7 +139,7 @@
          if cost.currency != product.unit_price.currency:
              raise ValueError("cost currency differs from product currency")
          product.change_price(price_with_margin(cost, margin))
-@@ -123,7 +123,7 @@
+@@ -123,7 +123,7 @@ class AdminCommands:
  
      def refund(self, order_id: str, amount: Money | None = None,
                 reason: str = "admin adjustment", restock: dict[str, int] | None = None) -> str:
@@ -159,7 +159,7 @@
  from fulfil.util.dates import utc_now
  
  
-@@ -52,8 +52,8 @@
+@@ -52,8 +52,8 @@ class StockChanged:
              object.__setattr__(self, "occurred_at", utc_now())
  
      @property
@@ -172,18 +172,21 @@
  @dataclass(frozen=True)
 --- a/fulfil/models/__init__.py
 +++ b/fulfil/models/__init__.py
-@@ -2,7 +2,7 @@
+@@ -2,9 +2,9 @@ from fulfil.models.customer import Address, Customer
  from fulfil.models.fulfillment import BackorderRequest, Refund, Shipment
  from fulfil.models.money import Money
  from fulfil.models.order import Order, OrderLine, OrderStatus
 -from fulfil.models.product import Product, Sku
 +from fulfil.models.product import Product, ProductCode
  
- __all__ = ["Address", "BackorderRequest", "Customer", "Money", "Order", "OrderLine", "OrderStatus", "Product", "Refund", "Shipment", "Sku"]
+-__all__ = ["Address", "BackorderRequest", "Customer", "Money", "Order", "OrderLine", "OrderStatus", "Product", "Refund", "Shipment", "Sku"]
++__all__ = ["Address", "BackorderRequest", "Customer", "Money", "Order", "OrderLine", "OrderStatus", "Product", "ProductCode", "Refund", "Shipment"]
  
+ 
+ def supported_currencies() -> tuple[str, ...]:
 --- a/fulfil/models/fulfillment.py
 +++ b/fulfil/models/fulfillment.py
-@@ -2,7 +2,7 @@
+@@ -2,7 +2,7 @@ from dataclasses import dataclass, field
  from datetime import datetime, timedelta, timezone
  from enum import Enum
  from fulfil.models.money import Money
@@ -192,7 +195,7 @@
  
  
  class ShipmentState(str, Enum):
-@@ -16,7 +16,7 @@
+@@ -16,7 +16,7 @@ class ShipmentState(str, Enum):
  class BackorderRequest:
      request_id: str
      order_id: str
@@ -201,7 +204,7 @@
      quantity: int
      requested_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
      allocated: int = 0
-@@ -131,7 +131,7 @@
+@@ -131,7 +131,7 @@ class Refund:
              raise ValueError("refund must be processed before returned stock is recorded")
          self.restocked = True
  
@@ -212,7 +215,7 @@
          return sku is None or str(sku) in self.reason
 --- a/fulfil/models/order.py
 +++ b/fulfil/models/order.py
-@@ -3,7 +3,7 @@
+@@ -3,7 +3,7 @@ from datetime import datetime, timezone
  from enum import Enum
  
  from fulfil.models.money import Money
@@ -221,7 +224,7 @@
  
  
  class OrderStatus(str, Enum):
-@@ -17,7 +17,7 @@
+@@ -17,7 +17,7 @@ class OrderStatus(str, Enum):
  
  @dataclass
  class OrderLine:
@@ -230,7 +233,7 @@
      description: str
      quantity: int
      unit_price: Money
-@@ -63,7 +63,7 @@
+@@ -63,7 +63,7 @@ class Order:
          self.lines.append(line)
          self.revision += 1
  
@@ -239,7 +242,7 @@
          before = len(self.lines)
          self.lines = [line for line in self.lines if line.sku != sku]
          if len(self.lines) == before:
-@@ -99,13 +99,13 @@
+@@ -99,13 +99,13 @@ class Order:
          self.revision += 1
          self.status_history.append((target.value, datetime.now(timezone.utc)))
  
@@ -256,7 +259,7 @@
          if self.status != OrderStatus.DRAFT:
              raise ValueError("only draft order lines can be changed")
          if quantity <= 0:
-@@ -167,7 +167,7 @@
+@@ -167,7 +167,7 @@ class Order:
              self.backorder_lines.append(line)
          self.revision += 1
  
@@ -265,7 +268,7 @@
          if quantity <= 0:
              raise ValueError("fulfil quantity must be positive")
          line = next((row for row in self.backorder_lines if row.sku == sku), None)
-@@ -180,7 +180,7 @@
+@@ -180,7 +180,7 @@ class Order:
          self.revision += 1
          return fulfilled
  
@@ -276,7 +279,7 @@
          line = self.line_for(sku)
 --- a/fulfil/models/product.py
 +++ b/fulfil/models/product.py
-@@ -6,7 +6,7 @@
+@@ -6,7 +6,7 @@ from fulfil.models.money import Money
  
  
  @dataclass(frozen=True)
@@ -285,7 +288,7 @@
      value: str
  
      def __post_init__(self) -> None:
-@@ -21,7 +21,7 @@
+@@ -21,7 +21,7 @@ class Sku:
  
  @dataclass
  class Product:
@@ -296,7 +299,7 @@
      stock_on_hand: int
 --- a/fulfil/pricing/pricing.py
 +++ b/fulfil/pricing/pricing.py
-@@ -11,7 +11,7 @@
+@@ -11,7 +11,7 @@ from typing import Iterable, Protocol
  
  from fulfil.models.money import Money
  from fulfil.models.order import Order, OrderLine
@@ -305,7 +308,7 @@
  
  
  # Rule definitions and eligibility
-@@ -52,7 +52,7 @@
+@@ -52,7 +52,7 @@ class MinimumQuantityRule:
  
  @dataclass(frozen=True)
  class SkuPriceRule:
@@ -314,7 +317,7 @@
      price: Money
      starts_at: datetime | None = None
      ends_at: datetime | None = None
-@@ -177,7 +177,7 @@
+@@ -177,7 +177,7 @@ class PercentageDiscount(Promotion):
  @dataclass(frozen=True)
  class FixedDiscount(Promotion):
      amount: Money = field(default_factory=lambda: Money(0))
@@ -323,7 +326,7 @@
  
      def discount(self, lines: list[OrderLine], context: PricingContext) -> list[OrderLine]:
          if self.amount.currency != context.currency:
-@@ -190,7 +190,7 @@
+@@ -190,7 +190,7 @@ class FixedDiscount(Promotion):
  class BuyXGetY(Promotion):
      buy_quantity: int = 1
      free_quantity: int = 1
@@ -332,7 +335,7 @@
  
      def __post_init__(self):
          if self.buy_quantity <= 0 or self.free_quantity <= 0:
-@@ -319,7 +319,7 @@
+@@ -319,7 +319,7 @@ def tax_for(subtotal: Money, region: str, shipping: Money | None = None,
      return selected.calculate(subtotal, shipping)
  
  
@@ -341,7 +344,7 @@
      rows = list(lines)
      if not rows:
          return Money(0)
-@@ -327,8 +327,8 @@
+@@ -327,8 +327,8 @@ def taxable_subtotal(lines: Iterable[OrderLine], exempt_skus: set[Sku] | None =
      return Money(sum(line.subtotal.minor for line in rows if line.sku not in excluded), rows[0].unit_price.currency)
  
  
@@ -352,7 +355,7 @@
      for line in lines:
          tax = Money(round_minor(Decimal(line.subtotal.minor) * policy.rate), line.subtotal.currency)
          totals[line.sku] = totals.get(line.sku, Money(0, tax.currency)) + tax
-@@ -415,7 +415,7 @@
+@@ -415,7 +415,7 @@ class PricingEngine:
                shipping: Money | None = None, customer_id: str | None = None,
                at: datetime | None = None, tags: frozenset[str] = frozenset(),
                channel: str = "web", coupons: list[str] | None = None,
@@ -361,20 +364,19 @@
          context = PricingContext(order.currency, customer_id or order.customer_id, region,
                                   at or datetime.now(timezone.utc), tags, channel)
          lines = combine_duplicate_lines(order.lines)
-@@ -597,9 +597,9 @@
+@@ -597,9 +597,9 @@ class PriceBand:
  class PriceBook:
      """Quantity and audience price bands indexed by product code."""
      def __init__(self):
 -        self._bands: dict[Sku, list[PriceBand]] = {}
--
--    def add(self, sku: Sku, band: PriceBand) -> None:
 +        self._bands: dict[ProductCode, list[PriceBand]] = {}
-+
+ 
+-    def add(self, sku: Sku, band: PriceBand) -> None:
 +    def add(self, sku: ProductCode, band: PriceBand) -> None:
          bands = self._bands.setdefault(sku, [])
          if any(existing.minimum_quantity == band.minimum_quantity
                 and existing.customer_group == band.customer_group for existing in bands):
-@@ -609,7 +609,7 @@
+@@ -609,7 +609,7 @@ class PriceBook:
          bands.append(band)
          bands.sort(key=lambda item: (item.customer_group, item.minimum_quantity))
  
@@ -383,7 +385,7 @@
                    discount_per_tier: Decimal, group: str = "retail") -> list[PriceBand]:
          created = []
          for quantity, price in price_breaks(base_price, quantities, discount_per_tier).items():
-@@ -618,7 +618,7 @@
+@@ -618,7 +618,7 @@ class PriceBook:
              created.append(band)
          return created
  
@@ -392,7 +394,7 @@
          if quantity <= 0:
              raise ValueError("quantity must be positive")
          at = when or datetime.now(timezone.utc)
-@@ -627,11 +627,11 @@
+@@ -627,11 +627,11 @@ class PriceBook:
              return None
          return max(candidates, key=lambda item: item.minimum_quantity).unit_price
  
@@ -406,7 +408,7 @@
          bands = self._bands.get(sku)
          if not bands:
              return False
-@@ -738,7 +738,7 @@
+@@ -738,7 +738,7 @@ def percentage_of_tax_inclusive(amount: Money, rate: Decimal) -> Money:
      return Money(round_minor(tax), amount.currency)
  
  
@@ -415,7 +417,7 @@
      rows = list(lines)
      total = apply_tax_exemptions(rows, policy)
      breakdown = calculate_tax_by_line(rows, policy)
-@@ -786,7 +786,7 @@
+@@ -786,7 +786,7 @@ def line_fingerprint(line: OrderLine) -> tuple[str, int, int, int]:
  
  
  def combine_duplicate_lines(lines: Iterable[OrderLine]) -> list[OrderLine]:
@@ -424,7 +426,7 @@
      for line in lines:
          if line.discount and line.discount.minor:
              key = (line.sku, line.description, id(line))
-@@ -892,12 +892,12 @@
+@@ -892,12 +892,12 @@ def order_taxable_total(order: Order, policy: TaxPolicy) -> Money:
      return policy.calculate(taxable_subtotal(order.lines), order.shipping_fee)
  
  
@@ -439,7 +441,7 @@
      base = taxable_subtotal(lines, exempt_skus)
      return policy.calculate(base)
  
-@@ -916,7 +916,7 @@
+@@ -916,7 +916,7 @@ def assert_same_currency(items: Iterable[Money], currency: str) -> None:
              raise ValueError(f"expected {currency}, got {item.currency}")
  
  
@@ -448,7 +450,7 @@
      rows = [line for line in lines if sku is None or line.sku == sku]
      return total_lines(rows)
  
-@@ -945,7 +945,7 @@
+@@ -945,7 +945,7 @@ def tax_included_amount(total: Money, policy: TaxPolicy) -> Money:
      return percentage_of_tax_inclusive(total, policy.rate)
  
  
@@ -459,7 +461,7 @@
      return Money(sum(line.subtotal.minor for line in rows if line.sku in exempt_skus), currency)
 --- a/fulfil/reports/revenue.py
 +++ b/fulfil/reports/revenue.py
-@@ -4,7 +4,7 @@
+@@ -4,7 +4,7 @@ from datetime import datetime, timezone
  from fulfil.events.types import OrderPlaced, RefundProcessed
  from fulfil.models.money import Money
  from fulfil.models.order import OrderLine
@@ -468,7 +470,7 @@
  from fulfil.pricing import PriceQuote, compare_quotes, savings_rate, split_minor
  from fulfil.storage.repositories import RepositorySet
  from fulfil.util.dates import month_bounds, within_window, week_bounds
-@@ -57,9 +57,9 @@
+@@ -57,9 +57,9 @@ class RevenueReport:
                              f"net {format_money(row.net)} ({row.order_count} orders)" for row in rows)
          return f"Revenue {year:04d}-{month:02d}\n{detail}"
  
@@ -480,7 +482,7 @@
          for order in self.repositories.orders.all():
              if within_window(order.created_at, start, end) and order.status.value != "cancelled":
                  for line in order.lines:
-@@ -91,9 +91,9 @@
+@@ -91,9 +91,9 @@ class RevenueReport:
      def compare_rows(self, first: RevenueRow, second: RevenueRow) -> int:
          if first.currency != second.currency:
              raise ValueError("revenue rows must use the same currency")
@@ -503,7 +505,7 @@
  from fulfil.pricing import round_minor
  from fulfil.storage.repositories import RepositorySet
  from fulfil.util.money import format_money
-@@ -63,7 +63,7 @@
+@@ -63,7 +63,7 @@ class StockReport:
                                               product.stock_on_hand, product.name.casefold()))
          return [(str(product.sku), target_level - product.stock_on_hand) for product in candidates]
  
@@ -522,7 +524,7 @@
  from fulfil.models.fulfillment import BackorderRequest
  from fulfil.models.order import Order
  from fulfil.storage.repositories import RepositorySet
-@@ -11,13 +11,13 @@
+@@ -11,13 +11,13 @@ class InventoryService:
      def __init__(self, repositories: RepositorySet, bus: EventBus):
          self.repositories = repositories
          self.bus = bus
@@ -539,7 +541,7 @@
          try:
              for sku, quantity in requested.items():
                  if quantity <= 0:
-@@ -37,7 +37,7 @@
+@@ -37,7 +37,7 @@ class InventoryService:
              raise
          self._reservations[order_id] = reserved
  
@@ -548,7 +550,7 @@
          reserved = self._reservations.pop(order_id, {})
          for sku, quantity in reserved.items():
              product = self.repositories.products.get(str(sku))
-@@ -50,7 +50,7 @@
+@@ -50,7 +50,7 @@ class InventoryService:
          self._backorders = [request for request in self._backorders if request.remaining]
          return reserved
  
@@ -557,7 +559,7 @@
          if quantity <= 0:
              raise ValueError("restock quantity must be positive")
          product = self.repositories.products.get(str(sku))
-@@ -61,21 +61,21 @@
+@@ -61,21 +61,21 @@ class InventoryService:
          product = self.repositories.products.get(str(sku))
          return product
  
@@ -584,7 +586,7 @@
          if quantity <= 0:
              raise ValueError("release quantity must be positive")
          product = self.repositories.products.get(str(sku))
-@@ -84,17 +84,17 @@
+@@ -84,17 +84,17 @@ class InventoryService:
          self.bus.publish(StockChanged(str(sku), -quantity, f"release:{reason}"))
          return product
  
@@ -606,7 +608,7 @@
          pending: list[BackorderRequest] = []
          for sku, quantity in requested.items():
              if quantity <= 0:
-@@ -118,7 +118,7 @@
+@@ -118,7 +118,7 @@ class InventoryService:
          self._backorders.extend(pending)
          return shortages
  
@@ -615,7 +617,7 @@
          if quantity <= 0:
              raise ValueError("release quantity must be positive")
          reservations = self._reservations.get(order_id, {})
-@@ -143,7 +143,7 @@
+@@ -143,7 +143,7 @@ class InventoryService:
              self.bus.publish(StockChanged(str(sku), released, f"partial-release:{order_id}"))
          return released
  
@@ -624,7 +626,7 @@
          current = dict(self._reservations.get(order_id, {}))
          skus = set(current) | set(requested)
          plan = {}
-@@ -198,7 +198,7 @@
+@@ -198,7 +198,7 @@ class InventoryService:
              rows = [request for request in rows if request.order_id == order_id]
          return list(rows)
  
@@ -643,7 +645,7 @@
  from fulfil.pricing import (
      PricingEngine, discount_allocation, effective_unit_price, exempt_order_amount,
      line_discount_for_display, order_taxable_total, per_unit_discount,
-@@ -58,7 +58,7 @@
+@@ -58,7 +58,7 @@ def pricing_summary(order: Order) -> dict[str, int | str]:
  
  def invoice_tax_lines(order: Order, region: str = "US-CA") -> list[dict[str, str | int]]:
      quote = PricingEngine().quote(order, region=region)
@@ -652,7 +654,7 @@
      taxable_lines = [line for line in quote.lines if line.sku not in excluded]
      _, by_sku = tax_summary(taxable_lines, PricingEngine().policies[region])
      return [{"sku": str(sku), "tax": format_money(amount)} for sku, amount in sorted(by_sku.items())]
-@@ -66,7 +66,7 @@
+@@ -66,7 +66,7 @@ def invoice_tax_lines(order: Order, region: str = "US-CA") -> list[dict[str, str
  
  def invoice_taxable_amount(order: Order, region: str = "US-CA") -> Money:
      policy = PricingEngine().policies[region]
@@ -661,7 +663,7 @@
      taxable = [line for line in order.lines if line.sku not in exempt]
      result = order_taxable_total(order, policy)
      if exempt:
-@@ -75,7 +75,7 @@
+@@ -75,7 +75,7 @@ def invoice_taxable_amount(order: Order, region: str = "US-CA") -> Money:
      return result
  
  
@@ -672,7 +674,7 @@
  
 --- a/fulfil/services/orders.py
 +++ b/fulfil/services/orders.py
-@@ -2,7 +2,7 @@
+@@ -2,7 +2,7 @@ from fulfil.events.bus import EventBus
  from fulfil.events.types import OrderCancelled, OrderPlaced
  from fulfil.models.customer import Address
  from fulfil.models.order import Order, OrderLine, OrderStatus
@@ -681,7 +683,7 @@
  from fulfil.pricing import (
      PriceBand, PriceBook, PriceQuote, PriceRule, PricingEngine, Promotion,
      compare_quotes, combine_duplicate_lines,
-@@ -22,12 +22,12 @@
+@@ -22,12 +22,12 @@ class OrderService:
          self.bus = bus
          self.pricing = pricing or PricingEngine()
  
@@ -696,7 +698,7 @@
          for sku, quantity in lines:
              product = self.repositories.products.get(str(sku))
              if product.unit_price.currency != currency:
-@@ -83,12 +83,12 @@
+@@ -83,12 +83,12 @@ class OrderService:
          self.bus.publish(OrderCancelled(order_id, reason))
          return order
  
@@ -711,7 +713,7 @@
          for sku, quantity in lines:
              product = self.repositories.products.get(str(sku))
              if product.unit_price.currency != order.currency:
-@@ -112,7 +112,7 @@
+@@ -112,7 +112,7 @@ class OrderService:
          self.repositories.orders.save(order)
          return order
  
@@ -722,7 +724,7 @@
              raise ValueError("only open orders support partial cancellation")
 --- a/fulfil/services/refunds.py
 +++ b/fulfil/services/refunds.py
-@@ -3,7 +3,7 @@
+@@ -3,7 +3,7 @@ from fulfil.events.bus import EventBus
  from fulfil.events.types import RefundProcessed
  from fulfil.models.fulfillment import Refund
  from fulfil.models.money import Money
@@ -731,7 +733,7 @@
  from fulfil.models.order import OrderStatus
  from fulfil.pricing import cap_line_discount, discount_allocation
  from fulfil.services.inventory import InventoryService
-@@ -19,7 +19,7 @@
+@@ -19,7 +19,7 @@ class RefundService:
          self.inventory = inventory or InventoryService(repositories, bus)
  
      def issue(self, order_id: str, amount: Money | None = None, reason: str = "returned goods",
@@ -740,7 +742,7 @@
          order = self.repositories.orders.get(order_id)
          if order.status not in {OrderStatus.PAID, OrderStatus.FULFILLED, OrderStatus.REFUNDED}:
              raise ValueError("only paid orders can be refunded")
-@@ -55,7 +55,7 @@
+@@ -55,7 +55,7 @@ class RefundService:
          return self.repositories.refunds.get(refund.refund_id)
  
      def partial(self, order_id: str, amount: Money, reason: str = "partial refund",
@@ -757,7 +759,7 @@
  from fulfil.storage.base import InMemoryRepository
  
  
-@@ -6,14 +6,14 @@
+@@ -6,14 +6,14 @@ class ProductRepository(InMemoryRepository[Product]):
      def __init__(self):
          super().__init__(lambda product: product.sku)
  
@@ -778,7 +780,7 @@
  
      def active_products(self) -> list[Product]:
          return [product for product in self.all() if product.active]
-@@ -31,10 +31,10 @@
+@@ -31,10 +31,10 @@ class ProductRepository(InMemoryRepository[Product]):
              raise ValueError("stock threshold cannot be negative")
          return [product for product in self.active_products() if product.stock_on_hand <= level]
  
@@ -802,7 +804,7 @@
  from fulfil.models.fulfillment import ShipmentState
  
  CURRENT_SCHEMA_VERSION = 2
-@@ -18,7 +18,7 @@
+@@ -18,7 +18,7 @@ def product_to_dict(product: Product) -> dict:
  
  
  def product_from_dict(data: dict) -> Product:
@@ -811,7 +813,7 @@
                     int(data["stock_on_hand"]), bool(data.get("active", True)), set(data.get("tags", [])),
                     datetime.fromisoformat(data["updated_at"]), int(data.get("weight_grams", 250)),
                     int(data.get("volume_cm3", 400)), set(data.get("tax_exempt_regions", [])),
-@@ -54,7 +54,7 @@
+@@ -54,7 +54,7 @@ def line_to_dict(line: OrderLine) -> dict:
  
  def line_from_dict(data: dict) -> OrderLine:
      discount = Money(data["discount"], data["currency"]) if data.get("discount") is not None else None
@@ -822,7 +824,7 @@
  
 --- a/tests/test_api_workflows.py
 +++ b/tests/test_api_workflows.py
-@@ -6,7 +6,7 @@
+@@ -6,7 +6,7 @@ from fulfil.api.handlers import (
      search_products, shipping_options, update_customer_address,
  )
  from fulfil.api.schemas import OrderRequest
@@ -831,7 +833,7 @@
  
  
  class ApiWorkflowTests(unittest.TestCase):
-@@ -15,12 +15,12 @@
+@@ -15,12 +15,12 @@ class ApiWorkflowTests(unittest.TestCase):
          self.address = Address("Jamie Park", "9 Elm Way", "Oakland", "94612")
          self.customer = Customer("cus-api", "Jamie Park", "jamie@example.test", [self.address])
          self.app.repositories.customers.add(self.customer)
@@ -846,7 +848,7 @@
          self.assertFalse(self.app.product_cache.contains("API-ITEM"))
          self.assertEqual(get_product(self.app, "bad sku").status, 400)
          self.assertEqual(health(self.app).body["products"], 1)
-@@ -47,7 +47,7 @@
+@@ -47,7 +47,7 @@ class ApiWorkflowTests(unittest.TestCase):
          self.assertEqual(deliver_shipment(self.app, shipment_id).body["state"], "delivered")
          line_cancel = cancel_order_line(self.app, order_id, "api-item", 1)
          self.assertEqual(line_cancel.status, 200)
@@ -857,7 +859,7 @@
          self.assertEqual(invoice_order(self.app, "missing").status, 404)
 --- a/tests/test_commerce_flows.py
 +++ b/tests/test_commerce_flows.py
-@@ -3,7 +3,7 @@
+@@ -3,7 +3,7 @@ from datetime import datetime, timezone
  from decimal import Decimal
  
  from fulfil.api.handlers import create_application, create_shipment, deliver_shipment, dispatch_shipment
@@ -866,7 +868,7 @@
  from fulfil.pricing import PriceBook, PricingEngine, PromotionBook, PercentageDiscount
  from fulfil.services.invoicing import (
      credit_note, invoice_discount_rate, invoice_filename, invoice_lines, invoice_tax_exempt_amount,
-@@ -20,61 +20,61 @@
+@@ -20,61 +20,61 @@ class CommerceFlowTests(unittest.TestCase):
          self.address = Address("Sam Rivera", "4 Birch Lane", "Oakland", "94612")
          self.customer = Customer("cus-flow", "Sam Rivera", "sam@example.test", [self.address])
          self.app.repositories.customers.add(self.customer)
@@ -946,7 +948,7 @@
          self.assertTrue(first.processed)
          self.assertTrue(first.restocked)
          self.assertEqual(self.app.repositories.products.get("linen-1").stock_on_hand, 11)
-@@ -87,16 +87,16 @@
+@@ -87,16 +87,16 @@ class CommerceFlowTests(unittest.TestCase):
              self.app.refunds.issue(order.order_id, Money(1))
  
      def test_refund_rejects_excessive_restock_before_recording(self):
@@ -966,7 +968,7 @@
          rates = self.app.shipping.rates(order, overseas)
          self.assertEqual(rates[0].zone, "international")
          self.assertEqual(rates[0].billable_grams, 800)
-@@ -114,7 +114,7 @@
+@@ -114,7 +114,7 @@ class CommerceFlowTests(unittest.TestCase):
  
      def test_remote_postcode_and_shipping_service_options(self):
          alaska = Address("Sam Rivera", "1 Ice Road", "Anchorage", "99501", "US")
@@ -975,7 +977,7 @@
          rates = self.app.shipping.quote_for_postcode(order, "99501")
          self.assertEqual(rates[0].amount.minor, 595 + 450)
          self.assertEqual(self.app.shipping.compare_carriers(rates[0], rates[1]), -1)
-@@ -125,7 +125,7 @@
+@@ -125,7 +125,7 @@ class CommerceFlowTests(unittest.TestCase):
              self.app.shipping.select_rate(rates, maximum=Money(1))
  
      def test_invoice_tax_discounts_and_credit_notes(self):
@@ -984,7 +986,7 @@
          invoice = render_invoice(order)
          self.assertIn("Subtotal:", invoice)
          self.assertIn("Tax (US-CA)", invoice)
-@@ -145,7 +145,7 @@
+@@ -145,7 +145,7 @@ class CommerceFlowTests(unittest.TestCase):
              credit_note(order, Money(order.total.minor + 1), "too much")
  
      def test_notification_email_templates_render_domain_values(self):
@@ -995,7 +997,7 @@
          self.assertIn(order.order_id, order_text)
 --- a/tests/test_events_reports_cli.py
 +++ b/tests/test_events_reports_cli.py
-@@ -5,7 +5,7 @@
+@@ -5,7 +5,7 @@ from fulfil.cli.commands import AdminCommands
  from fulfil.events.bus import EventBus
  from fulfil.events.handlers import handler_status, register_handlers, unregister_application_handlers
  from fulfil.events.types import RefundProcessed, StockChanged
@@ -1004,7 +1006,7 @@
  from fulfil.reports.refunds import RefundReport
  from fulfil.reports.revenue import RevenueReport
  from fulfil.reports.stock import StockReport
-@@ -21,7 +21,7 @@
+@@ -21,7 +21,7 @@ class EventTests(unittest.TestCase):
      def setUp(self):
          self.repositories = RepositorySet()
          self.bus = EventBus()
@@ -1013,7 +1015,7 @@
  
      def test_registration_is_safe_and_events_are_visible(self):
          register_handlers(self.bus, self.repositories)
-@@ -29,7 +29,7 @@
+@@ -29,7 +29,7 @@ class EventTests(unittest.TestCase):
          self.assertEqual(self.bus.handler_count(StockChanged), 1)
          self.assertEqual(handler_status(self.bus)["StockChanged"], 1)
          inventory = InventoryService(self.repositories, self.bus)
@@ -1022,7 +1024,7 @@
          self.assertEqual(self.repositories.products.get("pen-1").stock_on_hand, 8)
          self.assertEqual(len(self.bus.history(StockChanged)), 1)
          self.assertEqual(unregister_application_handlers(self.bus, self.repositories), 6)
-@@ -52,9 +52,9 @@
+@@ -52,9 +52,9 @@ class ReportAndCliTests(unittest.TestCase):
          self.customer = Customer("cus-9", "Casey", "casey@example.test",
                                   [Address("Casey", "1 High Street", "London", "W1A", "GB")])
          self.repositories.customers.add(self.customer)
@@ -1034,7 +1036,7 @@
                        OrderStatus.PAID, created_at=created)
          order.shipping_fee = Money(0)
          order.tax = Money(99)
-@@ -72,7 +72,7 @@
+@@ -72,7 +72,7 @@ class ReportAndCliTests(unittest.TestCase):
          self.assertEqual(row.net, Money(999))
          event = RefundProcessed("rfd-apr", "ord-apr", Money(300), datetime(2026, 4, 8, tzinfo=timezone.utc))
          self.assertEqual(report.monthly(2026, 4, [event])[0].refunds, Money(300))
@@ -1045,7 +1047,7 @@
          stock = StockReport(self.repositories, low_stock_level=3)
 --- a/tests/test_full_coverage.py
 +++ b/tests/test_full_coverage.py
-@@ -20,7 +20,7 @@
+@@ -20,7 +20,7 @@ from fulfil.events.types import (
  )
  from fulfil.models import (
      Address, BackorderRequest, Customer, Money, Order, OrderLine, OrderStatus,
@@ -1054,7 +1056,7 @@
  )
  from fulfil.models.fulfillment import ShipmentState
  from fulfil.pricing import FixedDiscount, SkuPriceRule
-@@ -47,7 +47,7 @@
+@@ -47,7 +47,7 @@ from fulfil.util.validation import (
  
  class ModelPublicMethodTests(unittest.TestCase):
      def setUp(self):
@@ -1063,7 +1065,7 @@
          self.product = Product(self.sku, "Case", Money(2400), 10)
          self.address = Address("Alex Kim", "5 Pine Street", "Oakland", "94612")
          self.customer = Customer("cus-public", "Alex Kim", "alex@example.test", [self.address])
-@@ -124,10 +124,10 @@
+@@ -124,10 +124,10 @@ class RepositoryAndEventMethodTests(unittest.TestCase):
          with self.assertRaises(ValueError):
              repository.update("a", lambda row: {**row, "id": "b"})
          stores = RepositorySet()
@@ -1076,7 +1078,7 @@
              work.commit()
          self.assertEqual([change.action for change in work.receipt.changes], ["add", "save"])
          self.assertTrue(work.receipt.committed)
-@@ -169,7 +169,7 @@
+@@ -169,7 +169,7 @@ class ServiceAndReportPublicMethodTests(unittest.TestCase):
          self.address = Address("Rory", "8 Oak Road", "Oakland", "94612")
          self.customer = Customer("cus-methods", "Rory", "rory@example.test", [self.address])
          self.repositories.customers.add(self.customer)
@@ -1085,7 +1087,7 @@
          self.repositories.products.add(self.product)
          self.orders = OrderService(self.repositories, self.inventory, self.bus)
  
-@@ -269,7 +269,7 @@
+@@ -269,7 +269,7 @@ class UtilitySettingsAndCliTests(unittest.TestCase):
              Settings.from_mapping({"unknown": True})
  
      def test_api_schemas_and_all_admin_command_paths(self):
@@ -1094,7 +1096,7 @@
          page = PageRequest(1, 2)
          self.assertEqual(page.slice([0, 1, 2]), [1, 2])
          self.assertEqual(page_response(["a", "b"], page)["total"], 2)
-@@ -278,9 +278,9 @@
+@@ -278,9 +278,9 @@ class UtilitySettingsAndCliTests(unittest.TestCase):
          address = Address("Admin", "3 Admin Road", "Oakland", "94612")
          customer = Customer("cus-admin", "Admin", "admin@example.test", [address])
          app.repositories.customers.add(customer)
@@ -1117,7 +1119,7 @@
  
  
  class MoneyTests(unittest.TestCase):
-@@ -19,7 +19,7 @@
+@@ -19,7 +19,7 @@ class MoneyTests(unittest.TestCase):
  
  class ProductTests(unittest.TestCase):
      def setUp(self):
@@ -1126,7 +1128,7 @@
  
      def test_sku_normalizes_and_product_inventory_is_checked(self):
          self.assertEqual(str(self.product.sku), "ITEM-1")
-@@ -41,9 +41,9 @@
+@@ -41,9 +41,9 @@ class ProductTests(unittest.TestCase):
  
      def test_invalid_product_and_sku(self):
          with self.assertRaises(ValueError):
@@ -1138,7 +1140,7 @@
  
  
  class CustomerTests(unittest.TestCase):
-@@ -64,7 +64,7 @@
+@@ -64,7 +64,7 @@ class CustomerTests(unittest.TestCase):
  class OrderTests(unittest.TestCase):
      def setUp(self):
          self.order = Order("ord-1", "cus-1", "USD")
@@ -1149,7 +1151,7 @@
      def test_totals_and_line_edits(self):
 --- a/tests/test_pricing.py
 +++ b/tests/test_pricing.py
-@@ -2,7 +2,7 @@
+@@ -2,7 +2,7 @@ import unittest
  from datetime import datetime, timezone
  from decimal import Decimal
  
@@ -1158,7 +1160,7 @@
  from fulfil.pricing import (
      BuyXGetY, CategoryPriceRule, FixedDiscount, MinimumQuantityRule, PercentageDiscount,
      PriceBand, PriceBook, PricingContext, PricingEngine, Promotion, PromotionBook, PromotionUsage,
-@@ -25,9 +25,9 @@
+@@ -25,9 +25,9 @@ from fulfil.pricing import (
  
  class PricingTests(unittest.TestCase):
      def setUp(self):
@@ -1172,7 +1174,7 @@
      def test_quote_calculates_shipping_tax_and_total(self):
 --- a/tests/test_services_api.py
 +++ b/tests/test_services_api.py
-@@ -6,7 +6,7 @@
+@@ -6,7 +6,7 @@ from fulfil.api.handlers import (
      health, place_order, restock_product, search_products,
  )
  from fulfil.api.schemas import OrderRequest
@@ -1181,7 +1183,7 @@
  from fulfil.services.invoicing import invoice_filename, invoice_lines, render_invoice
  from fulfil.services.notifications import NotificationService
  from fulfil.services.shipping import ShippingService
-@@ -18,7 +18,7 @@
+@@ -18,7 +18,7 @@ class ServicesAndApiTests(unittest.TestCase):
          self.address = Address("Morgan Doe", "10 Market Street", "Oakland", "94612")
          self.customer = Customer("cus-1", "Morgan Doe", "morgan@example.test", [self.address])
          self.app.repositories.customers.add(self.customer)
@@ -1190,7 +1192,7 @@
                                                      tags={"kitchen"}))
  
      def test_api_product_search_and_cache(self):
-@@ -49,7 +49,7 @@
+@@ -49,7 +49,7 @@ class ServicesAndApiTests(unittest.TestCase):
          self.assertEqual(health(self.app).body["products"], 1)
  
      def test_invoice_notifications_and_shipping(self):
@@ -1199,7 +1201,7 @@
          invoice = render_invoice(order)
          self.assertIn("Total:", invoice)
          self.assertEqual(invoice_filename(order), f"invoice-{order.order_id}.txt")
-@@ -66,11 +66,11 @@
+@@ -66,11 +66,11 @@ class ServicesAndApiTests(unittest.TestCase):
  
      def test_currency_and_amendment_guards(self):
          with self.assertRaises(ValueError):
@@ -1216,7 +1218,7 @@
  if __name__ == "__main__":
 --- a/tests/test_storage.py
 +++ b/tests/test_storage.py
-@@ -3,7 +3,7 @@
+@@ -3,7 +3,7 @@ import unittest
  from pathlib import Path
  from decimal import Decimal
  
@@ -1225,7 +1227,7 @@
  from fulfil.storage.repositories import RepositorySet
  from fulfil.storage.serialization import (
      decode_customer, decode_order, decode_product, decode_refund, decode_shipment,
-@@ -83,15 +83,15 @@
+@@ -83,15 +83,15 @@ class SerializationTests(unittest.TestCase):
  class RepositoryTests(unittest.TestCase):
      def setUp(self):
          self.repositories = RepositorySet()

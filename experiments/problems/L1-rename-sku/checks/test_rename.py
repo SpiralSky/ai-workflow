@@ -1,5 +1,6 @@
 import importlib
 import io
+import pkgutil
 import tokenize
 import unittest
 import hashlib
@@ -15,6 +16,14 @@ class RenameTests(unittest.TestCase):
             with self.subTest(module=name):
                 self.assertIs(getattr(importlib.import_module(name), "ProductCode"), ProductCode)
         self.assertEqual(str(ProductCode(" ab-12 ")), "AB-12")
+
+    def test_all_exports_resolve(self):
+        import fulfil
+        for info in pkgutil.walk_packages(fulfil.__path__, "fulfil."):
+            module = importlib.import_module(info.name)
+            for name in getattr(module, "__all__", []):
+                with self.subTest(module=info.name, name=name):
+                    self.assertTrue(hasattr(module, name))
 
     def test_no_old_identifier(self):
         for source in Path("fulfil").rglob("*.py"):
