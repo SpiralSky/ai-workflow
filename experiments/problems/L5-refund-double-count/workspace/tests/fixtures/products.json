@@ -1,0 +1,4 @@
+[
+  {"active": true, "currency": "USD", "name": "Alpine Bottle", "sku": "BOT-ALPINE", "stock_on_hand": 24, "tags": ["drinkware", "outdoors"], "unit_price": 1899, "updated_at": "2026-01-12T09:30:00+00:00", "weight_grams": 330, "volume_cm3": 600, "tax_exempt_regions": [], "break_quantities": [6, 12], "break_discount_rate": "0.025"},
+  {"active": true, "currency": "EUR", "name": "Field Notebook", "sku": "NOTE-FIELD", "stock_on_hand": 80, "tags": ["stationery"], "unit_price": 725, "updated_at": "2026-01-13T10:00:00+00:00", "weight_grams": 180, "volume_cm3": 240, "tax_exempt_regions": ["GB"], "break_quantities": [], "break_discount_rate": "0"}
+]

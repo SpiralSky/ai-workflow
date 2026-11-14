@@ -1,0 +1,1 @@
+The monthly revenue report sometimes counts a refund twice, depending on how the application is started. Correct the underlying behavior for both API and CLI entry points and different import orders. Refund processing must happen once per event on each application bus, without losing legitimate refunds or changing other behavior.
