@@ -1,0 +1,39 @@
+--- a/fulfil/api/__init__.py
++++ b/fulfil/api/__init__.py
+@@ -8,15 +8,7 @@
+     return 200 <= response.status < 300
+ 
+ 
+-from dataclasses import dataclass
+-from fulfil.models.money import Money
+-
+-
+-@dataclass(frozen=True)
+-class OrderEventData:
+-    order_id: str
+-    customer_id: str
+-    total: Money
++from fulfil.models.order_event_data import OrderEventData
+ 
+ 
+ __all__ += ["OrderEventData", "OrderService"]
+--- a/fulfil/reports/__init__.py
++++ b/fulfil/reports/__init__.py
+@@ -1,4 +1,4 @@
+-from fulfil.api import OrderEventData
++from fulfil.models.order_event_data import OrderEventData
+ from fulfil.models.order import Order
+ 
+ 
+--- /dev/null
++++ b/fulfil/models/order_event_data.py
+@@ -0,0 +1,9 @@
++from dataclasses import dataclass
++from fulfil.models.money import Money
++
++
++@dataclass(frozen=True)
++class OrderEventData:
++    order_id: str
++    customer_id: str
++    total: Money

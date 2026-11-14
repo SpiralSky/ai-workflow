@@ -1,0 +1,15 @@
+{
+  "id": "L4-currency-param",
+  "size": "large",
+  "codebase": "fulfil",
+  "turnLimit": 25,
+  "tags": [
+    "signature",
+    "multi-file"
+  ],
+  "expectedTools": [
+    "findReferences",
+    "changeSignature",
+    "check"
+  ]
+}

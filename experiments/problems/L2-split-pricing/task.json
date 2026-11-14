@@ -1,0 +1,16 @@
+{
+  "id": "L2-split-pricing",
+  "size": "large",
+  "codebase": "fulfil",
+  "turnLimit": 30,
+  "tags": [
+    "refactor",
+    "move"
+  ],
+  "expectedTools": [
+    "outline",
+    "findReferences",
+    "moveSymbol",
+    "check"
+  ]
+}

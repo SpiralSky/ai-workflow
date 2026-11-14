@@ -1,0 +1,14 @@
+[
+  {"id":"rename-class","intent":"the Invoice class should be called Bill everywhere in billing.py","expected":"rename-known-symbol"},
+  {"id":"rename-function","intent":"change the name of calc_total to compute_total across the package","expected":"rename-known-symbol"},
+  {"id":"rename-typo","intent":"we misspelled Recieved in a function name, please fix the spelling in every module","expected":"rename-known-symbol"},
+  {"id":"where-defined","intent":"where is parse_config defined and who calls it?","expected":"inspect-python-symbol"},
+  {"id":"usage-survey","intent":"show me every place the Session class is used, I just want to look","expected":"inspect-python-symbol"},
+  {"id":"find-definition","intent":"I need to find the definition of load_rules before I decide what to do","expected":"inspect-python-symbol"},
+  {"id":"run-suite","intent":"run the unit tests in tests/ and tell me if they pass","expected":"check-python-project"},
+  {"id":"confirm-nothing-broke","intent":"make sure nothing broke after my last edit by running the test suite","expected":"check-python-project"},
+  {"id":"green-build","intent":"are the tests still green?","expected":"check-python-project"},
+  {"id":"add-feature","intent":"add CSV export to the reports page","expected":null},
+  {"id":"fix-race","intent":"fix the race condition in the job queue worker","expected":null},
+  {"id":"write-docs","intent":"write a README section explaining deployment to production","expected":null}
+]

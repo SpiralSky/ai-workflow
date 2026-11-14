@@ -1,0 +1,15 @@
+{
+  "id": "L5-refund-double-count",
+  "size": "large",
+  "codebase": "fulfil",
+  "turnLimit": 30,
+  "tags": [
+    "bugfix",
+    "deep-cause"
+  ],
+  "expectedTools": [
+    "findReferences",
+    "findDefinition",
+    "check"
+  ]
+}

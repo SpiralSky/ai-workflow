@@ -1,0 +1,16 @@
+{
+  "id": "L3-import-cycle",
+  "size": "large",
+  "codebase": "fulfil",
+  "turnLimit": 25,
+  "tags": [
+    "import-cycle",
+    "move"
+  ],
+  "expectedTools": [
+    "findReferences",
+    "outline",
+    "moveSymbol",
+    "check"
+  ]
+}

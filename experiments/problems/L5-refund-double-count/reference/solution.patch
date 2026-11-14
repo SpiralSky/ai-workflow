@@ -1,0 +1,11 @@
+--- a/fulfil/events/handlers.py
++++ b/fulfil/events/handlers.py
+@@ -19,7 +19,7 @@
+ 
+ 
+ def _register_reporting(bus: EventBus, repositories: RepositorySet) -> None:
+-    _subscribe_refunds(bus, repositories, f"report-refund:{id(repositories)}")
++    _subscribe_refunds(bus, repositories, f"refund:{id(repositories)}")
+ 
+ 
+ def enable_reporting() -> None:

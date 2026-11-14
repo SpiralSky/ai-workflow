@@ -1,0 +1,202 @@
+--- a/fulfil/util/money.py
++++ b/fulfil/util/money.py
+@@ -2,13 +2,16 @@
+ from fulfil.models.money import Money
+ 
+ 
+-def format_money(amount: Money | Decimal | int | float | str) -> str:
+-    """Format a major-unit value for the shop's default USD display."""
++def format_money(amount: Money | Decimal | int | float | str, currency: str = "USD") -> str:
++    """Format a major-unit value in the requested display currency; default to USD."""
+     if isinstance(amount, Money):
+         major = amount.major
+     else:
+         major = Decimal(str(amount))
+-    return f"${major:,.2f}"
++    symbols = {"USD": "$", "EUR": "€", "GBP": "£"}
++    if currency not in symbols:
++        raise ValueError("unsupported display currency")
++    return f"{symbols[currency]}{major:,.2f}"
+ 
+ 
+ def parse_money(text: str, currency: str = "USD") -> Money:
+--- a/fulfil/services/invoicing.py
++++ b/fulfil/services/invoicing.py
+@@ -14,17 +14,17 @@
+     rows = [f"Invoice {order.order_id}", shop_name, f"Status: {order.status.value}", ""]
+     for line in order.lines:
+         rows.append(f"{line.quantity} x {line.description} ({line.sku})  "
+-                    f"{format_money(line.subtotal)} — {line_discount_for_display(line)}")
+-    rows.extend(["", f"Subtotal: {format_money(order.item_subtotal)}"])
++                    f"{format_money(line.subtotal, order.currency)} — {line_discount_for_display(line)}")
++    rows.extend(["", f"Subtotal: {format_money(order.item_subtotal, order.currency)}"])
+     if order.shipping_fee:
+-        rows.append(f"Shipping: {format_money(order.shipping_fee)}")
++        rows.append(f"Shipping: {format_money(order.shipping_fee, order.currency)}")
+     if order.tax:
+-        rows.append(f"Tax ({order.metadata.get('tax_region', 'US-CA')}): {format_money(order.tax)}")
++        rows.append(f"Tax ({order.metadata.get('tax_region', 'US-CA')}): {format_money(order.tax, order.currency)}")
+         for tax_line in invoice_tax_lines(order, order.metadata.get("tax_region", "US-CA")):
+             rows.append(f"  {tax_line['sku']} tax: {tax_line['tax']}")
+     rows.append(f"Savings: {invoice_discount_rate(order)}")
+     total_due = round_cash_amount(order.total, order.currency)
+-    rows.append(f"Total: {format_money(total_due)}")
++    rows.append(f"Total: {format_money(total_due, order.currency)}")
+     return "\n".join(rows)
+ 
+ 
+@@ -36,11 +36,11 @@
+ 
+ def invoice_lines(order: Order) -> list[dict[str, str | int]]:
+     return [{"sku": str(line.sku), "description": line.description,
+-             "quantity": line.quantity, "unit_price": format_money(line.unit_price),
+-             "discount": format_money(line.discount) if line.discount else format_money(0),
+-             "discount_per_unit": format_money(per_unit_discount(line)),
+-             "effective_unit_price": format_money(effective_unit_price(line)),
+-             "amount": format_money(line.subtotal)} for line in order.lines]
++             "quantity": line.quantity, "unit_price": format_money(line.unit_price, order.currency),
++             "discount": format_money(line.discount, order.currency) if line.discount else format_money(0, order.currency),
++             "discount_per_unit": format_money(per_unit_discount(line), order.currency),
++             "effective_unit_price": format_money(effective_unit_price(line), order.currency),
++             "amount": format_money(line.subtotal, order.currency)} for line in order.lines]
+ 
+ 
+ def payment_reference(order: Order) -> str:
+@@ -48,7 +48,7 @@
+ 
+ 
+ def invoice_total_label(order: Order) -> str:
+-    return f"Amount due: {format_money(order.total)} {order.currency}"
++    return f"Amount due: {format_money(order.total, order.currency)} {order.currency}"
+ 
+ 
+ def pricing_summary(order: Order) -> dict[str, int | str]:
+@@ -61,7 +61,7 @@
+     excluded = {Sku(value) for value in order.metadata.get("tax_exempt_skus", "").split(",") if value}
+     taxable_lines = [line for line in quote.lines if line.sku not in excluded]
+     _, by_sku = tax_summary(taxable_lines, PricingEngine().policies[region])
+-    return [{"sku": str(sku), "tax": format_money(amount)} for sku, amount in sorted(by_sku.items())]
++    return [{"sku": str(sku), "tax": format_money(amount, order.currency)} for sku, amount in sorted(by_sku.items())]
+ 
+ 
+ def invoice_taxable_amount(order: Order, region: str = "US-CA") -> Money:
+@@ -89,6 +89,6 @@
+         raise ValueError("credit note amount is outside the order balance")
+     allocations = discount_allocation(order.lines, refund)
+     rows = [f"Credit note for {order.order_id}", f"Reason: {' '.join(reason.split())}"]
+-    rows.extend(f"{key}: {format_money(Money(amount, order.currency))}" for key, amount in allocations.items())
+-    rows.append(f"Credit total: {format_money(refund)}")
++    rows.extend(f"{key}: {format_money(Money(amount, order.currency), order.currency)}" for key, amount in allocations.items())
++    rows.append(f"Credit total: {format_money(refund, order.currency)}")
+     return "\n".join(rows)
+--- a/fulfil/services/notifications.py
++++ b/fulfil/services/notifications.py
+@@ -27,7 +27,7 @@
+ 
+     def order_confirmation(self, customer: Customer, order: Order) -> OutgoingMessage:
+         message = OutgoingMessage(customer.email, f"Order {order.order_id} confirmed",
+-                                  f"Hello {customer.name}, your total is {format_money(order.total)}.")
++                                  f"Hello {customer.name}, your total is {format_money(order.total, order.currency)}.")
+         self.sent.append(message)
+         return message
+ 
+@@ -51,7 +51,7 @@
+         if not clean:
+             raise ValueError("update message cannot be empty")
+         notice = OutgoingMessage(customer.email, f"Update for order {order.order_id}",
+-                                 f"{clean} Current order total: {format_money(order.total)}.")
++                                 f"{clean} Current order total: {format_money(order.total, order.currency)}.")
+         return self.send(notice)
+ 
+     def digest(self, messages: list[OutgoingMessage] | None = None) -> str:
+@@ -74,7 +74,7 @@
+ 
+     def render_order_email(self, customer: Customer, order: Order) -> str:
+         return self.render_template("order", {"customer": customer.name, "order": order.order_id,
+-                                               "total": format_money(order.total)})
++                                               "total": format_money(order.total, order.currency)})
+ 
+     def render_shipment_email(self, customer: Customer, order: Order, shipment: Shipment) -> str:
+         return self.render_template("shipment", {"customer": customer.name, "order": order.order_id,
+@@ -85,7 +85,7 @@
+         state = "processed" if refund.processed else "pending"
+         return self.render_template("refund", {"customer": customer.name, "order": order.order_id,
+                                                 "refund": refund.refund_id, "status": state,
+-                                                "amount": format_money(refund.amount)})
++                                                "amount": format_money(refund.amount, order.currency)})
+ 
+     def order_email(self, customer: Customer, order: Order) -> OutgoingMessage:
+         return self.send(OutgoingMessage(customer.email, f"{self.shop_name}: order {order.order_id}",
+--- a/fulfil/api/handlers.py
++++ b/fulfil/api/handlers.py
+@@ -68,7 +68,7 @@
+                                  request.allow_backorder, request.coupon_codes)
+     except (KeyError, ValueError) as exc:
+         return ApiResponse(400, {"error": "invalid_order", "detail": str(exc)})
+-    summary = OrderSummary(order.order_id, order.status.value, format_money(order.total))
++    summary = OrderSummary(order.order_id, order.status.value, format_money(order.total, order.currency))
+     customer = app.repositories.customers.get(order.customer_id)
+     app.notifications.order_email(customer, order)
+     return ApiResponse(201, summary.as_dict())
+@@ -100,12 +100,12 @@
+         return ApiResponse(404, {"error": "order_not_found"})
+     return ApiResponse(200, {"order_id": order.order_id, "customer_id": order.customer_id,
+                              "status": order.status.value, "currency": order.currency,
+-                             "subtotal": format_money(order.item_subtotal),
+-                             "shipping": format_money(order.shipping_fee or 0),
+-                             "tax": format_money(order.tax or 0), "total": format_money(order.total),
++                             "subtotal": format_money(order.item_subtotal, order.currency),
++                             "shipping": format_money(order.shipping_fee or 0, order.currency),
++                             "tax": format_money(order.tax or 0, order.currency), "total": format_money(order.total, order.currency),
+                              "revision": order.revision,
+                              "lines": [{"sku": str(line.sku), "description": line.description,
+-                                        "quantity": line.quantity, "line_total": format_money(line.subtotal)}
++                                        "quantity": line.quantity, "line_total": format_money(line.subtotal, order.currency)}
+                                        for line in order.lines],
+                              "backorders": [{"sku": str(line.sku), "quantity": line.quantity}
+                                             for line in order.backorder_lines]})
+@@ -121,7 +121,7 @@
+     orders = app.repositories.orders.for_customer(customer_id)
+     orders.sort(key=lambda order: order.created_at, reverse=True)
+     window = page.slice(orders)
+-    summaries = [OrderSummary(order.order_id, order.status.value, format_money(order.total)).as_dict()
++    summaries = [OrderSummary(order.order_id, order.status.value, format_money(order.total, order.currency)).as_dict()
+                  for order in window]
+     return ApiResponse(200, {**page_response(orders, page), "items": summaries,
+                              "total": len(orders)})
+@@ -153,7 +153,7 @@
+         return ApiResponse(404, {"error": "order_not_found"})
+     except (ValueError, TypeError) as exc:
+         return error_response("invalid_amendment", str(exc))
+-    return ApiResponse(200, OrderSummary(order.order_id, order.status.value, format_money(order.total)).as_dict())
++    return ApiResponse(200, OrderSummary(order.order_id, order.status.value, format_money(order.total, order.currency)).as_dict())
+ 
+ 
+ def cancel_order_line(app: Application, order_id: str, sku: str, quantity: int) -> ApiResponse:
+@@ -163,7 +163,7 @@
+         return ApiResponse(404, {"error": "order_not_found"})
+     except (ValueError, TypeError) as exc:
+         return ApiResponse(409, {"error": "line_cancellation_failed", "detail": str(exc)})
+-    return ApiResponse(200, {"order_id": order.order_id, "total": format_money(order.total),
++    return ApiResponse(200, {"order_id": order.order_id, "total": format_money(order.total, order.currency),
+                              "revision": order.revision})
+ 
+ 
+@@ -179,7 +179,7 @@
+         return ApiResponse(404, {"error": "order_not_found"})
+     except (ValueError, TypeError) as exc:
+         return error_response("refund_failed", str(exc))
+-    return ApiResponse(201, {"refund_id": refund.refund_id, "amount": format_money(refund.amount),
++    return ApiResponse(201, {"refund_id": refund.refund_id, "amount": format_money(refund.amount, order.currency),
+                              "processed": refund.processed, "restocked": refund.restocked})
+ 
+ 
+@@ -214,7 +214,7 @@
+     except ValueError as exc:
+         return error_response("shipping_unavailable", str(exc))
+     return ApiResponse(200, {"rates": [{"carrier": rate.carrier, "service": rate.service,
+-                                        "amount": format_money(rate.amount),
++                                        "amount": format_money(rate.amount, order.currency),
+                                         "currency": rate.amount.currency, "zone": rate.zone,
+                                         "billable_grams": rate.billable_grams,
+                                         "estimated_days": rate.estimated_days} for rate in rates]})
