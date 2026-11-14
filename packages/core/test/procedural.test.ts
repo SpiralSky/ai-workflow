@@ -70,7 +70,7 @@ test("argument filler cannot replace known values", async () => {
   await assert.rejects(fillProcedureArguments(rename, known, "rename", { async fill() { return { oldName: "Other", newName: "Gadget" }; } }));
 });
 for (const kind of ["flat", "tree", "bm25"] as const) test(`${kind} offline selector finds rename and records actual request bytes`, async () => {
-  const result = await createProcedureSelector(kind).select("rename known Python symbol identifier", procedures);
+  const result = await createProcedureSelector(kind).select("renames one Python class or function across the given files", procedures);
   assert.ok(result.candidates.includes("rename-known-symbol"));
   assert.ok(result.requests.every(x => x.inputBytes > 0));
   assert.equal(result.requests.length, kind === "tree" ? 2 : 1);

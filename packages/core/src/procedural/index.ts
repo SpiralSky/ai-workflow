@@ -101,15 +101,15 @@ export const pythonProcedureTools: Record<string, ProcedureTool> = {
 
 /** Three useful procedures share the same runtime and selectors; none is an autonomous agent. */
 export const procedures: Procedure[] = [
-  { version: 1, id: "rename-known-symbol", category: "transform", description: "rename known Python symbol identifier while preserving string keys", inputs: { oldName: "identifier", newName: "identifier", paths: "paths", testDirs: "paths" }, steps: [
+  { version: 1, id: "rename-known-symbol", category: "transform", description: "Renames one Python class or function across the given files without touching string literals, and applies when the old name is known and the new name is not yet used.", inputs: { oldName: "identifier", newName: "identifier", paths: "paths", testDirs: "paths" }, steps: [
     { id: "inspect", tool: "inspect", dependsOn: [], args: { symbol: { input: "oldName" }, paths: { input: "paths" } } },
     { id: "rename", tool: "rename", dependsOn: ["inspect"], args: { oldName: { input: "oldName" }, newName: { input: "newName" }, paths: { input: "paths" }, testDirs: { input: "testDirs" }, inspected: { result: "inspect" } } },
     { id: "check", tool: "check", dependsOn: ["rename"], args: { testDirs: { input: "testDirs" } } },
   ] },
-  { version: 1, id: "inspect-python-symbol", category: "inspect", description: "locate inspect Python symbol definitions references before refactoring import cycle", inputs: { symbol: "identifier", paths: "paths" }, steps: [
+  { version: 1, id: "inspect-python-symbol", category: "inspect", description: "Lists where a Python class or function is defined and used in the given files, and applies when someone only wants to look at a symbol without changing it.", inputs: { symbol: "identifier", paths: "paths" }, steps: [
     { id: "inspect", tool: "inspect", dependsOn: [], args: { symbol: { input: "symbol" }, paths: { input: "paths" } } },
   ] },
-  { version: 1, id: "check-python-project", category: "validate", description: "run Python unittest regression tests check behavior after change", inputs: { testDirs: "paths" }, steps: [
+  { version: 1, id: "check-python-project", category: "validate", description: "Runs the unittest suites in the given test directories and reports whether they pass, and applies when existing tests should confirm nothing broke.", inputs: { testDirs: "paths" }, steps: [
     { id: "check", tool: "check", dependsOn: [], args: { testDirs: { input: "testDirs" } } },
   ] },
 ];
