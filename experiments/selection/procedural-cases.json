@@ -1,0 +1,8 @@
+[
+  {"id":"rename-type","intent":"rename known Python symbol identifier while preserving string keys","expected":"rename-known-symbol"},
+  {"id":"rename-helper","intent":"rename a known helper symbol identifier","expected":"rename-known-symbol"},
+  {"id":"find-references","intent":"locate inspect Python symbol definitions references","expected":"inspect-python-symbol"},
+  {"id":"cycle-inspection","intent":"inspect definitions before refactoring an import cycle","expected":"inspect-python-symbol"},
+  {"id":"regression-check","intent":"run Python unittest regression tests","expected":"check-python-project"},
+  {"id":"verify-change","intent":"check behavior after change with regression tests","expected":"check-python-project"}
+]
