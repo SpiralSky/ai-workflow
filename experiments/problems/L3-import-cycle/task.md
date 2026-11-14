@@ -1,0 +1,1 @@
+After the last change, importing fulfil.api fails with a circular import. Fix the import cycle without imports inside functions, keeping the existing API, order-event reporting and all other behavior working. Every fulfil module should import cleanly in a fresh interpreter, and the source import graph should have no cycles.
