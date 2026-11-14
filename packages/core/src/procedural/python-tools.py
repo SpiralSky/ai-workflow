@@ -70,18 +70,22 @@ def run(action, args):
         raise ValueError("invalid symbol")
     observations = scan(args["paths"], old)
     if action == "inspect":
-        return {"ok": bool(observations), "reason": "symbol absent" if not observations else None, "files": observations}
+        if not observations:
+            return {"ok": False, "reason": "symbol absent", "noFit": True, "files": observations}
+        return {"ok": True, "reason": None, "files": observations}
     if action != "rename":
         raise ValueError("unknown action")
+    # Validate test directories before anything can be written.
+    files(args["testDirs"])
     new = args["newName"]
     if not isinstance(new, str) or not new.isidentifier() or keyword.iskeyword(new) or old == new:
         raise ValueError("invalid replacement")
     if observations != args["inspected"]["files"]:
         raise ValueError("source changed since inspection")
     if sum(item["definitions"] for item in observations) != 1:
-        return {"ok": False, "reason": "expected one known definition"}
+        return {"ok": False, "reason": "expected one known definition", "noFit": True}
     if scan(args["paths"], new):
-        return {"ok": False, "reason": "replacement identifier already exists"}
+        return {"ok": False, "reason": "replacement identifier already exists", "noFit": True}
     replacements = []
     for item in observations:
         file = ROOT / item["path"]

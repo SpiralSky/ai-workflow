@@ -32,9 +32,22 @@ test("path escape and symlink are rejected before mutation", async () => {
   await symlink(join(root, "item.py"), join(root, "linked.py"));
   for (const paths of [["../outside"], ["linked.py"]]) {
     const result = await executeProcedure(rename, root, { oldName: "Widget", newName: "Gadget", paths, testDirs: ["tests"] }, pythonProcedureTools);
-    assert.equal(result.status, "does-not-fit");
+    assert.equal(result.status, "failed");
   }
   assert.match(await readFile(join(root, "item.py"), "utf8"), /class Widget/);
+});
+test("unsafe testDirs fail before any write", async () => {
+  const root = await fixture();
+  const result = await executeProcedure(rename, root, { oldName: "Widget", newName: "Gadget", paths: ["item.py"], testDirs: ["../x"] }, pythonProcedureTools);
+  assert.equal(result.status, "failed");
+  assert.deepEqual(result.completed, ["inspect"]);
+  assert.equal(await readFile(join(root, "item.py"), "utf8"), 'class Widget:\n    pass\n\nkey = "Widget"\n');
+});
+test("rename to an existing name is no-fit and leaves the file unchanged", async () => {
+  const root = await fixture();
+  const result = await executeProcedure(rename, root, { oldName: "Widget", newName: "key", paths: ["item.py"], testDirs: ["tests"] }, pythonProcedureTools);
+  assert.equal(result.status, "does-not-fit", JSON.stringify(result));
+  assert.equal(await readFile(join(root, "item.py"), "utf8"), 'class Widget:\n    pass\n\nkey = "Widget"\n');
 });
 test("absent symbol is ordinary no-fit; failed checks retain partial edits", async () => {
   const root = await fixture();

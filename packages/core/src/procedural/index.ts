@@ -15,8 +15,8 @@ export interface Procedure {
   version: 1; id: string; description: string; category: string;
   inputs: Record<string, InputKind>; steps: ProcedureStep[];
 }
-/** Structured observations are retained even when a later step fails. */
-export interface ToolResult { ok: boolean; reason?: string; [key: string]: unknown; }
+/** Structured observations are retained even when a later step fails. `noFit` is set only when a precondition is unmet and nothing was written. */
+export interface ToolResult { ok: boolean; reason?: string; noFit?: boolean; [key: string]: unknown; }
 /** Caller-supplied host tools retain responsibility for effects and permissions. */
 export type ProcedureTool = (workspace: string, args: Record<string, unknown>) => Promise<ToolResult>;
 /** Completion is distinct from no-fit, missing input and partial failure. */
@@ -76,7 +76,7 @@ export async function executeProcedure(procedure: Procedure, workspace: string, 
       const result = await tools[step.tool]!(root, args);
       if (!result || typeof result.ok !== "boolean") throw Error("invalid tool result");
       observations[step.id] = result;
-      if (!result.ok) return { status: completed.length ? "failed" : "does-not-fit", reason: result.reason ?? "outcome check failed", observations, completed };
+      if (!result.ok) return { status: result.noFit === true ? "does-not-fit" : "failed", reason: result.reason ?? "outcome check failed", observations, completed };
       completed.push(step.id);
     }
     return { status: "completed", observations, completed };
@@ -103,7 +103,7 @@ export const pythonProcedureTools: Record<string, ProcedureTool> = {
 export const procedures: Procedure[] = [
   { version: 1, id: "rename-known-symbol", category: "transform", description: "rename known Python symbol identifier while preserving string keys", inputs: { oldName: "identifier", newName: "identifier", paths: "paths", testDirs: "paths" }, steps: [
     { id: "inspect", tool: "inspect", dependsOn: [], args: { symbol: { input: "oldName" }, paths: { input: "paths" } } },
-    { id: "rename", tool: "rename", dependsOn: ["inspect"], args: { oldName: { input: "oldName" }, newName: { input: "newName" }, paths: { input: "paths" }, inspected: { result: "inspect" } } },
+    { id: "rename", tool: "rename", dependsOn: ["inspect"], args: { oldName: { input: "oldName" }, newName: { input: "newName" }, paths: { input: "paths" }, testDirs: { input: "testDirs" }, inspected: { result: "inspect" } } },
     { id: "check", tool: "check", dependsOn: ["rename"], args: { testDirs: { input: "testDirs" } } },
   ] },
   { version: 1, id: "inspect-python-symbol", category: "inspect", description: "locate inspect Python symbol definitions references before refactoring import cycle", inputs: { symbol: "identifier", paths: "paths" }, steps: [
