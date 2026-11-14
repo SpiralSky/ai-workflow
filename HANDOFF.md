@@ -2,6 +2,29 @@
 
 > **To resume**: read this file, then see the [Roadmap](README.md#roadmap) in the main README for pending work.
 
+## 2026-11-14: PR #5 reviewed and fixed (`dot/procedural-selection-20261113`)
+
+**State:** dot's draft PR #5 (draft spec `procedural-selection.md`, problem `L1-rename-sku`, offline
+procedure prototype) was reviewed and fixed in five commits, `cbaf8a4` to `6f4c386`, on the PR branch.
+`npm test` (761 tests, 0 failed) and `npm run typecheck` pass at `6f4c386`.
+
+- L1: the reference left `"Sku"` in `__all__` of `fulfil/models/__init__.py`; fixed, with a check that
+  every `__all__` name resolves. `fixWords` front matter added. Local Python runs only: fails before,
+  passes after, five runs. `aiw problems check` (Docker) is still not run.
+- Prototype: `testDirs` validated before writes; `does-not-fit` only for unmet preconditions. The
+  selection cases are 12 paraphrased requests; the lexical stub finds 7/12 for flat, tree and BM25 and
+  never rejects a no-fit request. This is the stub, not Jev.
+- `packages/tools/src/procedural.ts`: a rename procedure over the real `findReferences`,
+  `renameSymbol` and `check`, gated on errors rising above a pre-rename baseline. On L1 it completes,
+  but L1's checks fail on `__all__` alone, because rope does not rename strings.
+
+**Open:**
+- Decision (tools §6.4, Final): should `renameSymbol` update `__all__` entries and list other string
+  and comment mentions in a new `textOccurrences` field? With it, `renameSymbol` alone solves L1.
+- L2–L5 are unbuilt and are the next unit; a prompt for dot was written for them (dot cannot push real
+  commits or run `npm test`, so it publishes through the GitHub app and verifies with local Python).
+- Docker self-check for L1; the prototype's precondition and exit schema; the paid checks listed below.
+
 ## 2026-11-13: shared fulfil codebase ready
 
 **Current state:** the previously untracked `experiments/problems/_codebases/fulfil/`
